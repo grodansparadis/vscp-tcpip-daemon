@@ -4,3 +4,6 @@
 [submodule "third-party/civetweb"]
 	path = third-party/civetweb
 	url = https://github.com/civetweb/civetweb.git
+[submodule "third-party/duktape"]
+	path = third-party/duktape
+	url = https://github.com/svaarala/duktape.git
