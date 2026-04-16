@@ -67,10 +67,17 @@ set(VSCP_SUB "${CMAKE_CURRENT_SOURCE_DIR}/third-party/vscp")
 set(DUKTAPE_SUB "${CMAKE_CURRENT_SOURCE_DIR}/third-party/duktape")
 set(DUKTAPE_AMALG_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third-party/duktape-amalgamation")
 
+# Use a platform-appropriate daemon entrypoint.
+if(WIN32)
+    set(VSCPD_MAIN_SOURCE "${VSCP_SUB}/src/vscp/daemon/vscpd.cpp")
+else()
+    set(VSCPD_MAIN_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/linux/vscpd.cpp")
+endif()
+
 # ---- Daemon source files ----
 # Build the legacy daemon implementation using matching legacy dependencies.
 set(VSCPD_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/linux/vscpd.cpp"
+    "${VSCPD_MAIN_SOURCE}"
     "${VSCP_SUB}/src/vscp/common/clientlist.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_vscp_common/controlobject.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_vscp_common/tcpipsrv.cpp"
@@ -135,6 +142,15 @@ target_include_directories(vscpd
         "${VSCP_SUB}/third_party/mustache"
         "${VSCP_SUB}/third_party/maddy/include"
 )
+
+if(WIN32)
+    target_include_directories(vscpd
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_vscp_common/win32helpers"
+            "${VSCP_SUB}/src/vscp/common/win32helpers"
+            "${VSCP_SUB}/src/vscp/daemon"
+    )
+endif()
 
 target_compile_definitions(vscpd PRIVATE
     USE_IPV6
