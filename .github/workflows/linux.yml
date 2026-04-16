@@ -48,19 +48,19 @@ jobs:
         run: cpack -G "DEB;RPM;TGZ"
 
       - name: Upload DEB
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: deb-${{ matrix.os }}
           path: build/*.deb
 
       - name: Upload RPM
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: rpm-${{ matrix.os }}
           path: build/*.rpm
 
       - name: Upload TGZ
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: tgz-${{ matrix.os }}
           path: build/*.tar.gz
