@@ -22,7 +22,7 @@ jobs:
       - name: Install dependencies (Homebrew)
         run: |
           brew update
-          brew install cmake ninja openssl expat mosquitto zlib
+          brew install cmake ninja openssl expat mosquitto zlib curl
 
       - name: Configure (CMake)
         run: |
