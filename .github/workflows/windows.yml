@@ -22,22 +22,19 @@ jobs:
       - name: Set up MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Install dependencies (vcpkg)
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgGitCommitId: '7adc2e4d672d9b033b3dba5d3d8de8b1e579b7e3'
-
       - name: Install packages via vcpkg
         run: |
-          vcpkg install openssl expat zlib curl mosquitto --triplet x64-windows
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install openssl expat zlib curl mosquitto --triplet x64-windows
+        shell: pwsh
 
       - name: Configure (CMake)
         run: |
           cmake -S . -B build `
             -G "Visual Studio 17 2022" -A x64 `
             -DCMAKE_BUILD_TYPE=Release `
-            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake" `
             -DVCPKG_TARGET_TRIPLET=x64-windows
+        shell: pwsh
 
       - name: Build
         run: cmake --build build --config Release --parallel
