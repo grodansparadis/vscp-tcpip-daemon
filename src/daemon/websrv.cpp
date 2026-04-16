@@ -1334,7 +1334,7 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(conn, "%s", "Windows 32-bit");
 #elif _WIN64
 #elif __APPLE__ || __MACH__
-      mg_printf( conn, "%s", "Mac OSX";
+      mg_printf( conn, "%s", "Mac OSX");
 #elif __linux__
     struct utsname uts;
     uname(&uts);

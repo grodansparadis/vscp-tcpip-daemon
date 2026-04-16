@@ -2181,7 +2181,7 @@ ws2_command(struct mg_connection* conn,
             std::string strSessionId =
               vscp_str_format("{\"sid\": \"%s\"}", pSession->m_sid);
             std::string str =
-              vscp_str_format(WS2_POSITIVE_RESPONSE, "CHALLENGE", strSessionId);
+              vscp_str_format(WS2_POSITIVE_RESPONSE, "CHALLENGE", strSessionId.c_str());
             mg_websocket_write(conn,
                                MG_WEBSOCKET_OPCODE_TEXT,
                                (const char*)str.c_str(),
@@ -2474,7 +2474,7 @@ ws2_command(struct mg_connection* conn,
     }
     else {
         std::string str = vscp_str_format(WS2_NEGATIVE_RESPONSE,
-                                          strCmd,
+                                          strCmd.c_str(),
                                           (int)WEBSOCK_ERROR_UNKNOWN_COMMAND,
                                           WEBSOCK_STR_ERROR_UNKNOWN_COMMAND);
         syslog(LOG_ERR, "[Websocket w2] Unknown command [%s].", strCmd.c_str());
