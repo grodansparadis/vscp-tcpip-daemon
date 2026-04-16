@@ -1,0 +1,6 @@
+[submodule "third-party/vscp"]
+	path = third-party/vscp
+	url = https://github.com/grodansparadis/vscp.git
+[submodule "third-party/civetweb"]
+	path = third-party/civetweb
+	url = https://github.com/civetweb/civetweb.git

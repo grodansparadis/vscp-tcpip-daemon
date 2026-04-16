@@ -1,0 +1,18 @@
+{
+  "chat.tools.terminal.autoApprove": {
+    "git submodule": true,
+    "/^cd /home/akhe/development/VSCP/vscp-tcpip-daemon && python - <<'PY'\nfrom pathlib import Path\nsrc = Path\\('src/vscp/common'\\)\nsub = Path\\('third-party/vscp/src/vscp/common'\\)\nsrc_files = sorted\\(\\[p\\.name for p in src\\.iterdir\\(\\) if p\\.is_file\\(\\)\\]\\)\nsub_files = sorted\\(\\[p\\.name for p in sub\\.iterdir\\(\\) if p\\.is_file\\(\\)\\]\\)\nsub_set = set\\(sub_files\\)\nmap_names = \\{\n    'canal_macro\\.h': 'canal-macro\\.h',\n    'vscp_class\\.h': 'vscp-class\\.h',\n    'vscp_debug\\.h': 'vscp-debug\\.h',\n    'vscp_hashclass\\.h': 'vscp-hashclass\\.h',\n    'vscp_hashtype\\.h': 'vscp-hashtype\\.h',\n    'vscp_serial\\.h': 'vscp-serial\\.h',\n    'vscp_type\\.h': 'vscp-type\\.h',\n    'vscpd_caps\\.h': 'vscpd-caps\\.h',\n    'vscp_bootdevice\\.cpp': 'vscp-bootdevice\\.cpp',\n    'vscp_bootdevice\\.h': 'vscp-bootdevice\\.h',\n    'vscp_bootdevice_pic1\\.cpp': 'vscp-bootdevice-pic1\\.cpp',\n    'vscp_bootdevice_pic1\\.h': 'vscp-bootdevice-pic1\\.h',\n    'vscp_bootdevice_vscp\\.cpp': 'vscp-bootdevice-vscp\\.cpp',\n    'vscp_bootdevice_vscp\\.h': 'vscp-bootdevice-vscp\\.h',\n\\}\nmatched = \\[\\]\nfor name in src_files:\n    if name in sub_set:\n        matched\\.append\\(\\(name, name\\)\\)\n    elif name in map_names and map_names\\[name\\] in sub_set:\n        matched\\.append\\(\\(name, map_names\\[name\\]\\)\\)\nprint\\('MATCHED:'\\)\nfor a,b in matched:\n    print\\(f'\\{a\\} -> \\{b\\}'\\)\nprint\\('\\\\nUNMATCHED:'\\)\nfor name in src_files:\n    if not any\\(name == a for a,_ in matched\\):\n        print\\(name\\)\nPY$/": {
+      "approve": true,
+      "matchCommandLine": true
+    },
+    "cmake": true,
+    "/^cd /home/akhe/development/VSCP/vscp-tcpip-daemon && python - <<'PY'\nfrom pathlib import Path\nsrc_root = Path\\('src/vscp'\\)\nsub_root = Path\\('third-party/vscp/src/vscp'\\)\nsrc_files = sorted\\(\\[p\\.relative_to\\(src_root\\)\\.as_posix\\(\\) for p in src_root\\.rglob\\('\\*'\\) if p\\.is_file\\(\\)\\]\\)\nsub_files = sorted\\(\\[p\\.relative_to\\(sub_root\\)\\.as_posix\\(\\) for p in sub_root\\.rglob\\('\\*'\\) if p\\.is_file\\(\\)\\]\\)\nsub_set = set\\(sub_files\\)\ncommon = \\[p for p in src_files if p in sub_set and not p\\.startswith\\('common/'\\)\\]\nprint\\('EXACT_MATCH_RELATIVE_PATHS_OUTSIDE_COMMON:'\\)\nfor p in common:\n    print\\(p\\)\nPY$/": {
+      "approve": true,
+      "matchCommandLine": true
+    },
+    "/^cd /home/akhe/development/VSCP/vscp-tcpip-daemon && python - <<'PY'\nfrom pathlib import Path\nsrc_root = Path\\('src/vscp'\\)\nsub_root = Path\\('third-party/vscp/src/vscp'\\)\nsrc_files = sorted\\(\\[p\\.relative_to\\(src_root\\)\\.as_posix\\(\\) for p in src_root\\.rglob\\('\\*'\\) if p\\.is_file\\(\\)\\]\\)\nsub_files = set\\(\\[p\\.relative_to\\(sub_root\\)\\.as_posix\\(\\) for p in sub_root\\.rglob\\('\\*'\\) if p\\.is_file\\(\\)\\]\\)\ncommon = \\[p for p in src_files if p in sub_files and not p\\.startswith\\('common/'\\)\\]\nfor p in common:\n    print\\(p\\)\nPY$/": {
+      "approve": true,
+      "matchCommandLine": true
+    }
+  }
+}
