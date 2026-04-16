@@ -162,7 +162,7 @@ union usa
 /* 
     Describes a string (chunk of memory).
 */
-struct msg
+struct stcp_msg
 {
     const char *ptr;
     size_t len;

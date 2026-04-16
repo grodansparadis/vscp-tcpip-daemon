@@ -40,9 +40,11 @@
 
 #include <arpa/inet.h>
 #include <errno.h>
+#ifdef __linux__
 #include <linux/if_ether.h>
 #include <linux/if_packet.h>
 #include <linux/sockios.h>
+#endif
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <netdb.h>
