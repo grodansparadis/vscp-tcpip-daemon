@@ -24,7 +24,7 @@ jobs:
 
       - name: Install packages via vcpkg
         run: |
-          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install openssl expat zlib curl mosquitto --triplet x64-windows
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install openssl expat zlib curl mosquitto dlfcn-win32 --triplet x64-windows
         shell: pwsh
 
       - name: Configure (CMake)
