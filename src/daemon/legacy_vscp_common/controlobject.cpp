@@ -1635,6 +1635,7 @@ CControlObject::getMacAddress(cguid& guid)
 #else
     // cat /sys/class/net/eth0/address
     bool rv = true;
+#ifdef __linux__
     struct ifreq s;
     int fd;
 
@@ -1686,7 +1687,13 @@ CControlObject::getMacAddress(cguid& guid)
 
     return rv;
 
-#endif
+#else
+    // SIOCGIFHWADDR not available on this platform (e.g. macOS)
+    rv = false;
+    return rv;
+#endif  // __linux__
+
+#endif  // WIN32
 }
 
 ///////////////////////////////////////////////////////////////////////////////
