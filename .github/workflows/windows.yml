@@ -1,0 +1,81 @@
+name: Windows CI
+
+on:
+  push:
+    branches: [ master, main ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  build:
+    name: Build & package (Windows)
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install dependencies (vcpkg)
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: '7adc2e4d672d9b033b3dba5d3d8de8b1e579b7e3'
+
+      - name: Install packages via vcpkg
+        run: |
+          vcpkg install openssl expat zlib mosquitto --triplet x64-windows
+
+      - name: Configure (CMake)
+        run: |
+          cmake -S . -B build `
+            -G "Visual Studio 17 2022" -A x64 `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=x64-windows
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Install NSIS
+        run: |
+          choco install nsis --no-progress -y
+
+      - name: Package (NSIS + ZIP)
+        working-directory: build
+        run: cpack -G "NSIS;ZIP" -C Release
+
+      - name: Upload NSIS installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: nsis-windows
+          path: build/*.exe
+
+      - name: Upload ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: zip-windows
+          path: build/*.zip
+
+  release:
+    name: Publish release packages
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Attach to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/**/*

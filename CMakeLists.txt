@@ -172,23 +172,134 @@ if(VSCPD_ENABLE_SYSTEMD)
 endif()
 
 # ---- Install rules ----
+include(GNUInstallDirs)
+
 install(TARGETS vscpd
     RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}
 )
 
-# Install the JSON configuration template.
-install(FILES
-    "${CMAKE_CURRENT_SOURCE_DIR}/install_files/unix/vscpd.json"
-    DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}/vscp"
-)
-
-# Install the sample systemd unit file if present.
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/service/systemd/vscpd.service")
+# Configuration file
+if(WIN32)
     install(FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/service/systemd/vscpd.service"
-        DESTINATION "${CMAKE_INSTALL_LIBDIR}/systemd/system"
+        "${CMAKE_CURRENT_SOURCE_DIR}/install_files/windows/vscpd64.conf_windows_distro"
+        DESTINATION "etc/vscp"
+        RENAME vscpd.conf
+    )
+else()
+    install(FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/install_files/unix/vscpd.json"
+        DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}/vscp"
+    )
+    install(FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/install_files/unix/mimetypes.xml"
+        DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}/vscp"
     )
 endif()
+
+# Man pages (Linux/macOS only)
+if(UNIX)
+    install(FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/man/vscpd.8"
+        "${CMAKE_CURRENT_SOURCE_DIR}/man/uvscpd.8"
+        DESTINATION "${CMAKE_INSTALL_MANDIR}/man8"
+    )
+    install(FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/man/vscp-mkpasswd.1"
+        "${CMAKE_CURRENT_SOURCE_DIR}/man/vscpcmd.1"
+        DESTINATION "${CMAKE_INSTALL_MANDIR}/man1"
+    )
+    install(FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/man/vscp.7"
+        "${CMAKE_CURRENT_SOURCE_DIR}/man/vscpd-tls.7"
+        "${CMAKE_CURRENT_SOURCE_DIR}/man/vscpdrivers.7"
+        DESTINATION "${CMAKE_INSTALL_MANDIR}/man7"
+    )
+    install(FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/man/vscpd.conf.5"
+        DESTINATION "${CMAKE_INSTALL_MANDIR}/man5"
+    )
+endif()
+
+# systemd unit file (Linux only)
+if(UNIX AND NOT APPLE)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/service/systemd/vscpd.service.simple")
+        install(FILES
+            "${CMAKE_CURRENT_SOURCE_DIR}/service/systemd/vscpd.service.simple"
+            DESTINATION "${CMAKE_INSTALL_LIBDIR}/systemd/system"
+            RENAME vscpd.service
+        )
+    elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/service/systemd/vscpd.service.notify")
+        install(FILES
+            "${CMAKE_CURRENT_SOURCE_DIR}/service/systemd/vscpd.service.notify"
+            DESTINATION "${CMAKE_INSTALL_LIBDIR}/systemd/system"
+            RENAME vscpd.service
+        )
+    endif()
+endif()
+
+# ---- CPack packaging ----
+set(CPACK_PACKAGE_NAME             "vscp-tcpip-daemon")
+set(CPACK_PACKAGE_VENDOR           "The VSCP project")
+set(CPACK_PACKAGE_CONTACT          "info@vscp.org")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
+set(CPACK_PACKAGE_DESCRIPTION
+    "The VSCP TCP/IP Daemon (vscpd) is the main control centre for the VSCP
+(Very Simple Control Protocol) framework. It provides a TCP/IP interface
+for connected clients and drivers.")
+set(CPACK_PACKAGE_VERSION          "${PROJECT_VERSION}")
+set(CPACK_PACKAGE_VERSION_MAJOR    "${PROJECT_VERSION_MAJOR}")
+set(CPACK_PACKAGE_VERSION_MINOR    "${PROJECT_VERSION_MINOR}")
+set(CPACK_PACKAGE_VERSION_PATCH    "${PROJECT_VERSION_PATCH}")
+set(CPACK_PACKAGE_HOMEPAGE_URL     "https://www.vscp.org")
+set(CPACK_RESOURCE_FILE_LICENSE    "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+set(CPACK_RESOURCE_FILE_README     "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+set(CPACK_STRIP_FILES              ON)
+
+# ---- TGZ / ZIP (universal source-archive fallbacks) ----
+set(CPACK_SOURCE_IGNORE_FILES
+    "/.git/"
+    "/build.*/"
+    "/\\\\.cache/"
+    "\\\\.swp$"
+)
+
+# ---- DEB (Linux) ----
+set(CPACK_DEBIAN_PACKAGE_SECTION      "net")
+set(CPACK_DEBIAN_PACKAGE_PRIORITY     "optional")
+set(CPACK_DEBIAN_PACKAGE_DEPENDS
+    "libssl3 | libssl1.1, libexpat1, libmosquitto1, zlib1g")
+set(CPACK_DEBIAN_PACKAGE_SUGGESTS     "mosquitto")
+set(CPACK_DEBIAN_PACKAGE_MAINTAINER   "${CPACK_PACKAGE_CONTACT}")
+set(CPACK_DEBIAN_FILE_NAME            DEB-DEFAULT)
+set(CPACK_DEB_COMPONENT_INSTALL       OFF)
+
+# ---- RPM (Linux) ----
+set(CPACK_RPM_PACKAGE_GROUP           "Applications/System")
+set(CPACK_RPM_PACKAGE_LICENSE         "MIT")
+set(CPACK_RPM_PACKAGE_REQUIRES        "openssl-libs, expat, mosquitto, zlib")
+set(CPACK_RPM_PACKAGE_URL             "${CPACK_PACKAGE_HOMEPAGE_URL}")
+set(CPACK_RPM_FILE_NAME               RPM-DEFAULT)
+
+# ---- NSIS (Windows installer) ----
+set(CPACK_NSIS_DISPLAY_NAME           "VSCP TCP/IP Daemon ${PROJECT_VERSION}")
+set(CPACK_NSIS_PACKAGE_NAME           "VSCP TCP/IP Daemon")
+set(CPACK_NSIS_HELP_LINK              "https://docs.vscp.org/vscpd/")
+set(CPACK_NSIS_URL_INFO_ABOUT         "${CPACK_PACKAGE_HOMEPAGE_URL}")
+set(CPACK_NSIS_CONTACT                "${CPACK_PACKAGE_CONTACT}")
+set(CPACK_NSIS_MODIFY_PATH            ON)
+set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
+
+# ---- Generator selection ----
+if(WIN32)
+    set(CPACK_GENERATOR "NSIS;ZIP")
+elseif(APPLE)
+    # productbuild / drag-drop archive; Homebrew formula is a separate file
+    set(CPACK_GENERATOR "TGZ")
+else()
+    set(CPACK_GENERATOR "DEB;RPM;TGZ")
+endif()
+
+include(CPack)
 
 # ---- Tests (optional) ----
 if(VSCPD_BUILD_TESTS)
