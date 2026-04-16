@@ -2827,7 +2827,7 @@ tcpipClientThread(void* pData)
                         std::string str = vscp_str_format(
                           "%d - %s",
                           ptcpipobj->m_commandArray.size() - i - 1,
-                          ptcpipobj->m_commandArray[i]);
+                          ptcpipobj->m_commandArray[i].c_str());
                         vscp_trim(str);
                         ptcpipobj->write(str, true);
                     }
