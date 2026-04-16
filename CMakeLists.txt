@@ -75,32 +75,27 @@ else()
 endif()
 
 # ---- Daemon source files ----
-# Build the legacy daemon implementation using matching legacy dependencies.
+# Build the daemon using vscp submodule for common functionality.
 set(VSCPD_SOURCES
     "${VSCPD_MAIN_SOURCE}"
-    "${VSCP_SUB}/src/vscp/common/clientlist.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_vscp_common/controlobject.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_vscp_common/tcpipsrv.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_vscp_common/interfacelist.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_vscp_common/userlist.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/controlobject.cpp"
+    "${VSCP_SUB}/src/vscp/common/tcpipsrv.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/interfacelist.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/userlist.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/devicethread.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/websrv.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_vscp_common/websocketsrv.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_vscp_common/restsrv.cpp"
-    "${VSCP_SUB}/src/vscp/common/vscpremotetcpif.cpp"
-    # Use vscphelper.cpp from the vscp submodule directly in the legacy daemon build.
-    "${VSCP_SUB}/src/vscp/common/vscphelper.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_vscp_common/vscphelper_compat.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_vscp_common/automation.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/websocketsrv.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/restsrv.cpp"
+    # Use vscphelper_compat from daemon.
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/vscphelper_compat.cpp"
+    "${VSCP_SUB}/src/vscp/common/automation.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/devicelist.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_vscp_common/mdf.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_vscp_common/guid.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_vscp_common/register.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_vscp_common/duktape_vscp_func.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_vscp_common/duktape_vscp_wrkthread.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_vscp_common/lua_vscp_func.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_vscp_common/lua_vscp_wrkthread.cpp"
-    "${VSCP_SUB}/src/vscp/common/vscpdatetime.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/mdf.cpp"
+    # Duktape and Lua scripting extensions
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/duktape_vscp_func.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/duktape_vscp_wrkthread.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/lua_vscp_func.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/lua_vscp_wrkthread.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/civetweb.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/sockettcp.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/dllist.c"
@@ -122,13 +117,12 @@ set(VSCPD_SOURCES
 # ---- Build the vscpd executable ----
 add_executable(vscpd ${VSCPD_SOURCES})
 
-# The legacy daemon headers and third-party imports live under src/daemon.
+# The daemon headers and third-party imports live under src/daemon.
 target_include_directories(vscpd
     PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/linux"
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_vscp_common"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/third_party"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/third_party/nlohmann"
@@ -146,7 +140,7 @@ target_include_directories(vscpd
 if(WIN32)
     target_include_directories(vscpd
         PRIVATE
-            "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_vscp_common/win32helpers"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/win32helpers"
             "${VSCP_SUB}/src/vscp/common/win32helpers"
             "${VSCP_SUB}/src/vscp/daemon"
     )
@@ -164,6 +158,8 @@ target_compile_definitions(vscpd PRIVATE
 target_link_libraries(vscpd
     PRIVATE
         Threads::Threads
+        vscp_common
+        vscp_sqlite3
 )
 
 if(TARGET EXPAT::EXPAT)

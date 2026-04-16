@@ -13,6 +13,8 @@
     "/^cd /home/akhe/development/VSCP/vscp-tcpip-daemon && python - <<'PY'\nfrom pathlib import Path\nsrc_root = Path\\('src/vscp'\\)\nsub_root = Path\\('third-party/vscp/src/vscp'\\)\nsrc_files = sorted\\(\\[p\\.relative_to\\(src_root\\)\\.as_posix\\(\\) for p in src_root\\.rglob\\('\\*'\\) if p\\.is_file\\(\\)\\]\\)\nsub_files = set\\(\\[p\\.relative_to\\(sub_root\\)\\.as_posix\\(\\) for p in sub_root\\.rglob\\('\\*'\\) if p\\.is_file\\(\\)\\]\\)\ncommon = \\[p for p in src_files if p in sub_files and not p\\.startswith\\('common/'\\)\\]\nfor p in common:\n    print\\(p\\)\nPY$/": {
       "approve": true,
       "matchCommandLine": true
-    }
+    },
+    "git remote": true,
+    "make": true
   }
 }
