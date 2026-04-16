@@ -30,8 +30,10 @@ jobs:
             -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DOPENSSL_ROOT_DIR=$(brew --prefix openssl) \
+            -DCURL_ROOT=$(brew --prefix curl) \
             -DEXPAT_INCLUDE_DIR=$(brew --prefix expat)/include \
-            -DEXPAT_LIBRARY=$(brew --prefix expat)/lib/libexpat.dylib
+            -DEXPAT_LIBRARY=$(brew --prefix expat)/lib/libexpat.dylib \
+            -DCMAKE_PREFIX_PATH="$(brew --prefix openssl);$(brew --prefix curl);$(brew --prefix expat)"
 
       - name: Build
         run: cmake --build build --parallel $(sysctl -n hw.logicalcpu)

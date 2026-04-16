@@ -49,6 +49,9 @@ include(GNUInstallDirs)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
+find_package(OpenSSL REQUIRED)
+find_package(EXPAT REQUIRED)
+find_package(ZLIB REQUIRED)
 
 # ---- Add the VSCP common submodule ----
 # This builds vscp_common, vscp_util and vscp_sqlite3 static libraries and
@@ -61,6 +64,8 @@ add_subdirectory(third-party/vscp)
 
 # ---- Convenience alias for the submodule source root ----
 set(VSCP_SUB "${CMAKE_CURRENT_SOURCE_DIR}/third-party/vscp")
+set(DUKTAPE_SUB "${CMAKE_CURRENT_SOURCE_DIR}/third-party/duktape")
+set(DUKTAPE_AMALG_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third-party/duktape-amalgamation")
 
 # ---- Daemon source files ----
 # Build the legacy daemon implementation using matching legacy dependencies.
@@ -96,7 +101,7 @@ set(VSCPD_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/crc.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/crc8.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/randpassword.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/third_party/duktape-2.5.0/src/duktape.c"
+    "${DUKTAPE_AMALG_DIR}/duktape.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/third_party/LuaXML_lib.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/third_party/lua_all.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/vscp_aes.c"
@@ -121,7 +126,7 @@ target_include_directories(vscpd
         "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/third_party"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/third_party/nlohmann"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/third_party/lua-5.3.5/src"
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/third_party/duktape-2.5.0/src"
+        "${DUKTAPE_AMALG_DIR}"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/third_party/sqlite3-3.30.1"
         "${VSCP_SUB}/src/vscp/common"
         "${VSCP_SUB}/src/common"
@@ -143,16 +148,29 @@ target_compile_definitions(vscpd PRIVATE
 target_link_libraries(vscpd
     PRIVATE
         Threads::Threads
-    expat
-    ssl
-    crypto
-    z
-    rt
+)
+
+if(TARGET EXPAT::EXPAT)
+    target_link_libraries(vscpd PRIVATE EXPAT::EXPAT)
+else()
+    target_link_libraries(vscpd PRIVATE expat)
+endif()
+
+if(TARGET ZLIB::ZLIB)
+    target_link_libraries(vscpd PRIVATE ZLIB::ZLIB)
+else()
+    target_link_libraries(vscpd PRIVATE z)
+endif()
+
+target_link_libraries(vscpd
+    PRIVATE
+        OpenSSL::SSL
+        OpenSSL::Crypto
 )
 
 # Platform-specific extra libs
 if(UNIX AND NOT APPLE)
-    target_link_libraries(vscpd PRIVATE m dl)
+    target_link_libraries(vscpd PRIVATE m dl rt)
 endif()
 
 # ---- Optional systemd sd_notify support ----

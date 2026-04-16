@@ -1,11 +1,6 @@
 version: 2
 updates:
-  # Ignore the bundled Duktape third-party debugger — it is a development
-  # tool shipped with the Duktape source tarball and is never installed or
-  # deployed as part of this project.
-  - package-ecosystem: "npm"
-    directory: "/src/daemon/legacy_common/third_party/duktape-2.5.0/debugger"
+  - package-ecosystem: "github-actions"
+    directory: "/"
     schedule:
-      interval: "monthly"
-    ignore:
-      - dependency-name: "*"
+      interval: "weekly"
