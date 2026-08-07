@@ -207,21 +207,21 @@ install(TARGETS vscpd
 if(WIN32)
     install(FILES
         "${CMAKE_CURRENT_SOURCE_DIR}/install/windows/vscpd64.conf_windows_distro"
-        DESTINATION "etc/vscp"
+        DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}/vscp"
         RENAME vscpd.conf
     )
 else()
     install(FILES
         "${CMAKE_CURRENT_SOURCE_DIR}/install/unix/vscpd.json"
-        DESTINATION "etc/vscp"
+        DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}/vscp"
     )
     install(FILES
         "${CMAKE_CURRENT_SOURCE_DIR}/install/unix/mimetypes.xml"
-        DESTINATION "etc/vscp"
+        DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}/vscp"
     )
     install(PROGRAMS
         "${CMAKE_CURRENT_SOURCE_DIR}/install/unix/tcpip-vscpd.init"
-        DESTINATION "etc/init.d"
+        DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}/init.d"
         RENAME tcpip-vscpd
     )
 endif()
