@@ -54,13 +54,15 @@ find_package(EXPAT REQUIRED)
 find_package(ZLIB REQUIRED)
 
 # ---- Add the VSCP common submodule ----
-# This builds vscp_common, vscp_util and vscp_sqlite3 static libraries and
+# This builds vscp_common and vscp_sqlite3 static libraries and
 # exports all of their PUBLIC include directories (nlohmann/json, spdlog,
 # mustache, OpenSSL, Mosquitto, Expat, CURL …) so that the daemon target
 # inherits them automatically via target_link_libraries.
 set(VSCP_INSTALL OFF CACHE BOOL "Skip install of vscp submodule targets" FORCE)
 set(VSCP_BUILD_TESTS OFF CACHE BOOL "Skip tests inside vscp submodule" FORCE)
-add_subdirectory(third-party/vscp)
+# Do not include all submodule targets in the default `all` build.
+# The daemon still builds required library dependencies via target links.
+add_subdirectory(third-party/vscp EXCLUDE_FROM_ALL)
 
 # ---- Convenience alias for the submodule source root ----
 set(VSCP_SUB "${CMAKE_CURRENT_SOURCE_DIR}/third-party/vscp")
