@@ -213,15 +213,15 @@ if(WIN32)
 else()
     install(FILES
         "${CMAKE_CURRENT_SOURCE_DIR}/install/unix/vscpd.json"
-        DESTINATION "/etc/vscp"
+        DESTINATION "etc/vscp"
     )
     install(FILES
         "${CMAKE_CURRENT_SOURCE_DIR}/install/unix/mimetypes.xml"
-        DESTINATION "/etc/vscp"
+        DESTINATION "etc/vscp"
     )
     install(PROGRAMS
         "${CMAKE_CURRENT_SOURCE_DIR}/install/unix/tcpip-vscpd.init"
-        DESTINATION "/etc/init.d"
+        DESTINATION "etc/init.d"
         RENAME tcpip-vscpd
     )
 endif()
