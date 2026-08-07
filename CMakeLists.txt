@@ -53,6 +53,14 @@ find_package(OpenSSL REQUIRED)
 find_package(EXPAT REQUIRED)
 find_package(ZLIB REQUIRED)
 
+# ---- Clang/Apple-clang: silence vendor-code warning treated as error ----
+# tcpipsrv.cpp (in the vscp submodule) passes std::string through a variadic
+# function.  GCC emits a warning; Clang escalates it to a hard error via
+# -Wnon-pod-varargs.  Suppress it globally so the third-party code compiles.
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    add_compile_options(-Wno-non-pod-varargs)
+endif()
+
 # ---- Add the VSCP common submodule ----
 # This builds vscp_common static library and
 # exports all of their PUBLIC include directories (nlohmann/json, spdlog,
