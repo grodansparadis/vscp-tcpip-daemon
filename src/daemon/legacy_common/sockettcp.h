@@ -42,7 +42,8 @@ extern "C" {
 
 #include <sys/types.h>
 #if defined(_WIN32)
-#include <Ws2ipdef.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #else
 #include <sys/socket.h>
 #include <netinet/ip.h>

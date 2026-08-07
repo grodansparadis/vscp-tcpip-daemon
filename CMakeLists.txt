@@ -135,6 +135,11 @@ target_include_directories(vscpd
 )
 
 if(WIN32)
+    target_compile_definitions(vscpd
+        PRIVATE
+            WIN32_LEAN_AND_MEAN
+    )
+
     target_include_directories(vscpd
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/win32helpers"
