@@ -30,6 +30,18 @@
 #pragma implementation "frmmain.h"
 #endif
 
+// On Windows, winsock2.h must be included before any other Windows headers
+// (including those pulled in transitively) to avoid the IN_ADDR redefinition
+// errors that occur when the older winsock.h is included first.
+#ifdef WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <windows.h>
+#endif
+
 #include <deque>
 #include <set>
 #include <string>
