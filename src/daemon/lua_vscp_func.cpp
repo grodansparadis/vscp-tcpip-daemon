@@ -28,6 +28,10 @@
 // wxJSON - http://wxcode.sourceforge.net/docs/wxjson/wxjson_tutorial.html
 //
 
+#ifdef WIN32
+#include <winsock2.h>
+#endif
+
 #include <list>
 #include <string>
 
