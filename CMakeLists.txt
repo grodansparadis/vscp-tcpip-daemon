@@ -180,6 +180,16 @@ if(UNIX AND NOT APPLE)
     target_link_libraries(vscpd PRIVATE m dl rt)
 endif()
 
+# Clang on macOS treats -Wnon-pod-varargs as an error for code in
+# third-party/vscp/src/vscp/common/tcpipsrv.cpp that passes std::string
+# through a variadic function.  Suppress the warning for that file only.
+if(APPLE)
+    set_source_files_properties(
+        "${VSCP_SUB}/src/vscp/common/tcpipsrv.cpp"
+        PROPERTIES COMPILE_OPTIONS "-Wno-non-pod-varargs"
+    )
+endif()
+
 # ---- Optional systemd sd_notify support ----
 if(VSCPD_ENABLE_SYSTEMD)
     find_package(PkgConfig QUIET)
