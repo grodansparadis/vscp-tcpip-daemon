@@ -1,0 +1,55 @@
+#!/bin/sh
+
+### BEGIN INIT INFO
+# Provides:          tcpip-vscpd
+# Required-Start:    $remote_fs $syslog
+# Required-Stop:     $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: VSCP TCP/IP daemon
+# Description:       Starts and stops the VSCP TCP/IP daemon.
+### END INIT INFO
+
+set -e
+
+NAME=tcpip-vscpd
+DAEMON=/usr/sbin/tcpip-vscpd
+PIDFILE=/var/run/vscpd.pid
+CONFIG=/etc/vscp/vscpd.json
+
+[ -x "$DAEMON" ] || exit 0
+
+. /lib/lsb/init-functions
+
+case "$1" in
+  start)
+    log_daemon_msg "Starting $NAME" "$NAME"
+    if start-stop-daemon --start --quiet --oknodo --pidfile "$PIDFILE" --exec "$DAEMON" -- -c "$CONFIG"; then
+      log_end_msg 0
+    else
+      log_end_msg 1
+    fi
+    ;;
+  stop)
+    log_daemon_msg "Stopping $NAME" "$NAME"
+    if start-stop-daemon --stop --quiet --oknodo --pidfile "$PIDFILE"; then
+      rm -f "$PIDFILE"
+      log_end_msg 0
+    else
+      log_end_msg 1
+    fi
+    ;;
+  restart|force-reload)
+    "$0" stop
+    "$0" start
+    ;;
+  status)
+    status_of_proc -p "$PIDFILE" "$DAEMON" "$NAME"
+    ;;
+  *)
+    echo "Usage: $0 {start|stop|restart|force-reload|status}"
+    exit 1
+    ;;
+esac
+
+exit 0

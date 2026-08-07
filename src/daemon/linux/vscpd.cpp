@@ -88,7 +88,7 @@ void
 _sighandlerStop(int sig)
 {
     fprintf(stderr, "vscpd: signal received, forced to stop.\n");
-    syslog(LOG_ERR, "vscpd: signal received, forced to stop.: %m");
+    SYSLOG(LOG_ERR, "vscpd: signal received, forced to stop.: %m");
     gpobj->m_bQuit = true;
     gbStopDaemon   = true;
     gbRestart      = false;
@@ -98,7 +98,7 @@ void
 _sighandlerRestart(int sig)
 {
     fprintf(stderr, "vscpd: signal received, restart. %m\n");
-    syslog(LOG_ERR, "vscpd: signal received, restart.: %m");
+    SYSLOG(LOG_ERR, "vscpd: signal received, restart.: %m");
     gpobj->m_bQuit = true;
     gbStopDaemon   = false;
     gbRestart      = true;
@@ -138,8 +138,7 @@ main(int argc, char** argv)
 
     fprintf(stderr, "Prepare to start vscpd...\n");
 
-    openlog("vscpd", LOG_PERROR | LOG_PID | LOG_CONS, LOG_DAEMON);
-    syslog(LOG_INFO, "Starting the VSCP daemon...");
+    SYSLOG(LOG_INFO, "Starting the VSCP daemon...");
 
     // Ignore return value from defunct processes d
     signal(SIGCHLD, SIG_IGN);
@@ -168,7 +167,7 @@ main(int argc, char** argv)
             case 'r':
                 rootFolder = optarg;
                 fprintf(stderr, "Will use rootfolder = %s", rootFolder.c_str());
-                syslog(LOG_INFO,
+                SYSLOG(LOG_INFO,
                        "Will use rootfolder = %s",
                        rootFolder.c_str());
                 break;
@@ -180,7 +179,7 @@ main(int argc, char** argv)
             case 'd':
                 gnDebugLevel = atoi(optarg);
                 fprintf(stderr, "Debug flags=%s\n", optarg);
-                syslog(LOG_INFO, "Debug flags=%s\n", optarg);
+                SYSLOG(LOG_INFO, "Debug flags=%s\n", optarg);
                 getDebugValues(optarg);
                 break;
 
@@ -201,12 +200,11 @@ main(int argc, char** argv)
             (const char*)strcfgfile.c_str());
 
     if (!init(strcfgfile, rootFolder)) {
-        syslog(LOG_ERR, "[vscpd] Failed to configure. Terminating.\n");
+        SYSLOG(LOG_ERR, "[vscpd] Failed to configure. Terminating.\n");
         fprintf(stderr, "vscpd: Failed to configure. Terminating.\n");
         exit(-1);
     }
 
-    closelog(); // Close syslog
 
     fprintf(stderr, "vscpd: Bye, bye.\n");
     exit(EXIT_SUCCESS);
@@ -225,7 +223,7 @@ init(std::string& strcfgfile, std::string& rootFolder)
         // Fork child
         if (0 > (pid = fork())) {
             // Failure
-            syslog(LOG_ERR, "Failed to fork.\n");
+            SYSLOG(LOG_ERR, "Failed to fork.\n");
             return -1;
         } else if (0 != pid) {
             exit(0); // Parent goes by by.
@@ -234,7 +232,7 @@ init(std::string& strcfgfile, std::string& rootFolder)
         sid = setsid(); // Become session leader
         if (sid < 0) {
             // Failure
-            syslog(LOG_ERR, "Failed to become session leader.\n");
+            SYSLOG(LOG_ERR, "Failed to become session leader.\n");
             return -1;
         }
 
@@ -246,7 +244,7 @@ init(std::string& strcfgfile, std::string& rootFolder)
         close(STDERR_FILENO);
 
         if (open("/", 0)) {
-            syslog(LOG_ERR, "vscpd: open / not 0: %m");
+            SYSLOG(LOG_ERR, "vscpd: open / not 0: %m");
         }
 
         dup2(0, 1);
@@ -261,18 +259,18 @@ init(std::string& strcfgfile, std::string& rootFolder)
     FILE* pFile;
     pFile = fopen("/var/run/vscpd.pid", "w");
     if (NULL == pFile) {
-        syslog(LOG_ERR, "Writing pid file failed.\n");
+        SYSLOG(LOG_ERR, "Writing pid file failed.\n");
         fprintf(stderr, "Writing pid file failed.\n");
     }
     else {
-        syslog(LOG_ERR, "Writing pid file [/var/run/vscpd.pid] sid=%u\n", sid);
+        SYSLOG(LOG_ERR, "Writing pid file [/var/run/vscpd.pid] sid=%u\n", sid);
         fprintf(pFile, "%u\n", sid);
         fclose(pFile);
     }
 
     // Create folder structure
     if (!createFolderStuct(rootFolder)) {
-        syslog(LOG_ERR,
+        SYSLOG(LOG_ERR,
                "vscpd: Folder structure is not in place (You may need to run "
                "as root).");
         fprintf(stderr,
@@ -284,11 +282,11 @@ init(std::string& strcfgfile, std::string& rootFolder)
 
     // Change working directory to root folder
     if (chdir((const char*)rootFolder.c_str())) {
-        syslog(LOG_ERR, "vscpd: Failed to change dir to rootdir");
+        SYSLOG(LOG_ERR, "vscpd: Failed to change dir to rootdir");
         fprintf(stderr, "vscpd: Failed to change dir to rootdir");
         unlink("/var/run/vscpd.pid");
         if (-1 == chdir("/var/lib/vscp/vscpd")) {
-            syslog(
+            SYSLOG(
               LOG_ERR,
               "Unable to chdir to home folder [/var/lib/vscp/vscpd] errno=%d",
               errno);
@@ -344,7 +342,7 @@ init(std::string& strcfgfile, std::string& rootFolder)
         fprintf(stderr, "vscpd: init.\n");
         if (!gpobj->init(strcfgfile, rootFolder)) {
             fprintf(stderr, "Can't initialize daemon. Exiting.\n");
-            syslog(LOG_ERR, "Can't initialize daemon. Exiting.");
+            SYSLOG(LOG_ERR, "Can't initialize daemon. Exiting.");
             unlink("/var/run/vscpd.pid");
             return FALSE;
         }
@@ -361,7 +359,7 @@ init(std::string& strcfgfile, std::string& rootFolder)
         if (!gpobj->run()) {
             fprintf(stderr,
                     "Unable to start the vscpd application. Exiting.\n");
-            syslog(LOG_ERR, "Unable to start the vscpd application. Exiting.");
+            SYSLOG(LOG_ERR, "Unable to start the vscpd application. Exiting.");
             unlink("/var/run/vscpd.pid");
             return FALSE;
         }
@@ -370,17 +368,17 @@ init(std::string& strcfgfile, std::string& rootFolder)
 
         if (!gpobj->cleanup()) {
             fprintf(stderr, "Unable to clean up the vscpd application.\n");
-            syslog(LOG_ERR, "Unable to clean up the vscpd application.");
+            SYSLOG(LOG_ERR, "Unable to clean up the vscpd application.");
             return FALSE;
         }
 
         fprintf(stderr, "vscpd: cleanup done.\n");
 
         if (gbRestart) {
-            syslog(LOG_ERR, "vscpd: Will try to restart.\n");
+            SYSLOG(LOG_ERR, "vscpd: Will try to restart.\n");
             fprintf(stderr, "vscpd: Will try to restart.\n");
         } else {
-            syslog(LOG_ERR, "vscpd: Will end things.\n");
+            SYSLOG(LOG_ERR, "vscpd: Will end things.\n");
             fprintf(stderr, "vscpd: Will end things.\n");
         }
 
@@ -480,7 +478,7 @@ createFolder(const char* folder)
     if (0 == vscp_dirExists(folder)) {
         if (-1 == mkdir(folder, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)) {
             fprintf(stderr, "Failed to create folder %s\n", folder);
-            syslog(LOG_ERR, "Failed to create folder %s\n", folder);
+            SYSLOG(LOG_ERR, "Failed to create folder %s\n", folder);
             return false;
         }
     }

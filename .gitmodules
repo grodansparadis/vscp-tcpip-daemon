@@ -4,3 +4,18 @@
 [submodule "third-party/civetweb"]
 	path = third-party/civetweb
 	url = https://github.com/civetweb/civetweb.git
+[submodule "third-party/json"]
+	path = third-party/json
+	url = https://github.com/nlohmann/json.git
+[submodule "third-party/Mustache"]
+	path = third-party/Mustache
+	url = https://github.com/kainjow/Mustache.git
+[submodule "third-party/maddy"]
+	path = third-party/maddy
+	url = https://github.com/progsource/maddy.git
+[submodule "third-party/mongoose"]
+	path = third-party/mongoose
+	url = https://github.com/cesanta/mongoose.git
+[submodule "third-party/spdlog"]
+	path = third-party/spdlog
+	url = https://github.com/gabime/spdlog.git

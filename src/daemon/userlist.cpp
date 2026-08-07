@@ -37,6 +37,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <canal_macro.h>
 
 #include <vscp_aes.h>
 #include <controlobject.h>
@@ -666,7 +667,7 @@ CUserItem::isUserAllowedToSendEvent(const uint32_t vscp_class,
             return true;
     }
 
-    syslog(LOG_ERR, "isUserAllowedToSendEvent: Not allowed to send event - ");
+    SYSLOG(LOG_ERR, "isUserAllowedToSendEvent: Not allowed to send event - ");
 
     return false;
 }
@@ -741,7 +742,7 @@ CUserList::addSuperUser(const std::string& user,
     // New user item
     CUserItem* pItem = new CUserItem;
     if (NULL == pItem) {
-        syslog(LOG_ERR,
+        SYSLOG(LOG_ERR,
                "addSuperUser: Failed to delete user - "
                "User is not defined.");
         return false;
@@ -763,7 +764,7 @@ CUserList::addSuperUser(const std::string& user,
     strIV = "5a475c082c80dcdf7f2dfbd976253b24";
     strCrypto ="69b1180d2f4809d39be34e19c750107f";
     if (0 == vscp_hexStr2ByteArray(iv, 16, (const char*)strIV.c_str())) {
-        syslog(LOG_ERR,
+        SYSLOG(LOG_ERR,
                "[addSuperUser] Authentication: No room "
                "for iv block. ");
         return false; // Not enough room in buffer
@@ -773,7 +774,7 @@ CUserList::addSuperUser(const std::string& user,
     if (0 == (len = vscp_hexStr2ByteArray((uint8_t *)secret,
                                           strCrypto.length(),
                                           (const char*)strCrypto.c_str()))) {
-        syslog(LOG_ERR,
+        SYSLOG(LOG_ERR,
                "[addSuperUser] Authentication: No room "
                "for crypto block. ");
         return false; // Not enough room in buffer
@@ -839,7 +840,7 @@ CUserList::addUser(const std::string& user,
 
     // Cant add user with name that is already defined.
     if (NULL != m_userhashmap[user]) {
-        syslog(LOG_ERR,
+        SYSLOG(LOG_ERR,
                "addUser: Failed to add user - "
                "user is already defined.");
         return false;
@@ -848,7 +849,7 @@ CUserList::addUser(const std::string& user,
     // // New user item
     CUserItem* pItem = new CUserItem;
     if (NULL == pItem) {
-        syslog(LOG_ERR,
+        SYSLOG(LOG_ERR,
                "addUser: Failed to add user - "
                "Memory problem (CUserItem).");
         return false;
@@ -997,7 +998,7 @@ CUserList::deleteUser(const std::string& user)
 {
     CUserItem* pUser = getUser(user);
     if (NULL == pUser) {
-        syslog(LOG_ERR,
+        SYSLOG(LOG_ERR,
                "deleteUser: Failed to delete user - "
                "User is not defined.");
         return false;
@@ -1018,7 +1019,7 @@ CUserList::deleteUser(const long userid)
 {
     CUserItem* pUser = getUser(userid);
     if (NULL == pUser) {
-        syslog(LOG_ERR,
+        SYSLOG(LOG_ERR,
                "deleteUser: Failed to delete user - "
                "User is not defined.");
         return false;
@@ -1053,7 +1054,7 @@ CUserList::getUser(const long userid)
         }
     }
 
-    syslog(LOG_ERR,
+    SYSLOG(LOG_ERR,
            "getUser: Failed to get user - "
            "User is not found.");
 
@@ -1071,14 +1072,14 @@ CUserList::validateUser(const std::string& user, const std::string& password)
 
     pUserItem = m_userhashmap[user];
     if (NULL == pUserItem) {
-        syslog(LOG_ERR,
+        SYSLOG(LOG_ERR,
                "validateUser: Failed to validate user - "
                "User is not defined.");
         return NULL;
     }
 
     if (!vscp_isPasswordValid(pUserItem->getPassword(), password)) {
-        syslog(LOG_INFO,
+        SYSLOG(LOG_INFO,
                "validateUser: Failed to validate user - "
                "Check username/password.");
         return NULL;
@@ -1099,7 +1100,7 @@ CUserList::validateUserDomain(const std::string& user,
 
     pUserItem = m_userhashmap[user];
     if (NULL == pUserItem) {
-        syslog(LOG_ERR,
+        SYSLOG(LOG_ERR,
                "validateUserDomain: Failed to validate user - "
                "User is not defined.");
         return NULL;
@@ -1107,7 +1108,7 @@ CUserList::validateUserDomain(const std::string& user,
 
     // Check password
     if (pUserItem->getPasswordDomain() != md5password) {
-        syslog(LOG_INFO,
+        SYSLOG(LOG_INFO,
                "validateUserDomain: Failed to validate user - "
                "Check username/password.");
         return NULL;
@@ -1130,7 +1131,7 @@ CUserList::getUserAsString(CUserItem* pUserItem, std::string& strUser)
 
     // Check pointer
     if (NULL == pUserItem) {
-        syslog(LOG_ERR,
+        SYSLOG(LOG_ERR,
                "getUserAsString: Failed to get user - "
                "IOnvalid user item.");
         return false;

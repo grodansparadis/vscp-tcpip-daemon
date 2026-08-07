@@ -63,7 +63,6 @@
 #include <unistd.h>
 
 // For version and copyright info
-#include <duktape.h>
 #include <expat.h>
 #include <json.hpp>
 #include <lua.h>
@@ -533,7 +532,7 @@ websrv_add_session(struct mg_connection* conn)
 
     pSession->m_pClientItem = new CClientItem(); // Create client
     if (NULL == pSession->m_pClientItem) {
-        syslog(LOG_ERR,
+        SYSLOG(LOG_ERR,
                "[websrv] New session: Unable to create client object.");
         delete pSession;
         return NULL;
@@ -556,7 +555,7 @@ websrv_add_session(struct mg_connection* conn)
         delete pSession->m_pClientItem;
         pSession->m_pClientItem = NULL;
         pthread_mutex_unlock(&gpobj->m_clientList.m_mutexItemList);
-        syslog(LOG_ERR,
+        SYSLOG(LOG_ERR,
                ("WEB server: Failed to add client. Terminating thread."));
         return NULL;
     }
@@ -646,7 +645,7 @@ check_admin_authorization(struct mg_connection* conn, void* cbdata)
     // Check pointers
     if (!conn || !(ctx = mg_get_context(conn)) ||
         !(reqinfo = mg_get_request_info(conn))) {
-        syslog(LOG_ERR,
+        SYSLOG(LOG_ERR,
                "[websrv] check_admin_authorization: Pointers are invalid.");
         return WEB_ERROR;
     }
@@ -654,7 +653,7 @@ check_admin_authorization(struct mg_connection* conn, void* cbdata)
     // Get admin user
     if (NULL ==
         (pUserItem = gpobj->m_userList.getUser(gpobj->m_admin_user.c_str()))) {
-        syslog(LOG_ERR,
+        SYSLOG(LOG_ERR,
                "[websrv] check_admin_authorization: Admin user [%s] i not "
                "available.",
                gpobj->m_admin_user.c_str());
@@ -664,7 +663,7 @@ check_admin_authorization(struct mg_connection* conn, void* cbdata)
 
     if ((NULL == (auth_header = mg_get_header(conn, "Authorization"))) ||
         (vscp_strncasecmp(auth_header, "Basic ", 6) != 0)) {
-        syslog(LOG_ERR,
+        SYSLOG(LOG_ERR,
                "[websrv] check_admin_authorization: Authorization header or "
                "digest missing for admin log in.");
         mg_send_basic_access_authentication_request(conn, NULL);
@@ -676,7 +675,7 @@ check_admin_authorization(struct mg_connection* conn, void* cbdata)
 
     const struct mg_request_info* pri = mg_get_request_info(conn);
     if (NULL == pri) {
-        syslog(
+        SYSLOG(
           LOG_ERR,
           "[websrv] check_admin_authorization: Failed to to get request info.");
         return WEB_ERROR;
@@ -713,7 +712,7 @@ check_admin_authorization(struct mg_connection* conn, void* cbdata)
 
     if (NULL == pUserItem) {
         // Password is not correct
-        syslog(LOG_ERR,
+        SYSLOG(LOG_ERR,
                "[Webserver Client] Use on host [%s] NOT "
                "allowed connect. User [%s]. Wrong user/password",
                (const char*)reqinfo->remote_addr,
@@ -729,7 +728,7 @@ check_admin_authorization(struct mg_connection* conn, void* cbdata)
     pthread_mutex_unlock(&gpobj->m_mutex_UserList);
     if (!bValidHost) {
         // Host is not allowed to connect
-        syslog(LOG_ERR,
+        SYSLOG(LOG_ERR,
                "[Webserver Client] Host [%s] "
                "NOT allowed to connect. User [%s]",
                (const char*)reqinfo->remote_addr,
@@ -762,7 +761,7 @@ check_rest_authorization(struct mg_connection* conn, void* cbdata)
 static int
 log_message(const struct mg_connection* conn, const char* message)
 {
-    syslog(LOG_INFO, "[websrv] %s", message);
+    SYSLOG(LOG_INFO, "[websrv] %s", message);
     return WEB_OK;
 }
 
@@ -1409,9 +1408,6 @@ vscp_configure_list(struct mg_connection* conn, void* cbdata)
     mg_printf(conn,
               "&nbsp;&nbsp;&nbsp;&nbsp;<b>SQLite version:</b> %s <br>",
               SQLITE_VERSION);
-    mg_printf(conn,
-              "&nbsp;&nbsp;&nbsp;&nbsp;<b>Duktape version:</b> %s <br>",
-              DUK_GIT_DESCRIBE);
     mg_printf(conn,
               "&nbsp;&nbsp;&nbsp;&nbsp;<b>Civetweb version:</b> %s <br>",
               CIVETWEB_VERSION);
@@ -3000,14 +2996,14 @@ init_ssl(void* ssl_context, void* user_data)
 int
 start_webserver(void)
 {
-    syslog(LOG_ERR, ("Starting web server...\n"));
+    SYSLOG(LOG_ERR, ("Starting web server...\n"));
 
     if (gpobj->m_bWebsocketsEnable) {
-        syslog(LOG_ERR, ("Websockets enable...\n"));
+        SYSLOG(LOG_ERR, ("Websockets enable...\n"));
     }
 
     if (gpobj->m_bEnableRestApi) {
-        syslog(LOG_ERR, ("REST API enable...\n"));
+        SYSLOG(LOG_ERR, ("REST API enable...\n"));
     }
 
     // This structure must be larger than the number of options to set
@@ -3437,7 +3433,7 @@ start_webserver(void)
 
     // Check return value:
     if (NULL == gpobj->m_web_ctx) {
-        syslog(LOG_ERR, "websrv: Cannot start webserver - web_start failed.");
+        SYSLOG(LOG_ERR, "websrv: Cannot start webserver - web_start failed.");
         return EXIT_FAILURE;
     }
 

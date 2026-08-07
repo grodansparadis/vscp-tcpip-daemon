@@ -186,7 +186,7 @@ bool CMsgLog::open( const char *szfile, unsigned long flags )
                                         workThread,
                                         this ) ) {
 
-            syslog( LOG_ERR, "canallogger: Unable to create logger thread.");
+            SYSLOG( LOG_ERR, "canallogger: Unable to create logger thread.");
             rv = false;
             fclose( m_flog );
         }

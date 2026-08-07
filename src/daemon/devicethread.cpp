@@ -64,14 +64,14 @@ deviceThread(void* pData)
 
     CDeviceItem* pDevItem = (CDeviceItem*)pData;
     if (NULL == pDevItem) {
-        syslog(LOG_ERR, "No device item defined. Aborting device thread!");
+        SYSLOG(LOG_ERR, "No device item defined. Aborting device thread!");
         return NULL;
     }
 
     // Must have a valid pointer to the control object
     CControlObject* pObj = pDevItem->m_pObj;
     if (NULL == pObj) {
-        syslog(LOG_ERR, "No control object defined. Aborting device thread!");
+        SYSLOG(LOG_ERR, "No control object defined. Aborting device thread!");
         return NULL;
     }
 
@@ -94,7 +94,7 @@ deviceThread(void* pData)
     pClientItem->m_strDeviceName = "driver_" + pDevItem->m_strName;
 
     if (__VSCP_DEBUG_EXTRA) {
-        syslog(LOG_DEBUG,
+        SYSLOG(LOG_DEBUG,
                "Devicethread: Starting %s",
                pClientItem->m_strDeviceName.c_str());
     }
@@ -108,7 +108,7 @@ deviceThread(void* pData)
         pDevItem->m_pClientItem = NULL;
 
         pthread_mutex_unlock(&pObj->m_clientList.m_mutexItemList);
-        syslog(LOG_ERR,
+        SYSLOG(LOG_ERR,
                "Devicethread: Failed to add client. Terminating thread.");
         return NULL;
     }
@@ -128,7 +128,7 @@ deviceThread(void* pData)
     // Load dynamic library
     hdll = dlopen(pDevItem->m_strPath.c_str(), RTLD_LAZY);
     if (!hdll) {
-        syslog(LOG_ERR,
+        SYSLOG(LOG_ERR,
                "Devicethread: Unable to load dynamic library. path = %s",
                pDevItem->m_strPath.c_str());
         return NULL;
@@ -141,7 +141,7 @@ deviceThread(void* pData)
 
         // Now find methods in library
         if (__VSCP_DEBUG_DRIVER1) {
-            syslog(LOG_DEBUG,
+            SYSLOG(LOG_DEBUG,
                    "Loading level I driver: %s",
                    pDevItem->m_strName.c_str());
         }
@@ -153,7 +153,7 @@ deviceThread(void* pData)
 
         if (dlsym_error) {
             // Free the library
-            syslog(LOG_ERR,
+            SYSLOG(LOG_ERR,
                    "%s : Unable to get dl entry for CanalOpen.",
                    pDevItem->m_strName.c_str());
             return NULL;
@@ -165,7 +165,7 @@ deviceThread(void* pData)
         dlsym_error = dlerror();
         if (dlsym_error) {
             // Free the library
-            syslog(LOG_ERR,
+            SYSLOG(LOG_ERR,
                    "%s: Unable to get dl entry for CanalClose.",
                    pDevItem->m_strName.c_str());
             dlclose(hdll);
@@ -178,7 +178,7 @@ deviceThread(void* pData)
         dlsym_error = dlerror();
         if (dlsym_error) {
             // Free the library
-            syslog(LOG_ERR,
+            SYSLOG(LOG_ERR,
                    "%s: Unable to get dl entry for CanalGetLevel.",
                    pDevItem->m_strName.c_str());
             dlclose(hdll);
@@ -191,7 +191,7 @@ deviceThread(void* pData)
         dlsym_error = dlerror();
         if (dlsym_error) {
             // Free the library
-            syslog(LOG_ERR,
+            SYSLOG(LOG_ERR,
                    "%s: Unable to get dl entry for CanalSend.",
                    pDevItem->m_strName.c_str());
             dlclose(hdll);
@@ -204,7 +204,7 @@ deviceThread(void* pData)
         dlsym_error = dlerror();
         if (dlsym_error) {
             // Free the library
-            syslog(LOG_ERR,
+            SYSLOG(LOG_ERR,
                    "%s: Unable to get dl entry for CanalDataAvailable.",
                    pDevItem->m_strName.c_str());
             dlclose(hdll);
@@ -217,7 +217,7 @@ deviceThread(void* pData)
         dlsym_error = dlerror();
         if (dlsym_error) {
             // Free the library
-            syslog(LOG_ERR,
+            SYSLOG(LOG_ERR,
                    "%s: Unable to get dl entry for CanalReceive.",
                    pDevItem->m_strName.c_str());
             dlclose(hdll);
@@ -230,7 +230,7 @@ deviceThread(void* pData)
         dlsym_error = dlerror();
         if (dlsym_error) {
             // Free the library
-            syslog(LOG_ERR,
+            SYSLOG(LOG_ERR,
                    "%s: Unable to get dl entry for CanalGetStatus.",
                    pDevItem->m_strName.c_str());
             dlclose(hdll);
@@ -243,7 +243,7 @@ deviceThread(void* pData)
         dlsym_error = dlerror();
         if (dlsym_error) {
             // Free the library
-            syslog(LOG_ERR,
+            SYSLOG(LOG_ERR,
                    "%s: Unable to get dl entry for CanalGetStatistics.",
                    pDevItem->m_strName.c_str());
             dlclose(hdll);
@@ -256,7 +256,7 @@ deviceThread(void* pData)
         dlsym_error = dlerror();
         if (dlsym_error) {
             // Free the library
-            syslog(LOG_ERR,
+            SYSLOG(LOG_ERR,
                    "%s: Unable to get dl entry for CanalSetFilter.",
                    pDevItem->m_strName.c_str());
             dlclose(hdll);
@@ -269,7 +269,7 @@ deviceThread(void* pData)
         dlsym_error = dlerror();
         if (dlsym_error) {
             // Free the library
-            syslog(LOG_ERR,
+            SYSLOG(LOG_ERR,
                    "%s: Unable to get dl entry for CanalSetMask.",
                    pDevItem->m_strName.c_str());
             dlclose(hdll);
@@ -282,7 +282,7 @@ deviceThread(void* pData)
         dlsym_error = dlerror();
         if (dlsym_error) {
             // Free the library
-            syslog(LOG_ERR,
+            SYSLOG(LOG_ERR,
                    "%s: Unable to get dl entry for CanalGetVersion.",
                    pDevItem->m_strName.c_str());
             dlclose(hdll);
@@ -295,7 +295,7 @@ deviceThread(void* pData)
         dlsym_error = dlerror();
         if (dlsym_error) {
             // Free the library
-            syslog(LOG_ERR,
+            SYSLOG(LOG_ERR,
                    "%s: Unable to get dl entry for CanalGetDllVersion.",
                    pDevItem->m_strName.c_str());
             dlclose(hdll);
@@ -308,7 +308,7 @@ deviceThread(void* pData)
         dlsym_error = dlerror();
         if (dlsym_error) {
             // Free the library
-            syslog(LOG_ERR,
+            SYSLOG(LOG_ERR,
                    "%s: Unable to get dl entry for CanalGetVendorString.",
                    pDevItem->m_strName.c_str());
             dlclose(hdll);
@@ -324,7 +324,7 @@ deviceThread(void* pData)
           (LPFNDLL_CANALBLOCKINGSEND)dlsym(hdll, "CanalBlockingSend");
         dlsym_error = dlerror();
         if (dlsym_error) {
-            syslog(LOG_ERR,
+            SYSLOG(LOG_ERR,
                    "%s: Unable to get dl entry for CanalBlockingSend. Probably "
                    "Generation 1 driver.",
                    pDevItem->m_strName.c_str());
@@ -336,7 +336,7 @@ deviceThread(void* pData)
           (LPFNDLL_CANALBLOCKINGRECEIVE)dlsym(hdll, "CanalBlockingReceive");
         dlsym_error = dlerror();
         if (dlsym_error) {
-            syslog(LOG_ERR,
+            SYSLOG(LOG_ERR,
                    "%s: Unable to get dl entry for CanalBlockingReceive. "
                    "Probably Generation 1 driver.",
                    pDevItem->m_strName.c_str());
@@ -348,7 +348,7 @@ deviceThread(void* pData)
           (LPFNDLL_CANALGETDRIVERINFO)dlsym(hdll, "CanalGetDriverInfo");
         dlsym_error = dlerror();
         if (dlsym_error) {
-            syslog(LOG_ERR,
+            SYSLOG(LOG_ERR,
                    "%s: Unable to get dl entry for CanalGetDriverInfo. "
                    "Probably Generation 1 driver.",
                    pDevItem->m_strName.c_str());
@@ -362,7 +362,7 @@ deviceThread(void* pData)
 
         // Check if the driver opened properly
         if (pDevItem->m_openHandle <= 0) {
-            syslog(LOG_ERR,
+            SYSLOG(LOG_ERR,
                    "Failed to open driver. Will not use it! %ld [%s] ",
                    pDevItem->m_openHandle,
                    pDevItem->m_strName.c_str());
@@ -371,7 +371,7 @@ deviceThread(void* pData)
         }
 
         if (__VSCP_DEBUG_DRIVER1) {
-            syslog(LOG_DEBUG,
+            SYSLOG(LOG_DEBUG,
                    "%s: [Device tread] Level I Driver open.",
                    pDevItem->m_strName.c_str());
         }
@@ -388,7 +388,7 @@ deviceThread(void* pData)
             // * * * * Blocking version * * * *
 
             if (__VSCP_DEBUG_DRIVER1) {
-                syslog(LOG_DEBUG,
+                SYSLOG(LOG_DEBUG,
                        "%s: [Device tread] Level I blocking version.",
                        pDevItem->m_strName.c_str());
             }
@@ -401,7 +401,7 @@ deviceThread(void* pData)
                                NULL,
                                deviceLevel1WriteThread,
                                pDevItem)) {
-                syslog(LOG_ERR,
+                SYSLOG(LOG_ERR,
                        "%s: Unable to run the device write worker thread.",
                        pDevItem->m_strName.c_str());
                 dlclose(hdll);
@@ -415,7 +415,7 @@ deviceThread(void* pData)
                                NULL,
                                deviceLevel1ReceiveThread,
                                pDevItem)) {
-                syslog(LOG_ERR,
+                SYSLOG(LOG_ERR,
                        "%s: Unable to run the device read worker thread.",
                        pDevItem->m_strName.c_str());
                 pDevItem->m_bQuit = true;
@@ -433,7 +433,7 @@ deviceThread(void* pData)
             pDevItem->m_bQuit = true;
 
             if (__VSCP_DEBUG_DRIVER1) {
-                syslog(LOG_DEBUG,
+                SYSLOG(LOG_DEBUG,
                        "%s: [Device tread] Level I work loop ended.",
                        pDevItem->m_strName.c_str());
             }
@@ -447,7 +447,7 @@ deviceThread(void* pData)
             // * * * * Non blocking version * * * *
 
             if (__VSCP_DEBUG_DRIVER1) {
-                syslog(LOG_DEBUG,
+                SYSLOG(LOG_DEBUG,
                        "%s: [Device tread] Level I NON Blocking version.",
                        pDevItem->m_strName.c_str());
             }
@@ -525,7 +525,7 @@ deviceThread(void* pData)
                         (pev->vscp_class > 512)) {
                         // Remove the event and the node
                         pClientItem->m_clientInputQueue.pop_front();
-                        syslog(LOG_ERR,
+                        SYSLOG(LOG_ERR,
                                "Level II event on Level I queue thrown away. "
                                "class=%d, type=%d",
                                pev->vscp_class,
@@ -562,7 +562,7 @@ deviceThread(void* pData)
         } // if blocking/non blocking
 
         if (__VSCP_DEBUG_DRIVER1) {
-            syslog(LOG_DEBUG,
+            SYSLOG(LOG_DEBUG,
                    "%s: [Device tread] Level I Work loop ended.",
                    pDevItem->m_strName.c_str());
         }
@@ -571,7 +571,7 @@ deviceThread(void* pData)
         pDevItem->m_proc_CanalClose(pDevItem->m_openHandle);
 
         if (__VSCP_DEBUG_DRIVER1) {
-            syslog(LOG_DEBUG,
+            SYSLOG(LOG_DEBUG,
                    "%s: [Device tread] Level I Closed.",
                    pDevItem->m_strName.c_str());
         }
@@ -590,7 +590,7 @@ deviceThread(void* pData)
     else if (VSCP_DRIVER_LEVEL2 == pDevItem->m_driverLevel) {
 
         // Now find methods in library
-        syslog(LOG_INFO,
+        SYSLOG(LOG_INFO,
                "Loading level II driver: <%s>",
                pDevItem->m_strName.c_str());
 
@@ -598,7 +598,7 @@ deviceThread(void* pData)
         if (NULL == (pDevItem->m_proc_VSCPOpen =
                        (LPFNDLL_VSCPOPEN)dlsym(hdll, "VSCPOpen"))) {
             // Free the library
-            syslog(LOG_ERR,
+            SYSLOG(LOG_ERR,
                    "%s: Unable to get dl entry for VSCPOpen.",
                    pDevItem->m_strName.c_str());
             return NULL;
@@ -608,7 +608,7 @@ deviceThread(void* pData)
         if (NULL == (pDevItem->m_proc_VSCPClose =
                        (LPFNDLL_VSCPCLOSE)dlsym(hdll, "VSCPClose"))) {
             // Free the library
-            syslog(LOG_ERR,
+            SYSLOG(LOG_ERR,
                    "%s: Unable to get dl entry for VSCPClose.",
                    pDevItem->m_strName.c_str());
             return NULL;
@@ -618,7 +618,7 @@ deviceThread(void* pData)
         if (NULL == (pDevItem->m_proc_VSCPWrite =
                        (LPFNDLL_VSCPWRITE)dlsym(hdll, "VSCPWrite"))) {
             // Free the library
-            syslog(LOG_ERR,
+            SYSLOG(LOG_ERR,
                    "%s: Unable to get dl entry for VSCPWrite.",
                    pDevItem->m_strName.c_str());
             return NULL;
@@ -628,7 +628,7 @@ deviceThread(void* pData)
         if (NULL == (pDevItem->m_proc_VSCPRead =
                        (LPFNDLL_VSCPREAD)dlsym(hdll, "VSCPRead"))) {
             // Free the library
-            syslog(LOG_ERR,
+            SYSLOG(LOG_ERR,
                    "%s: Unable to get dl entry for VSCPBlockingReceive.",
                    pDevItem->m_strName.c_str());
             return NULL;
@@ -638,14 +638,14 @@ deviceThread(void* pData)
         if (NULL == (pDevItem->m_proc_VSCPGetVersion =
                        (LPFNDLL_VSCPGETVERSION)dlsym(hdll, "VSCPGetVersion"))) {
             // Free the library
-            syslog(LOG_ERR,
+            SYSLOG(LOG_ERR,
                    "%s: Unable to get dl entry for VSCPGetVersion.",
                    pDevItem->m_strName.c_str());
             return NULL;
         }
 
         if (__VSCP_DEBUG_DRIVER2) {
-            syslog(LOG_DEBUG,
+            SYSLOG(LOG_DEBUG,
                    "%s: Discovered all methods\n",
                    pDevItem->m_strName.c_str());
         }
@@ -657,7 +657,7 @@ deviceThread(void* pData)
 
         if (0 == pDevItem->m_openHandle) {
             // Free the library
-            syslog(LOG_ERR,
+            SYSLOG(LOG_ERR,
                    "%s: [Device tread] Unable to open VSCP "
                    " level II driver (path, config file access rights)."
                    " There may be additional info from driver "
@@ -667,7 +667,7 @@ deviceThread(void* pData)
         }
 
         if (__VSCP_DEBUG_DRIVER2) {
-            syslog(LOG_DEBUG,
+            SYSLOG(LOG_DEBUG,
                    "%s: [Device tread] Level II Open.",
                    pDevItem->m_strName.c_str());
         }
@@ -680,7 +680,7 @@ deviceThread(void* pData)
                            NULL,
                            deviceLevel2WriteThread,
                            pDevItem)) {
-            syslog(LOG_ERR,
+            SYSLOG(LOG_ERR,
                    "%s: Unable to run the device Level II write worker thread.",
                    pDevItem->m_strName.c_str());
             dlclose(hdll);
@@ -688,7 +688,7 @@ deviceThread(void* pData)
         }
 
         if (__VSCP_DEBUG_DRIVER2) {
-            syslog(LOG_DEBUG,
+            SYSLOG(LOG_DEBUG,
                    "%s: [Device tread] Level II Write thread created.",
                    pDevItem->m_strName.c_str());
         }
@@ -701,7 +701,7 @@ deviceThread(void* pData)
                            NULL,
                            deviceLevel2ReceiveThread,
                            pDevItem)) {
-            syslog(LOG_ERR,
+            SYSLOG(LOG_ERR,
                    "%s: Unable to run the device Level II read worker thread.",
                    pDevItem->m_strName.c_str());
             pDevItem->m_bQuit = true;
@@ -712,7 +712,7 @@ deviceThread(void* pData)
         }
 
         if (__VSCP_DEBUG_DRIVER2) {
-            syslog(LOG_DEBUG,
+            SYSLOG(LOG_DEBUG,
                    "%s: [Device tread] Level II Write thread created.",
                    pDevItem->m_strName.c_str());
         }
@@ -723,7 +723,7 @@ deviceThread(void* pData)
         }
 
         if (__VSCP_DEBUG_DRIVER2) {
-            syslog(LOG_DEBUG,
+            SYSLOG(LOG_DEBUG,
                    "%s: [Device tread] Level II Closing.",
                    pDevItem->m_strName.c_str());
         }
@@ -732,7 +732,7 @@ deviceThread(void* pData)
         pDevItem->m_proc_VSCPClose(pDevItem->m_openHandle);
 
         if (__VSCP_DEBUG_DRIVER2) {
-            syslog(LOG_DEBUG,
+            SYSLOG(LOG_DEBUG,
                    "%s: [Device tread] Level II Closed.",
                    pDevItem->m_strName.c_str());
         }
@@ -745,7 +745,7 @@ deviceThread(void* pData)
         dlclose(hdll);
 
         if (__VSCP_DEBUG_DRIVER2) {
-            syslog(LOG_DEBUG,
+            SYSLOG(LOG_DEBUG,
                    "%s: [Device tread] Level II Done waiting for threads.",
                    pDevItem->m_strName.c_str());
         }
@@ -773,7 +773,7 @@ deviceLevel1ReceiveThread(void* pData)
 
     CDeviceItem* pDevItem = (CDeviceItem*)pData;
     if (NULL == pDevItem) {
-        syslog(
+        SYSLOG(
           LOG_ERR,
           "deviceLevel1ReceiveThread quitting due to NULL DevItem object.");
         return NULL;
@@ -907,7 +907,7 @@ deviceLevel1WriteThread(void* pData)
 
     CDeviceItem* pDevItem = (CDeviceItem*)pData;
     if (NULL == pDevItem) {
-        syslog(LOG_ERR,
+        SYSLOG(LOG_ERR,
                "deviceLevel1WriteThread quitting due to NULL DevItem object.");
         return NULL;
     }
@@ -946,7 +946,7 @@ deviceLevel1WriteThread(void* pData)
 
             canalMsg msg;
             if (!vscp_convertEventToCanal(&msg, pev)) {
-                syslog(
+                SYSLOG(
                   LOG_ERR,
                   "deviceLevel1WriteThread - vscp_convertEventToCanal failed");
                 vscp_deleteEvent(pev);
@@ -956,7 +956,7 @@ deviceLevel1WriteThread(void* pData)
                 pDevItem->m_proc_CanalBlockingSend(pDevItem->m_openHandle,
                                                    &msg,
                                                    300)) {
-                syslog(
+                SYSLOG(
                   LOG_ERR,
                   "deviceLevel1WriteThread - m_proc_CanalBlockingSend failed");
                 vscp_deleteEvent(pev);
@@ -990,7 +990,7 @@ deviceLevel2ReceiveThread(void* pData)
 
     CDeviceItem* pDevItem = (CDeviceItem*)pData;
     if (NULL == pDevItem) {
-        syslog(
+        SYSLOG(
           LOG_ERR,
           "deviceLevel2ReceiveThread quitting due to NULL DevItem object.");
         return NULL;
@@ -1080,7 +1080,7 @@ deviceLevel2WriteThread(void* pData)
 {
     CDeviceItem* pDevItem = (CDeviceItem*)pData;
     if (NULL == pDevItem) {
-        syslog(LOG_ERR,
+        SYSLOG(LOG_ERR,
                "deviceLevel2WriteThread quitting due to NULL DevItem object.");
         return NULL;
     }

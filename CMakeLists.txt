@@ -54,7 +54,7 @@ find_package(EXPAT REQUIRED)
 find_package(ZLIB REQUIRED)
 
 # ---- Add the VSCP common submodule ----
-# This builds vscp_common and vscp_sqlite3 static libraries and
+# This builds vscp_common static library and
 # exports all of their PUBLIC include directories (nlohmann/json, spdlog,
 # mustache, OpenSSL, Mosquitto, Expat, CURL …) so that the daemon target
 # inherits them automatically via target_link_libraries.
@@ -66,8 +66,6 @@ add_subdirectory(third-party/vscp EXCLUDE_FROM_ALL)
 
 # ---- Convenience alias for the submodule source root ----
 set(VSCP_SUB "${CMAKE_CURRENT_SOURCE_DIR}/third-party/vscp")
-set(DUKTAPE_SUB "${CMAKE_CURRENT_SOURCE_DIR}/third-party/duktape")
-set(DUKTAPE_AMALG_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third-party/duktape-amalgamation")
 
 # Use a platform-appropriate daemon entrypoint.
 if(WIN32)
@@ -93,9 +91,7 @@ set(VSCPD_SOURCES
     "${VSCP_SUB}/src/vscp/common/automation.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/devicelist.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/mdf.cpp"
-    # Duktape and Lua scripting extensions
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/duktape_vscp_func.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/duktape_vscp_wrkthread.cpp"
+    # Lua scripting extensions
     "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/lua_vscp_func.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/lua_vscp_wrkthread.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/civetweb.c"
@@ -105,7 +101,6 @@ set(VSCPD_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/crc.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/crc8.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/randpassword.cpp"
-    "${DUKTAPE_AMALG_DIR}/duktape.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/third_party/LuaXML_lib.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/third_party/lua_all.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/vscp_aes.c"
@@ -118,6 +113,7 @@ set(VSCPD_SOURCES
 
 # ---- Build the vscpd executable ----
 add_executable(vscpd ${VSCPD_SOURCES})
+set_target_properties(vscpd PROPERTIES OUTPUT_NAME "tcpip-vscpd")
 
 # The daemon headers and third-party imports live under src/daemon.
 target_include_directories(vscpd
@@ -129,7 +125,6 @@ target_include_directories(vscpd
         "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/third_party"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/third_party/nlohmann"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/third_party/lua-5.3.5/src"
-        "${DUKTAPE_AMALG_DIR}"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/third_party/sqlite3-3.30.1"
         "${VSCP_SUB}/src/vscp/common"
         "${VSCP_SUB}/src/common"
@@ -152,7 +147,6 @@ target_compile_definitions(vscpd PRIVATE
     USE_IPV6
     USE_WEBSOCKET
     USE_LUA
-    USE_DUKTAPE
     USE_ZLIB
     USE_SERVER_STATS
 )
@@ -161,7 +155,6 @@ target_link_libraries(vscpd
     PRIVATE
         Threads::Threads
         vscp_common
-        vscp_sqlite3
 )
 
 if(TARGET EXPAT::EXPAT)
@@ -213,18 +206,23 @@ install(TARGETS vscpd
 # Configuration file
 if(WIN32)
     install(FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/install_files/windows/vscpd64.conf_windows_distro"
+        "${CMAKE_CURRENT_SOURCE_DIR}/install/windows/vscpd64.conf_windows_distro"
         DESTINATION "etc/vscp"
         RENAME vscpd.conf
     )
 else()
     install(FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/install_files/unix/vscpd.json"
-        DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}/vscp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/install/unix/vscpd.json"
+        DESTINATION "/etc/vscp"
     )
     install(FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/install_files/unix/mimetypes.xml"
-        DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}/vscp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/install/unix/mimetypes.xml"
+        DESTINATION "/etc/vscp"
+    )
+    install(PROGRAMS
+        "${CMAKE_CURRENT_SOURCE_DIR}/install/unix/tcpip-vscpd.init"
+        DESTINATION "/etc/init.d"
+        RENAME tcpip-vscpd
     )
 endif()
 

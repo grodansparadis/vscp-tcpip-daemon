@@ -37,6 +37,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <canal_macro.h>
 
 #ifdef __cplusplus
 extern "C"
@@ -110,7 +111,7 @@ actionLuaThread(void *pData)
 
     // actionLuaObj *pobj = (actionLuaObj *)pData;
     // if (NULL == pobj) {
-    //     syslog(LOG_ERR,
+    //     SYSLOG(LOG_ERR,
     //            "[LUA execution] - "
     //            "No control object, can't execute code.");
     //     return NULL;
@@ -157,19 +158,19 @@ actionLuaThread(void *pData)
     // if (vscp_convertEventToEventEx(&pobj->m_feedEvent, strFeedEvent)) {
     //     reg_string(L, "feedevent_str", (const char *)strFeedEvent.c_str());
     // } else {
-    //     syslog(LOG_ERR, "Failed to convert Lua feed event to string.");
+    //     SYSLOG(LOG_ERR, "Failed to convert Lua feed event to string.");
     // }
 
     // if (vscp_convertEventExToJSON(strFeedEvent,&pobj->m_feedEvent)) {
     //     reg_string(L, "feedevent_json", (const char *)strFeedEvent.c_str());
     // } else {
-    //     syslog(LOG_ERR, "Failed to convert Lua feed event to JSON.");
+    //     SYSLOG(LOG_ERR, "Failed to convert Lua feed event to JSON.");
     // }
 
     // if (vscp_convertEventExToXML(&pobj->m_feedEvent,strFeedEvent)) {
     //     mg_reg_string(L, "feedevent_xml", (const char *)strFeedEvent.c_str());
     // } else {
-    //     syslog(LOG_ERR, "Failed to conver Lua feed event to XML.");
+    //     SYSLOG(LOG_ERR, "Failed to conver Lua feed event to XML.");
     // }
 
     // // From httpd
@@ -265,7 +266,7 @@ actionLuaThread(void *pData)
     //     delete pobj->m_pClientItem;
     //     pobj->m_pClientItem = NULL;
     //     pthread_mutex_unlock(&gpobj->m_clientList.m_mutexItemList);
-    //     syslog(LOG_ERR,
+    //     SYSLOG(LOG_ERR,
     //            "LUA worker: Failed to add client. Terminating thread.");
     //     return NULL;
     // }
@@ -289,7 +290,7 @@ actionLuaThread(void *pData)
     //     std::string strError =
     //             vscp_str_format( "Lua failed to execute: %s\n",
     //                                 duk_safe_to_string(ctx, -1) );
-    //     syslog( LOG_ERR, ( strError, DAEMON_LOGMSG_NORMAL, DAEMON_LOGTYPE_DM );
+    //     SYSLOG( LOG_ERR, ( strError, DAEMON_LOGMSG_NORMAL, DAEMON_LOGTYPE_DM );
     // }*/
 
     // web_open_lua_libs(L);
@@ -298,7 +299,7 @@ actionLuaThread(void *pData)
 
     // if (lua_ret != LUA_OK) {
 
-    //     syslog(LOG_ERR,
+    //     SYSLOG(LOG_ERR,
     //            "Lua failed to load script from"
     //            " DM parameter. Script = %s",
     //            (const char *)pobj->m_strScript.c_str());
@@ -318,7 +319,7 @@ actionLuaThread(void *pData)
     //     // Error when executing the script
     //     lua_err_txt = lua_tostring(L, -1);
 
-    //     syslog(LOG_ERR,
+    //     SYSLOG(LOG_ERR,
     //            "Error running Lua script. "
     //            "Error = %s : Script = %s\n",
     //            lua_err_txt,

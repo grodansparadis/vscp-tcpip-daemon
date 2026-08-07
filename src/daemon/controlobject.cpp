@@ -65,16 +65,17 @@
 
 #include <algorithm>
 #include <deque>
+#include <fstream>
 #include <list>
 #include <map>
 #include <set>
 #include <string>
 
+#include <json.hpp>
+
 #include <web_css.h>
 #include <web_js.h>
 #include <web_template.h>
-
-#include <expat.h>
 
 #include <fastpbkdf2.h>
 #include <vscp_aes.h>
@@ -110,7 +111,7 @@ foo(const int i)
 #define _CRT_SECURE_NO_WARNINGS
 #endif
 
-#define XML_BUFF_SIZE 0xffff
+using json = nlohmann::json;
 
 // Prototypes
 void
@@ -130,10 +131,9 @@ UDPThread(void* pData); // udpsrv.cpp
 CControlObject::CControlObject()
 {
     // Open syslog
-    openlog("vscpd", LOG_CONS, LOG_DAEMON);
 
     if (__VSCP_DEBUG_EXTRA) {
-        syslog(LOG_DEBUG, "Starting the vscpd daemon");
+        SYSLOG(LOG_DEBUG, "Starting the vscpd daemon");
     }
 
     m_bQuit = false; // true  for app termination
@@ -141,47 +141,47 @@ CControlObject::CControlObject()
       false; // true for clientWorkerThread termination
 
     if (-1 == sem_init(&m_semClientOutputQueue, 0, 0)) {
-        syslog(LOG_ERR, "Unable to init m_semClientOutputQueue");
+        SYSLOG(LOG_ERR, "Unable to init m_semClientOutputQueue");
         return;
     }
 
     if (-1 == sem_init(&m_semSentToAllClients, 0, 0)) {
-        syslog(LOG_ERR, "Unable to init m_semSentToAllClients");
+        SYSLOG(LOG_ERR, "Unable to init m_semSentToAllClients");
         return;
     }
 
     if (0 != pthread_mutex_init(&m_mutex_ClientOutputQueue, NULL)) {
-        syslog(LOG_ERR, "Unable to init m_mutex_ClientOutputQueue");
+        SYSLOG(LOG_ERR, "Unable to init m_mutex_ClientOutputQueue");
         return;
     }
 
     if (0 != pthread_mutex_init(&m_mutex_websrvSession, NULL)) {
-        syslog(LOG_ERR, "Unable to init m_mutex_websrvSession");
+        SYSLOG(LOG_ERR, "Unable to init m_mutex_websrvSession");
         return;
     }
 
     if (0 != pthread_mutex_init(&m_mutex_restSession, NULL)) {
-        syslog(LOG_ERR, "Unable to init m_mutex_restSession");
+        SYSLOG(LOG_ERR, "Unable to init m_mutex_restSession");
         return;
     }
 
     if (0 != pthread_mutex_init(&m_mutex_websocketSession, NULL)) {
-        syslog(LOG_ERR, "Unable to init m_mutex_websocketSession");
+        SYSLOG(LOG_ERR, "Unable to init m_mutex_websocketSession");
         return;
     }
 
     if (0 != pthread_mutex_init(&m_mutex_DeviceList, NULL)) {
-        syslog(LOG_ERR, "Unable to init m_mutex_DeviceList");
+        SYSLOG(LOG_ERR, "Unable to init m_mutex_DeviceList");
         return;
     }
 
     if (0 != pthread_mutex_init(&m_mutex_clientList, NULL)) {
-        syslog(LOG_ERR, "Unable to init m_mutex_clientList");
+        SYSLOG(LOG_ERR, "Unable to init m_mutex_clientList");
         return;
     }
 
     if (0 != pthread_mutex_init(&m_mutex_UserList, NULL)) {
-        syslog(LOG_ERR, "Unable to init m_mutex_UserList");
+        SYSLOG(LOG_ERR, "Unable to init m_mutex_UserList");
         return;
     }
 
@@ -299,7 +299,7 @@ CControlObject::CControlObject()
     if (0 == mg_init_library(MG_FEATURES_IPV6 | MG_FEATURES_WEBSOCKET |
                              MG_FEATURES_LUA | MG_FEATURES_SSJS |
                              MG_FEATURES_COMPRESSION)) {
-        syslog(LOG_ERR, "Failed to initialize webserver subsystem.");
+        SYSLOG(LOG_ERR, "Failed to initialize webserver subsystem.");
     }
 
     // Initialize the CRC
@@ -313,7 +313,7 @@ CControlObject::CControlObject()
 CControlObject::~CControlObject()
 {
     if (__VSCP_DEBUG_EXTRA) {
-        syslog(LOG_DEBUG, "Cleaning up");
+        SYSLOG(LOG_DEBUG, "Cleaning up");
     }
 
     // Remove objects in Client send queue
@@ -335,54 +335,53 @@ CControlObject::~CControlObject()
     mg_exit_library();
 
     if (0 != sem_destroy(&m_semClientOutputQueue)) {
-        syslog(LOG_ERR, "Unable to destroy m_semClientOutputQueue");
+        SYSLOG(LOG_ERR, "Unable to destroy m_semClientOutputQueue");
     }
 
     if (0 != sem_destroy(&m_semSentToAllClients)) {
-        syslog(LOG_ERR, "Unable to destroy m_semSentToAllClients");
+        SYSLOG(LOG_ERR, "Unable to destroy m_semSentToAllClients");
     }
 
     if (0 != pthread_mutex_destroy(&m_mutex_ClientOutputQueue)) {
-        syslog(LOG_ERR, "Unable to destroy m_mutex_ClientOutputQueue");
+        SYSLOG(LOG_ERR, "Unable to destroy m_mutex_ClientOutputQueue");
         return;
     }
 
     if (0 != pthread_mutex_destroy(&m_mutex_websrvSession)) {
-        syslog(LOG_ERR, "Unable to destroy m_mutex_websrvSession");
+        SYSLOG(LOG_ERR, "Unable to destroy m_mutex_websrvSession");
         return;
     }
 
     if (0 != pthread_mutex_destroy(&m_mutex_restSession)) {
-        syslog(LOG_ERR, "Unable to destroy m_mutex_restSession");
+        SYSLOG(LOG_ERR, "Unable to destroy m_mutex_restSession");
         return;
     }
 
     if (0 != pthread_mutex_destroy(&m_mutex_websocketSession)) {
-        syslog(LOG_ERR, "Unable to destroy m_mutex_websocketSession");
+        SYSLOG(LOG_ERR, "Unable to destroy m_mutex_websocketSession");
         return;
     }
 
     if (0 != pthread_mutex_destroy(&m_mutex_DeviceList)) {
-        syslog(LOG_ERR, "Unable to destroy m_mutex_DeviceList");
+        SYSLOG(LOG_ERR, "Unable to destroy m_mutex_DeviceList");
         return;
     }
 
     if (0 != pthread_mutex_destroy(&m_mutex_clientList)) {
-        syslog(LOG_ERR, "Unable to destroy m_mutex_clientList");
+        SYSLOG(LOG_ERR, "Unable to destroy m_mutex_clientList");
         return;
     }
 
     if (0 != pthread_mutex_destroy(&m_mutex_UserList)) {
-        syslog(LOG_ERR, "Unable to destroy m_mutex_UserList");
+        SYSLOG(LOG_ERR, "Unable to destroy m_mutex_UserList");
         return;
     }
 
     if (__VSCP_DEBUG_EXTRA) {
-        syslog(LOG_DEBUG, "Terminating the vscpd daemon");
+        SYSLOG(LOG_DEBUG, "Terminating the vscpd daemon");
     }
 
     // Close syslog
-    closelog();
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -399,7 +398,7 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
 
     // Root folder must exist
     if (!vscp_fileExists(m_rootFolder.c_str())) {
-        syslog(LOG_ERR,
+        SYSLOG(LOG_ERR,
                "The specified rootfolder does not exist (%s).",
                (const char*)m_rootFolder.c_str());
         return false;
@@ -414,25 +413,25 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
     // A configuration file must be available
     if (!vscp_fileExists(strcfgfile.c_str())) {
         printf("No configuration file. Can't initialize!.");
-        syslog(LOG_ERR,
+        SYSLOG(LOG_ERR,
                "No configuration file. Can't initialize!. Path=%s",
                strcfgfile.c_str());
         return false;
     }
 
     ////////////////////////////////////////////////////////////////////////////
-    //                         Read XML configuration
+    //                        Read JSON configuration
     ////////////////////////////////////////////////////////////////////////////
 
-    // Read XML configuration
+    // Read JSON configuration
     if (__VSCP_DEBUG_EXTRA) {
-        syslog(LOG_DEBUG, "Reading configuration file");
+        SYSLOG(LOG_DEBUG, "Reading configuration file");
     }
 
-    // Read XML configuration
+    // Read JSON configuration
     try {
         if (!readConfiguration(strcfgfile)) {
-            syslog(LOG_ERR,
+            SYSLOG(LOG_ERR,
                    "Unable to open/parse configuration file. Can't initialize! "
                    "Path =%s",
                    strcfgfile.c_str());
@@ -440,7 +439,7 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
         }
     }
     catch (...) {
-        syslog(LOG_ERR, "Exception when reading configuration file");
+        SYSLOG(LOG_ERR, "Exception when reading configuration file");
         return FALSE;
     }
 
@@ -448,19 +447,19 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
     if (m_runAsUser.length()) {
         struct passwd* pw;
         if (NULL == (pw = getpwnam(m_runAsUser.c_str()))) {
-            syslog(LOG_ERR, "Unknown user.");
+            SYSLOG(LOG_ERR, "Unknown user.");
         }
         else if (setgid(pw->pw_gid) != 0) {
-            syslog(LOG_ERR, "setgid() failed. [%s]", strerror(errno));
+            SYSLOG(LOG_ERR, "setgid() failed. [%s]", strerror(errno));
         }
         else if (setuid(pw->pw_uid) != 0) {
-            syslog(LOG_ERR, "setuid() failed. [%s]", strerror(errno));
+            SYSLOG(LOG_ERR, "setuid() failed. [%s]", strerror(errno));
         }
     }
 #endif
 
     if (__VSCP_DEBUG_EXTRA) {
-        syslog(LOG_DEBUG, "Using configuration file: %s", strcfgfile.c_str());
+        SYSLOG(LOG_DEBUG, "Using configuration file: %s", strcfgfile.c_str());
     }
 
     //==========================================================================
@@ -527,14 +526,14 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
     str += VSCPD_DISPLAY_VERSION;
     str += " - ";
     str += VSCPD_COPYRIGHT;
-    syslog(LOG_INFO, "%s", str.c_str());
+    SYSLOG(LOG_INFO, "%s", str.c_str());
 
     // Start daemon internal client worker thread
     try {
         startClientMsgWorkerThread();
     }
     catch (...) {
-        syslog(LOG_ERR, "Exception when starting message worker thread");
+        SYSLOG(LOG_ERR, "Exception when starting message worker thread");
         return FALSE;
     }
 
@@ -546,7 +545,7 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
         start_webserver();
     }
     catch (...) {
-        syslog(LOG_ERR, "Exception when starting web server");
+        SYSLOG(LOG_ERR, "Exception when starting web server");
         return FALSE;
     }
 
@@ -555,7 +554,7 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
         startTcpipSrvThread();
     }
     catch (...) {
-        syslog(LOG_ERR, "Exception when starting tcp/ip server");
+        SYSLOG(LOG_ERR, "Exception when starting tcp/ip server");
         return FALSE;
     }
 
@@ -564,7 +563,7 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
         startDeviceWorkerThreads();
     }
     catch (...) {
-        syslog(LOG_ERR, "Exception when loading drivers");
+        SYSLOG(LOG_ERR, "Exception when loading drivers");
         return FALSE;
     }
 
@@ -585,7 +584,7 @@ CControlObject::run(void)
     // We need to create a clientItem and add this object to the list
     CClientItem* pClientItem = new CClientItem;
     if (NULL == pClientItem) {
-        syslog(LOG_ERR, "Unable to allocate Client item, Ending.");
+        SYSLOG(LOG_ERR, "Unable to allocate Client item, Ending.");
         return false;
     }
 
@@ -600,7 +599,7 @@ CControlObject::run(void)
     if (!addClient(pClientItem, CLIENT_ID_INTERNAL)) {
         // Failed to add client
         delete pClientItem;
-        syslog(LOG_ERR, "ControlObject: Failed to add internal client.");
+        SYSLOG(LOG_ERR, "ControlObject: Failed to add internal client.");
         pthread_mutex_unlock(&m_clientList.m_mutexItemList);
         delete pClientItem;
         return false;
@@ -608,7 +607,7 @@ CControlObject::run(void)
     pthread_mutex_unlock(&m_clientList.m_mutexItemList);
 
     if (__VSCP_DEBUG_EXTRA) {
-        syslog(LOG_DEBUG, "Mainloop starting");
+        SYSLOG(LOG_DEBUG, "Mainloop starting");
     }
 
 #ifdef WITH_SYSTEMD
@@ -634,7 +633,7 @@ CControlObject::run(void)
             clock_gettime(CLOCK_REALTIME, &old_now);
 
             if (!automation(pClientItem)) {
-                syslog(LOG_ERR, "Failed to send automation events!");
+                SYSLOG(LOG_ERR, "Failed to send automation events!");
             }
         }
 
@@ -678,7 +677,7 @@ CControlObject::run(void)
     // Clean up is called in main file
 
     if (__VSCP_DEBUG_EXTRA) {
-        syslog(LOG_DEBUG, "Mainloop ending");
+        SYSLOG(LOG_DEBUG, "Mainloop ending");
     }
 
     return true;
@@ -710,7 +709,7 @@ CControlObject::automation(CClientItem* pClientItem)
     ex.data[2] = 0; // subzone
 
     if (!sendEvent(pClientItem, &ex)) {
-        syslog(LOG_ERR, "Failed to send Class1 heartbeat");
+        SYSLOG(LOG_ERR, "Failed to send Class1 heartbeat");
     }
 
     // Send VSCP_CLASS2_INFORMATION,
@@ -732,7 +731,7 @@ CControlObject::automation(CClientItem* pClientItem)
            std::min((int)strlen(m_strServerName.c_str()), 64));
 
     if (!sendEvent(pClientItem, &ex)) {
-        syslog(LOG_ERR, "Failed to send Class2 heartbeat");
+        SYSLOG(LOG_ERR, "Failed to send Class2 heartbeat");
     }
 
     // Send VSCP_CLASS1_PROTOCOL,
@@ -759,7 +758,7 @@ CControlObject::automation(CClientItem* pClientItem)
     ex.data[4] = (uint8_t)((time32)&0xff); // Time since epoch LSB
 
     if (!sendEvent(pClientItem, &ex)) {
-        syslog(LOG_ERR, "Failed to send segment controller heartbeat");
+        SYSLOG(LOG_ERR, "Failed to send segment controller heartbeat");
     }
 
     // Send VSCP_CLASS2_PROTOCOL,
@@ -800,7 +799,7 @@ CControlObject::automation(CClientItem* pClientItem)
     ex.sizeData = 104;
 
     if (!sendEvent(pClientItem, &ex)) {
-        syslog(LOG_ERR, "Failed to send high end server capabilities.");
+        SYSLOG(LOG_ERR, "Failed to send high end server capabilities.");
     }
 
     return true;
@@ -813,13 +812,13 @@ bool
 CControlObject::cleanup(void)
 {
     if (__VSCP_DEBUG_EXTRA) {
-        syslog(LOG_DEBUG,
+        SYSLOG(LOG_DEBUG,
                "ControlObject: cleanup - Giving worker threads time to stop "
                "operations...");
     }
 
     if (__VSCP_DEBUG_EXTRA) {
-        syslog(LOG_DEBUG,
+        SYSLOG(LOG_DEBUG,
                "ControlObject: cleanup - Stopping device worker thread...");
     }
 
@@ -827,12 +826,12 @@ CControlObject::cleanup(void)
         stopDeviceWorkerThreads();
     }
     catch (...) {
-        syslog(LOG_ERR,
+        SYSLOG(LOG_ERR,
                "REST: Exception occurred when stoping device worker threads");
     }
 
     if (__VSCP_DEBUG_EXTRA) {
-        syslog(
+        SYSLOG(
           LOG_DEBUG,
           "ControlObject: cleanup - Stopping VSCP Server worker thread...");
     }
@@ -840,7 +839,7 @@ CControlObject::cleanup(void)
     // stopDaemonWorkerThread(); *****
 
     if (__VSCP_DEBUG_EXTRA) {
-        syslog(LOG_DEBUG,
+        SYSLOG(LOG_DEBUG,
                "ControlObject: cleanup - Stopping client worker thread...");
     }
 
@@ -848,11 +847,11 @@ CControlObject::cleanup(void)
         stopClientMsgWorkerThread();
     }
     catch (...) {
-        syslog(LOG_ERR, "Exception occurred when stoping client worker thread");
+        SYSLOG(LOG_ERR, "Exception occurred when stoping client worker thread");
     }
 
     if (__VSCP_DEBUG_EXTRA) {
-        syslog(LOG_DEBUG,
+        SYSLOG(LOG_DEBUG,
                "ControlObject: cleanup - Stopping Web Server worker thread...");
     }
 
@@ -860,11 +859,11 @@ CControlObject::cleanup(void)
         stop_webserver();
     }
     catch (...) {
-        syslog(LOG_ERR, "REST: Exception occurred when stoping web server");
+        SYSLOG(LOG_ERR, "REST: Exception occurred when stoping web server");
     }
 
     if (__VSCP_DEBUG_EXTRA) {
-        syslog(LOG_DEBUG,
+        SYSLOG(LOG_DEBUG,
                "ControlObject: cleanup - Stopping TCP/IP worker thread...");
     }
 
@@ -872,11 +871,11 @@ CControlObject::cleanup(void)
         stopTcpipSrvThread();
     }
     catch (...) {
-        syslog(LOG_ERR, "REST: Exception occurred when stoping tcp/ip server");
+        SYSLOG(LOG_ERR, "REST: Exception occurred when stoping tcp/ip server");
     }
 
     if (__VSCP_DEBUG_EXTRA) {
-        syslog(LOG_DEBUG, "Controlobject: ControlObject: Cleanup done.");
+        SYSLOG(LOG_DEBUG, "Controlobject: ControlObject: Cleanup done.");
     }
 
     return true;
@@ -890,7 +889,7 @@ bool
 CControlObject::startClientMsgWorkerThread(void)
 {
     if (__VSCP_DEBUG_EXTRA) {
-        syslog(LOG_DEBUG, "Controlobject: Starting client worker thread...");
+        SYSLOG(LOG_DEBUG, "Controlobject: Starting client worker thread...");
     }
 
     if (pthread_create(&m_clientMsgWorkerThread,
@@ -898,7 +897,7 @@ CControlObject::startClientMsgWorkerThread(void)
                        clientMsgWorkerThread,
                        this)) {
 
-        syslog(LOG_ERR, "Controlobject: Unable to start client thread.");
+        SYSLOG(LOG_ERR, "Controlobject: Unable to start client thread.");
         return false;
     }
 
@@ -928,19 +927,19 @@ CControlObject::startTcpipSrvThread(void)
 {
     if (!m_enableTcpip) {
         if (__VSCP_DEBUG_TCP) {
-            syslog(LOG_DEBUG, "Controlobject: TCP/IP interface disabled.");
+            SYSLOG(LOG_DEBUG, "Controlobject: TCP/IP interface disabled.");
         }
         return true;
     }
 
     if (__VSCP_DEBUG_TCP) {
-        syslog(LOG_DEBUG, "Controlobject: Starting TCP/IP interface...");
+        SYSLOG(LOG_DEBUG, "Controlobject: Starting TCP/IP interface...");
     }
 
     // Create the tcp/ip server data object
     m_ptcpipSrvObject = (tcpipListenThreadObj*)new tcpipListenThreadObj(this);
     if (NULL == m_ptcpipSrvObject) {
-        syslog(LOG_ERR,
+        SYSLOG(LOG_ERR,
                "Controlobject: Failed to allocate storage for tcp/ip.");
     }
 
@@ -953,7 +952,7 @@ CControlObject::startTcpipSrvThread(void)
                        m_ptcpipSrvObject)) {
         delete m_ptcpipSrvObject;
         m_ptcpipSrvObject = NULL;
-        syslog(LOG_ERR,
+        SYSLOG(LOG_ERR,
                "Controlobject: Unable to start the tcp/ip listen thread.");
         return false;
     }
@@ -972,7 +971,7 @@ CControlObject::stopTcpipSrvThread(void)
     m_ptcpipSrvObject->m_nStopTcpIpSrv = VSCP_TCPIP_SRV_STOP;
 
     if (__VSCP_DEBUG_TCP) {
-        syslog(LOG_DEBUG, "Controlobject: Terminating TCP thread.");
+        SYSLOG(LOG_DEBUG, "Controlobject: Terminating TCP thread.");
     }
 
     pthread_join(m_tcpipListenThread, NULL);
@@ -980,7 +979,7 @@ CControlObject::stopTcpipSrvThread(void)
     m_ptcpipSrvObject = NULL;
 
     if (__VSCP_DEBUG_TCP) {
-        syslog(LOG_DEBUG, "Controlobject: Terminated TCP thread.");
+        SYSLOG(LOG_DEBUG, "Controlobject: Terminated TCP thread.");
     }
 
     return true;
@@ -995,7 +994,7 @@ CControlObject::startDeviceWorkerThreads(void)
 {
     CDeviceItem* pDeviceItem;
     if (__VSCP_DEBUG_EXTRA) {
-        syslog(LOG_DEBUG, "[Controlobject][Driver] - Starting drivers...");
+        SYSLOG(LOG_DEBUG, "[Controlobject][Driver] - Starting drivers...");
     }
 
     std::deque<CDeviceItem*>::iterator it;
@@ -1007,7 +1006,7 @@ CControlObject::startDeviceWorkerThreads(void)
         if (NULL != pDeviceItem) {
 
             if (__VSCP_DEBUG_EXTRA) {
-                syslog(LOG_DEBUG,
+                SYSLOG(LOG_DEBUG,
                        "Controlobject: [Driver] - Preparing: %s ",
                        pDeviceItem->m_strName.c_str());
             }
@@ -1017,7 +1016,7 @@ CControlObject::startDeviceWorkerThreads(void)
                 continue;
 
             if (__VSCP_DEBUG_EXTRA) {
-                syslog(LOG_DEBUG,
+                SYSLOG(LOG_DEBUG,
                        "Controlobject: [Driver] - Starting: %s ",
                        pDeviceItem->m_strName.c_str());
             }
@@ -1041,7 +1040,7 @@ CControlObject::stopDeviceWorkerThreads(void)
     CDeviceItem* pDeviceItem;
 
     if (__VSCP_DEBUG_EXTRA) {
-        syslog(LOG_DEBUG, "[Controlobject][Driver] - Stopping drivers...");
+        SYSLOG(LOG_DEBUG, "[Controlobject][Driver] - Stopping drivers...");
     }
     std::deque<CDeviceItem*>::iterator iter;
     for (iter = m_deviceList.m_devItemList.begin();
@@ -1051,7 +1050,7 @@ CControlObject::stopDeviceWorkerThreads(void)
         pDeviceItem = *iter;
         if (NULL != pDeviceItem) {
             if (__VSCP_DEBUG_EXTRA) {
-                syslog(LOG_DEBUG,
+                SYSLOG(LOG_DEBUG,
                        "Controlobject: [Driver] - Stopping: %s ",
                        pDeviceItem->m_strName.c_str());
             }
@@ -1198,18 +1197,18 @@ CControlObject::sendEventToClient(CClientItem* pClientItem, vscpEvent* pEvent)
 {
     // Must be valid pointers
     if (NULL == pClientItem) {
-        syslog(LOG_ERR, "sendEventToClient - Pointer to clientitem is null");
+        SYSLOG(LOG_ERR, "sendEventToClient - Pointer to clientitem is null");
         return false;
     }
     if (NULL == pEvent) {
-        syslog(LOG_ERR, "sendEventToClient - Pointer to event is null");
+        SYSLOG(LOG_ERR, "sendEventToClient - Pointer to event is null");
         return false;
     }
 
     // Check if filtered out - if so do nothing here
     if (!vscp_doLevel2Filter(pEvent, &pClientItem->m_filter)) {
         if (__VSCP_DEBUG_EXTRA) {
-            syslog(LOG_DEBUG, "sendEventToClient - Filtered out");
+            SYSLOG(LOG_DEBUG, "sendEventToClient - Filtered out");
         }
         return false;
     }
@@ -1219,7 +1218,7 @@ CControlObject::sendEventToClient(CClientItem* pClientItem, vscpEvent* pEvent)
     if (pClientItem->m_clientInputQueue.size() >
         m_maxItemsInClientReceiveQueue) {
         if (__VSCP_DEBUG_EXTRA) {
-            syslog(LOG_DEBUG, "sendEventToClient - overrun");
+            SYSLOG(LOG_DEBUG, "sendEventToClient - overrun");
         }
         // Overrun
         pClientItem->m_statistics.cntOverruns++;
@@ -1257,7 +1256,7 @@ CControlObject::sendEventAllClients(vscpEvent* pEvent, uint32_t excludeID)
     std::deque<CClientItem*>::iterator it;
 
     if (NULL == pEvent) {
-        syslog(LOG_ERR, "sendEventAllClients - null event");
+        SYSLOG(LOG_ERR, "sendEventAllClients - null event");
         return false;
     }
 
@@ -1269,12 +1268,12 @@ CControlObject::sendEventAllClients(vscpEvent* pEvent, uint32_t excludeID)
 
         if ((NULL != pClientItem) && (excludeID != pClientItem->m_clientID)) {
             if (__VSCP_DEBUG_EXTRA) {
-                syslog(LOG_DEBUG,
+                SYSLOG(LOG_DEBUG,
                        "Send event to client [%s]",
                        pClientItem->m_strDeviceName.c_str());
             }
             if (!sendEventToClient(pClientItem, pEvent)) {
-                syslog(LOG_ERR, "sendEventAllClients - Failed to send event");
+                SYSLOG(LOG_ERR, "sendEventAllClients - Failed to send event");
             }
         }
     }
@@ -1297,11 +1296,11 @@ CControlObject::sendEvent(CClientItem* pClientItem, vscpEvent* peventToSend)
 
     // Check pointers
     if (NULL == pClientItem) {
-        syslog(LOG_ERR, "sendEvent - null clientItem");
+        SYSLOG(LOG_ERR, "sendEvent - null clientItem");
         return false;
     }
     if (NULL == peventToSend) {
-        syslog(LOG_ERR, "sendEvent - null event");
+        SYSLOG(LOG_ERR, "sendEvent - null event");
         return false;
     }
 
@@ -1322,7 +1321,7 @@ CControlObject::sendEvent(CClientItem* pClientItem, vscpEvent* peventToSend)
 
     vscpEvent* pEvent = new vscpEvent; // Create new VSCP Event
     if (NULL == pEvent) {
-        syslog(LOG_ERR, "sendEvent - Allocation of event failed");
+        SYSLOG(LOG_ERR, "sendEvent - Allocation of event failed");
         return false;
     }
 
@@ -1331,7 +1330,7 @@ CControlObject::sendEvent(CClientItem* pClientItem, vscpEvent* peventToSend)
     // Copy event
     if (!vscp_copyEvent(pEvent, peventToSend)) {
         vscp_deleteEvent_v2(&pEvent);
-        syslog(LOG_ERR, "sendEvent - Event copy failed");
+        SYSLOG(LOG_ERR, "sendEvent - Event copy failed");
         return false;
     }
 
@@ -1358,7 +1357,7 @@ CControlObject::sendEvent(CClientItem* pClientItem, vscpEvent* peventToSend)
         destguid.setAt(15, 0);
 
         if (__VSCP_DEBUG_EXTRA) {
-            syslog(LOG_DEBUG,
+            SYSLOG(LOG_DEBUG,
                    "Level I event over Level II "
                    "dest = %02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:"
                    "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:",
@@ -1390,7 +1389,7 @@ CControlObject::sendEvent(CClientItem* pClientItem, vscpEvent* peventToSend)
 
             CClientItem* pItem = *it;
             if (__VSCP_DEBUG_EXTRA) {
-                syslog(LOG_DEBUG,
+                SYSLOG(LOG_DEBUG,
                        "Test if = "
                        "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:  - %s",
                        pItem->m_guid.getAt(0),
@@ -1410,7 +1409,7 @@ CControlObject::sendEvent(CClientItem* pClientItem, vscpEvent* peventToSend)
                        pItem->m_guid.getAt(14),
                        pItem->m_guid.getAt(15),
                        pItem->m_strDeviceName.c_str());
-                syslog(LOG_DEBUG,"Match = %s",
+                SYSLOG(LOG_DEBUG,"Match = %s",
                         (pItem->m_guid == destguid) ? "true" : "false" );       
             }
 
@@ -1419,7 +1418,7 @@ CControlObject::sendEvent(CClientItem* pClientItem, vscpEvent* peventToSend)
                 // pDestClientItem = pItem;
                 bSent = true;
                 if (!sendEventToClient(pItem, pEvent)) {
-                    syslog(LOG_DEBUG,"sendEventToClient: Failed!");
+                    SYSLOG(LOG_DEBUG,"sendEventToClient: Failed!");
                 }
                 break;
             }
@@ -1446,7 +1445,7 @@ CControlObject::sendEvent(CClientItem* pClientItem, vscpEvent* peventToSend)
         }
         else {
             if (__VSCP_DEBUG_EXTRA) {
-                syslog(LOG_DEBUG, "sendEvent - overrun");
+                SYSLOG(LOG_DEBUG, "sendEvent - overrun");
             }
             pClientItem->m_statistics.cntOverruns++;
             vscp_deleteEvent_v2(&pEvent);
@@ -1468,12 +1467,12 @@ CControlObject::sendEvent(CClientItem* pClientItem, vscpEventEx* pex)
     vscpEvent ev;
 
     if (!vscp_convertEventExToEvent(&ev, pex)) {
-        syslog(LOG_ERR, "sendEvent: Failed in vscp_convertEventExToEvent");
+        SYSLOG(LOG_ERR, "sendEvent: Failed in vscp_convertEventExToEvent");
         return false;
     }
 
     if (!(rv = sendEvent(pClientItem, &ev))) {
-        syslog(LOG_ERR, "sendEvent: Failed to send event");
+        SYSLOG(LOG_ERR, "sendEvent: Failed to send event");
     }
 
     vscp_deleteEvent(&ev);
@@ -1653,7 +1652,7 @@ CControlObject::getMacAddress(cguid& guid)
 
         // ptr = (unsigned char *)&s.ifr_ifru.ifru_hwaddr.sa_data[0];
         if (__VSCP_DEBUG_EXTRA) {
-            syslog(LOG_DEBUG,
+            SYSLOG(LOG_DEBUG,
                    "Ethernet MAC address: %02X:%02X:%02X:%02X:%02X:%02X",
                    (uint8_t)s.ifr_addr.sa_data[0],
                    (uint8_t)s.ifr_addr.sa_data[1],
@@ -1681,7 +1680,7 @@ CControlObject::getMacAddress(cguid& guid)
         guid.setAt(15, 0);
     }
     else {
-        syslog(LOG_ERR, "Failed to get hardware address (must be root?).");
+        SYSLOG(LOG_ERR, "Failed to get hardware address (must be root?).");
         rv = false;
     }
 
@@ -1779,955 +1778,382 @@ CControlObject::getSystemKeyMD5(std::string& strKey)
 }
 
 // ----------------------------------------------------------------------------
-// FULL XML configuration callbacks
-// ----------------------------------------------------------------------------
-
-static int depth_full_config_parser = 0;
-static int bVscpConfigFound         = 0;
-static int bGeneralConfigFound      = 0;
-static int bRemoteUserConfigFound   = 0;
-static int bLevel1DriverConfigFound = 0;
-static int bLevel2DriverConfigFound = 0;
-static int bLevel3DriverConfigFound = 0;
-
-static void
-startFullConfigParser(void* data, const char* name, const char** attr)
-{
-    CControlObject* pObj = (CControlObject*)data;
-    if (NULL == data)
-        return;
-
-    // fprintf(stderr, "%s\n", name);
-
-    if ((0 == depth_full_config_parser) &&
-        (0 == vscp_strcasecmp(name, "vscpconfig"))) {
-        bVscpConfigFound = TRUE;
-    }
-    else if (bVscpConfigFound && (1 == depth_full_config_parser) &&
-             (0 == vscp_strcasecmp(name, "general"))) {
-        bGeneralConfigFound = TRUE;
-
-        for (int i = 0; attr[i]; i += 2) {
-
-            std::string attribute = attr[i + 1];
-            vscp_trim(attribute);
-
-            if (0 == vscp_strcasecmp(attr[i], "clientbuffersize")) {
-                pObj->m_maxItemsInClientReceiveQueue =
-                  vscp_readStringValue(attribute);
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "runasuser")) {
-                vscp_trim(attribute);
-                pObj->m_runAsUser = attribute;
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "guid")) {
-                pObj->m_guid.getFromString(attribute);
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "servername")) {
-                pObj->m_strServerName = attribute;
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "webadminif")) {
-                if (0 == vscp_strcasecmp(attribute.c_str(), "true")) {
-                    pObj->m_enableWebAdminIf = true;
-                }
-                else {
-                    pObj->m_enableWebAdminIf = false;
-                }
-            }
-        }
-    }
-    else if (bVscpConfigFound && bGeneralConfigFound &&
-             (2 == depth_full_config_parser) &&
-             (0 == vscp_strcasecmp(name, "debug"))) {
-
-        for (int i = 0; attr[i]; i += 2) {
-
-            std::string attribute = attr[i + 1];
-            vscp_trim(attribute);
-
-            if (0 == vscp_strcasecmp(attr[i], "byte1")) {
-                if (attribute.length()) {
-                    pObj->m_debugFlags[0] = vscp_readStringValue(attribute);
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "byte2")) {
-                if (attribute.length()) {
-                    pObj->m_debugFlags[1] = vscp_readStringValue(attribute);
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "byte3")) {
-                if (attribute.length()) {
-                    pObj->m_debugFlags[2] = vscp_readStringValue(attribute);
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "byte4")) {
-                if (attribute.length()) {
-                    pObj->m_debugFlags[3] = vscp_readStringValue(attribute);
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "byte5")) {
-                if (attribute.length()) {
-                    pObj->m_debugFlags[4] = vscp_readStringValue(attribute);
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "byte6")) {
-                if (attribute.length()) {
-                    pObj->m_debugFlags[5] = vscp_readStringValue(attribute);
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "byte7")) {
-                if (attribute.length()) {
-                    pObj->m_debugFlags[6] = vscp_readStringValue(attribute);
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "byte8")) {
-                if (attribute.length()) {
-                    pObj->m_debugFlags[7] = vscp_readStringValue(attribute);
-                }
-            }
-        }
-    }
-    else if (bVscpConfigFound && bGeneralConfigFound &&
-             (2 == depth_full_config_parser) &&
-             (0 == vscp_strcasecmp(name, "security"))) {
-
-        for (int i = 0; attr[i]; i += 2) {
-
-            std::string attribute = attr[i + 1];
-            vscp_trim(attribute);
-
-            if (0 == vscp_strcasecmp(attr[i], "admin")) {
-                pObj->m_admin_user = attribute;
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "password")) {
-                pObj->m_admin_password = attribute;
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "allowfrom")) {
-                pObj->m_admin_allowfrom = attribute;
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "vscptoken")) {
-                pObj->m_vscptoken = attribute;
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "vscpkey")) {
-                if (attribute.length()) {
-                    vscp_hexStr2ByteArray(pObj->m_systemKey,
-                                          32,
-                                          attribute.c_str());
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "authentication_domain")) {
-                if (attribute.length()) {
-                    pObj->m_web_authentication_domain = attribute;
-                }
-            }
-        }
-    }
-    else if (bVscpConfigFound && (1 == depth_full_config_parser) &&
-             (0 == vscp_strcasecmp(name, "tcpip"))) {
-
-        for (int i = 0; attr[i]; i += 2) {
-
-            std::string attribute = attr[i + 1];
-            vscp_trim(attribute);
-
-            if (0 == vscp_strcasecmp(attr[i], "enable")) {
-                if (0 == vscp_strcasecmp(attribute.c_str(), "true")) {
-                    pObj->m_enableTcpip = true;
-                }
-                else {
-                    pObj->m_enableTcpip = false;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "interface")) {
-                vscp_startsWith(attribute, "tcp://", &attribute);
-                vscp_trim(attribute);
-                pObj->m_strTcpInterfaceAddress = attribute;
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "ssl_certificate")) {
-                pObj->m_tcpip_ssl_certificate = attribute;
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "ssl_verify_peer")) {
-                pObj->m_tcpip_ssl_verify_peer = vscp_readStringValue(attribute);
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "ssl_certificate_chain")) {
-                pObj->m_tcpip_ssl_certificate_chain = attribute;
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "ssl_ca_path")) {
-                pObj->m_tcpip_ssl_ca_path = attribute;
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "ssl_ca_file")) {
-                pObj->m_tcpip_ssl_ca_file = attribute;
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "ssl_verify_depth")) {
-                pObj->m_tcpip_ssl_verify_depth =
-                  vscp_readStringValue(attribute);
-            }
-            else if (0 ==
-                     vscp_strcasecmp(attr[i], "ssl_default_verify_paths")) {
-                if (0 == vscp_strcasecmp(attribute.c_str(), "true")) {
-                    pObj->m_tcpip_ssl_default_verify_paths = true;
-                }
-                else {
-                    pObj->m_tcpip_ssl_default_verify_paths = false;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "ssl_cipher_list")) {
-                pObj->m_tcpip_ssl_cipher_list = attribute;
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "ssl_protocol_version")) {
-                pObj->m_tcpip_ssl_verify_depth =
-                  vscp_readStringValue(attribute);
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "ssl_short_trust")) {
-                if (0 == vscp_strcasecmp(attribute.c_str(), "true")) {
-                    pObj->m_tcpip_ssl_short_trust = true;
-                }
-                else {
-                    pObj->m_tcpip_ssl_short_trust = false;
-                }
-            }
-        }
-    }
-
-    else if (bVscpConfigFound && (1 == depth_full_config_parser) &&
-             (0 == vscp_strcasecmp(name, "webserver"))) {
-
-        for (int i = 0; attr[i]; i += 2) {
-
-            std::string attribute = attr[i + 1];
-            vscp_trim(attribute);
-
-            if (0 == vscp_strcasecmp(attr[i], "enable")) {
-                if (0 == vscp_strcasecmp(attribute.c_str(), "true")) {
-                    pObj->m_web_bEnable = true;
-                }
-                else {
-                    pObj->m_web_bEnable = false;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "document_root")) {
-                if (attribute.length()) {
-                    pObj->m_web_document_root = attribute;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "listening_ports")) {
-                if (attribute.length()) {
-                    pObj->m_web_listening_ports = attribute;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "index_files")) {
-                if (attribute.length()) {
-                    pObj->m_web_index_files = vscp_trim_copy(attribute);
-                    ;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "authentication_domain")) {
-                if (attribute.length()) {
-                    pObj->m_web_authentication_domain = attribute;
-                }
-            }
-            else if (0 ==
-                     vscp_strcasecmp(attr[i], "enable_auth_domain_check")) {
-                if (0 == vscp_strcasecmp(attribute.c_str(), "true")) {
-                    pObj->m_enable_auth_domain_check = true;
-                }
-                else {
-                    pObj->m_enable_auth_domain_check = false;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "ssl_certificat")) {
-                if (attribute.length()) {
-                    pObj->m_web_ssl_certificate = attribute;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "ssl_certificat_chain")) {
-                if (attribute.length()) {
-                    pObj->m_web_ssl_certificate_chain = attribute;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "ssl_verify_peer")) {
-                if (0 == vscp_strcasecmp(attribute.c_str(), "true")) {
-                    pObj->m_web_ssl_verify_peer = true;
-                }
-                else {
-                    pObj->m_web_ssl_verify_peer = false;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "ssl_ca_path")) {
-                if (attribute.length()) {
-                    pObj->m_web_ssl_ca_path = attribute;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "ssl_ca_file")) {
-                if (attribute.length()) {
-                    pObj->m_web_ssl_ca_file = attribute;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "ssl_verify_depth")) {
-                if (attribute.length()) {
-                    pObj->m_web_ssl_verify_depth =
-                      vscp_readStringValue(attribute);
-                }
-            }
-            else if (0 ==
-                     vscp_strcasecmp(attr[i], "ssl_default_verify_paths")) {
-                if (0 == vscp_strcasecmp(attribute.c_str(), "true")) {
-                    pObj->m_web_ssl_default_verify_paths = true;
-                }
-                else {
-                    pObj->m_web_ssl_default_verify_paths = false;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "ssl_cipher_list")) {
-                if (attribute.length()) {
-                    pObj->m_web_ssl_cipher_list = attribute;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "ssl_protcol_version")) {
-                if (attribute.length()) {
-                    pObj->m_web_ssl_protocol_version =
-                      vscp_readStringValue(attribute);
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "ssl_short_trust")) {
-                if (0 == vscp_strcasecmp(attribute.c_str(), "true")) {
-                    pObj->m_web_ssl_short_trust = true;
-                }
-                else {
-                    pObj->m_web_ssl_short_trust = false;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "cgi_interpreter")) {
-                if (attribute.length()) {
-                    pObj->m_web_cgi_interpreter = attribute;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "cgi_pattern")) {
-                if (attribute.length()) {
-                    pObj->m_web_cgi_patterns = attribute;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "cgi_environment")) {
-                if (attribute.length()) {
-                    pObj->m_web_cgi_environment = attribute;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "protect_uri")) {
-                if (attribute.length()) {
-                    pObj->m_web_protect_uri = attribute;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "trottle")) {
-                if (attribute.length()) {
-                    pObj->m_web_trottle = attribute;
-                }
-            }
-            else if (0 ==
-                     vscp_strcasecmp(attr[i], "enable_directory_listing")) {
-                if (0 == vscp_strcasecmp(attribute.c_str(), "true")) {
-                    pObj->m_web_enable_directory_listing = true;
-                }
-                else {
-                    pObj->m_web_enable_directory_listing = false;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "enable_keep_alive")) {
-                if (0 == vscp_strcasecmp(attribute.c_str(), "true")) {
-                    pObj->m_web_enable_keep_alive = true;
-                }
-                else {
-                    pObj->m_web_enable_keep_alive = false;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "keep_alive_timeout_ms")) {
-                if (attribute.length()) {
-                    pObj->m_web_keep_alive_timeout_ms =
-                      vscp_readStringValue(attribute);
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "access_control_list")) {
-                if (attribute.length()) {
-                    pObj->m_web_access_control_list = attribute;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "extra_mime_types")) {
-                if (attribute.length()) {
-                    pObj->m_web_extra_mime_types = attribute;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "num_threads")) {
-                if (attribute.length()) {
-                    pObj->m_web_num_threads = vscp_readStringValue(attribute);
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "hide_file_pattern")) {
-                if (attribute.length()) {
-                    pObj->m_web_hide_file_patterns = attribute;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "url_rewrite_patterns")) {
-                if (attribute.length()) {
-                    pObj->m_web_url_rewrite_patterns = attribute;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "hide_file_patterns")) {
-                if (attribute.length()) {
-                    pObj->m_web_hide_file_patterns = attribute;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "request_timeout_ms")) {
-                if (attribute.length()) {
-                    pObj->m_web_request_timeout_ms =
-                      vscp_readStringValue(attribute);
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "linger_timeout_ms")) {
-                if (attribute.length()) {
-                    pObj->m_web_linger_timeout_ms =
-                      vscp_readStringValue(attribute);
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "decode_url")) {
-                if (0 == vscp_strcasecmp(attribute.c_str(), "true")) {
-                    pObj->m_web_decode_url = true;
-                }
-                else {
-                    pObj->m_web_decode_url = false;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "global_auth_file")) {
-                if (attribute.length()) {
-                    pObj->m_web_global_auth_file = attribute;
-                }
-            }
-            else if (0 ==
-                     vscp_strcasecmp(attr[i], "web_per_directory_auth_file")) {
-                if (attribute.length()) {
-                    pObj->m_web_per_directory_auth_file = attribute;
-                }
-            }
-            else if (0 ==
-                     vscp_strcasecmp(attr[i], "access_control_allow_origin")) {
-                if (attribute.length()) {
-                    pObj->m_web_access_control_allow_methods = attribute;
-                }
-            }
-            else if (0 ==
-                     vscp_strcasecmp(attr[i], "access_control_allow_methods")) {
-                if (attribute.length()) {
-                    pObj->m_web_access_control_allow_methods = attribute;
-                }
-            }
-            else if (0 ==
-                     vscp_strcasecmp(attr[i], "access_control_allow_headers")) {
-                if (attribute.length()) {
-                    pObj->m_web_access_control_allow_headers = attribute;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "error_pages")) {
-                if (attribute.length()) {
-                    pObj->m_web_error_pages = attribute;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "tcp_nodelay")) {
-                if (attribute.length()) {
-                    pObj->m_web_linger_timeout_ms =
-                      vscp_readStringValue(attribute);
-                }
-            }
-            else if (0 ==
-                     vscp_strcasecmp(attr[i], "static_file_cache_control")) {
-                if (attribute.length()) {
-                    pObj->m_web_static_file_cache_control = attribute;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "static_file_max_age")) {
-                if (attribute.length()) {
-                    pObj->m_web_static_file_max_age =
-                      vscp_readStringValue(attribute);
-                }
-            }
-            else if (0 ==
-                     vscp_strcasecmp(attr[i],
-                                     "strict_transport_security_max_age")) {
-                if (attribute.length()) {
-                    pObj->m_web_strict_transport_security_max_age =
-                      vscp_readStringValue(attribute);
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "sendfile_call")) {
-                if (0 == vscp_strcasecmp(attribute.c_str(), "true")) {
-                    pObj->m_web_allow_sendfile_call = true;
-                }
-                else {
-                    pObj->m_web_allow_sendfile_call = false;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "additional_headers")) {
-                if (attribute.length()) {
-                    pObj->m_web_additional_header = attribute;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "max_request_size")) {
-                if (attribute.length()) {
-                    pObj->m_web_max_request_size =
-                      vscp_readStringValue(attribute);
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i],
-                                          "web_allow_index_script_resource")) {
-                if (0 == vscp_strcasecmp(attribute.c_str(), "true")) {
-                    pObj->m_web_allow_index_script_resource = true;
-                }
-                else {
-                    pObj->m_web_allow_index_script_resource = false;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "duktape_script_patterns")) {
-                if (attribute.length()) {
-                    pObj->m_web_duktape_script_patterns = attribute;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "lua_preload_file")) {
-                if (attribute.length()) {
-                    pObj->m_web_lua_preload_file = attribute;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "lua_script_patterns")) {
-                if (attribute.length()) {
-                    pObj->m_web_lua_script_patterns = attribute;
-                }
-            }
-            else if (0 ==
-                     vscp_strcasecmp(attr[i], "lua_server_page_patterns")) {
-                if (attribute.length()) {
-                    pObj->m_web_lua_server_page_patterns = attribute;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "lua_websockets_patterns")) {
-                if (attribute.length()) {
-                    pObj->m_web_lua_websocket_patterns = attribute;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "lua_background_script")) {
-                if (attribute.length()) {
-                    pObj->m_web_lua_background_script = attribute;
-                }
-            }
-            else if (0 ==
-                     vscp_strcasecmp(attr[i], "lua_background_script_params")) {
-                if (attribute.length()) {
-                    pObj->m_web_lua_background_script_params = attribute;
-                }
-            }
-        }
-    }
-    else if (bVscpConfigFound && (1 == depth_full_config_parser) &&
-             (0 == vscp_strcasecmp(name, "restapi"))) {
-
-        for (int i = 0; attr[i]; i += 2) {
-
-            std::string attribute = attr[i + 1];
-            vscp_trim(attribute);
-
-            if (0 == vscp_strcasecmp(attr[i], "enable")) {
-                if (0 == vscp_strcasecmp(attribute.c_str(), "true")) {
-                    pObj->m_bEnableRestApi = true;
-                }
-                else {
-                    pObj->m_bEnableRestApi = false;
-                }
-            }
-        }
-    }
-    else if (bVscpConfigFound && (1 == depth_full_config_parser) &&
-             (0 == vscp_strcasecmp(name, "websockets"))) {
-
-        for (int i = 0; attr[i]; i += 2) {
-
-            std::string attribute = attr[i + 1];
-            vscp_trim(attribute);
-
-            if (0 == vscp_strcasecmp(attr[i], "enable")) {
-                if (0 == vscp_strcasecmp(attribute.c_str(), "true")) {
-                    pObj->m_bWebsocketsEnable = true;
-                }
-                else {
-                    pObj->m_bWebsocketsEnable = false;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "document_root")) {
-                if (attribute.length()) {
-                    pObj->m_websocket_document_root = attribute;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "timeout_ms")) {
-                if (attribute.length()) {
-                    pObj->m_websocket_timeout_ms =
-                      vscp_readStringValue(attribute);
-                }
-            }
-            else if (0 ==
-                     vscp_strcasecmp(attr[i], "enable_websocket_ping_pong")) {
-                if (0 == vscp_strcasecmp(attribute.c_str(), "true")) {
-                    pObj->bEnable_websocket_ping_pong = true;
-                }
-                else {
-                    pObj->bEnable_websocket_ping_pong = false;
-                }
-            }
-            else if (0 ==
-                     vscp_strcasecmp(attr[i], "web-lua_websocket_pattern")) {
-                if (attribute.length()) {
-                    pObj->lua_websocket_pattern = attribute;
-                }
-            }
-        }
-    }
-    else if (bVscpConfigFound && (1 == depth_full_config_parser) &&
-             (0 == vscp_strcasecmp(name, "remoteuser"))) {
-        bRemoteUserConfigFound = TRUE;
-    }
-    else if (bVscpConfigFound && bRemoteUserConfigFound &&
-             (2 == depth_full_config_parser) &&
-             (0 == vscp_strcasecmp(name, "user"))) {
-
-        vscpEventFilter VSCPFilter;
-        bool bFilterPresent = false;
-        bool bMaskPresent   = false;
-        std::string name;
-        std::string md5;
-        std::string privilege;
-        std::string allowfrom;
-        std::string allowevent;
-        std::string fullname;
-        std::string note;
-
-        vscp_clearVSCPFilter(&VSCPFilter); // Allow all frames
-
-        for (int i = 0; attr[i]; i += 2) {
-
-            std::string attribute = attr[i + 1];
-            vscp_trim(attribute);
-
-            if (0 == vscp_strcasecmp(attr[i], "name")) {
-                name = attribute;
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "password")) {
-                md5 = attribute;
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "fullname")) {
-                fullname = attribute;
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "note")) {
-                note = attribute;
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "privilege")) {
-                privilege = attribute;
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "allowfrom")) {
-                allowfrom = attribute;
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "allowevent")) {
-                allowevent = attribute;
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "filter")) {
-                if (attribute.length()) {
-                    if (vscp_readFilterFromString(&VSCPFilter, attribute)) {
-                        bFilterPresent = true;
-                    }
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "mask")) {
-                if (attribute.length()) {
-                    if (vscp_readMaskFromString(&VSCPFilter, attribute)) {
-                        bMaskPresent = true;
-                    }
-                }
-            }
-
-            if (bFilterPresent && bMaskPresent) {
-                pObj->m_userList.addUser(name,
-                                         md5,
-                                         fullname,
-                                         note,
-                                         pObj->m_web_authentication_domain,
-                                         &VSCPFilter,
-                                         privilege,
-                                         allowfrom,
-                                         allowevent,
-                                         0);
-            }
-            else {
-                pObj->m_userList.addUser(name,
-                                         md5,
-                                         fullname,
-                                         note,
-                                         pObj->m_web_authentication_domain,
-                                         NULL,
-                                         privilege,
-                                         allowfrom,
-                                         allowevent,
-                                         0);
-            }
-        }
-    }
-    else if (bVscpConfigFound && (1 == depth_full_config_parser) &&
-             ((0 == vscp_strcasecmp(name, "level1driver")) ||
-              (0 == vscp_strcasecmp(name, "canal1driver")))) {
-        bLevel1DriverConfigFound = TRUE;
-    }
-    else if (bVscpConfigFound && bLevel1DriverConfigFound &&
-             (2 == depth_full_config_parser) &&
-             (0 == vscp_strcasecmp(name, "driver"))) {
-
-        std::string strName;
-        std::string strConfig;
-        std::string strPath;
-        unsigned long flags  = 0;
-        uint32_t translation = 0;
-        cguid guid;
-        bool bEnabled = false;
-
-        for (int i = 0; attr[i]; i += 2) {
-
-            std::string attribute = attr[i + 1];
-            vscp_trim(attribute);
-
-            if (0 == vscp_strcasecmp(attr[i], "enable")) {
-                if (0 == vscp_strcasecmp(attribute.c_str(), "true")) {
-                    bEnabled = true;
-                }
-                else {
-                    bEnabled = false;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "name")) {
-                strName = attribute;
-                // Replace spaces in name with underscore
-                std::string::size_type found;
-                while (std::string::npos !=
-                       (found = strName.find_first_of(" "))) {
-                    strName[found] = '_';
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "config")) {
-                strConfig = attribute;
-            }
-            else if (0 == vscp_strcasecmp(attr[i],
-                                          "parameter")) { // deprecated
-                strConfig = attribute;
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "path")) {
-                strPath = attribute;
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "flags")) {
-                flags = vscp_readStringValue(attribute);
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "guid")) {
-                guid.getFromString(attribute);
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "translation")) {
-                translation = vscp_readStringValue(attribute);
-            }
-        } // for
-
-        if (bEnabled) {
-            // Add the level I device
-            if (!pObj->m_deviceList.addItem(strName,
-                                            strConfig,
-                                            strPath,
-                                            flags,
-                                            guid,
-                                            VSCP_DRIVER_LEVEL1,
-                                            bEnabled,
-                                            translation)) {
-                syslog(LOG_ERR,
-                       "Level I driver not added name=%s. "
-                       "Path does not exist. - [%s]",
-                       strName.c_str(),
-                       strPath.c_str());
-            }
-            else {
-                if (__VSCP_DEBUG_DRIVER1) {
-                    syslog(LOG_DEBUG,
-                           "Level I driver added. name = %s - [%s]",
-                           strName.c_str(),
-                           strPath.c_str());
-                }
-            }
-        }
-    }
-    else if (bVscpConfigFound && (1 == depth_full_config_parser) &&
-             ((0 == vscp_strcasecmp(name, "level2driver")))) {
-        bLevel2DriverConfigFound = TRUE;
-    }
-    else if (bVscpConfigFound && bLevel2DriverConfigFound &&
-             (2 == depth_full_config_parser) &&
-             (0 == vscp_strcasecmp(name, "driver"))) {
-
-        std::string strName;
-        std::string strConfig;
-        std::string strPath;
-        cguid guid;
-        bool bEnabled = false;
-
-        for (int i = 0; attr[i]; i += 2) {
-
-            std::string attribute = attr[i + 1];
-            vscp_trim(attribute);
-
-            if (0 == vscp_strcasecmp(attr[i], "enable")) {
-                if (0 == vscp_strcasecmp(attribute.c_str(), "true")) {
-                    bEnabled = true;
-                }
-                else {
-                    bEnabled = false;
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "name")) {
-                strName = attribute;
-                // Replace spaces in name with underscore
-                std::string::size_type found;
-                while (std::string::npos !=
-                       (found = strName.find_first_of(" "))) {
-                    strName[found] = '_';
-                }
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "path-config")) {
-                strConfig = attribute;
-            }
-            else if (0 == vscp_strcasecmp(attr[i],
-                                          "parameter")) { // deprecated
-                strConfig = attribute;
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "path-driver")) {
-                strPath = attribute;
-            }
-            else if (0 == vscp_strcasecmp(attr[i], "guid")) {
-                guid.getFromString(attribute);
-            }
-        } // for
-
-        // Add the level II device
-        if (bEnabled) {
-            if (!pObj->m_deviceList.addItem(strName,
-                                            strConfig,
-                                            strPath,
-                                            0,
-                                            guid,
-                                            VSCP_DRIVER_LEVEL2,
-                                            bEnabled)) {
-                if (__VSCP_DEBUG_DRIVER2) {
-                    syslog(LOG_ERR,
-                           "Level II driver was not added. name = %s"
-                           "Path does not exist. - [%s]",
-                           strName.c_str(),
-                           strPath.c_str());
-                }
-            }
-            else {
-                if (__VSCP_DEBUG_DRIVER2) {
-                    syslog(LOG_DEBUG,
-                           "Level II driver added. name = %s- [%s]",
-                           strName.c_str(),
-                           strPath.c_str());
-                }
-            }
-        }
-    }
-
-    depth_full_config_parser++;
-}
-
-static void
-handleFullConfigData(void* data, const char* content, int length)
-{
-}
-
-static void
-endFullConfigParser(void* data, const char* name)
-{
-    depth_full_config_parser--;
-
-    if (1 == depth_full_config_parser &&
-        (0 == vscp_strcasecmp(name, "vscpconfig"))) {
-        bVscpConfigFound = FALSE;
-    }
-    if (bVscpConfigFound && (1 == depth_full_config_parser) &&
-        ((0 == vscp_strcasecmp(name, "level1driver")) ||
-         (0 == vscp_strcasecmp(name, "canal1driver")))) {
-        bLevel1DriverConfigFound = FALSE;
-    }
-    else if (bVscpConfigFound && (1 == depth_full_config_parser) &&
-             (0 == vscp_strcasecmp(name, "level2driver"))) {
-        bLevel2DriverConfigFound = FALSE;
-    }
-    else if (bVscpConfigFound && (1 == depth_full_config_parser) &&
-             (0 == vscp_strcasecmp(name, "level3driver"))) {
-        bLevel3DriverConfigFound = FALSE;
-    }
-}
-
-// ----------------------------------------------------------------------------
 
 ///////////////////////////////////////////////////////////////////////////////
 // readConfiguration
 //
-// Read the configuration XML file
+// Read the configuration JSON file
 //
 
 bool
 CControlObject::readConfiguration(const std::string& strcfgfile)
 {
-    FILE* fp;
-
     if (__VSCP_DEBUG_EXTRA) {
-        syslog(LOG_DEBUG,
-               "Reading full XML configuration from [%s]",
+        SYSLOG(LOG_DEBUG,
+               "Reading full JSON configuration from [%s]",
                (const char*)strcfgfile.c_str());
     }
 
-    fp = fopen(strcfgfile.c_str(), "r");
-    if (NULL == fp) {
-        syslog(LOG_ERR,
-               "Failed to open configuration file [%s]",
+    json j;
+    try {
+        std::ifstream in(strcfgfile, std::ifstream::in);
+        if (!in.is_open()) {
+            SYSLOG(LOG_ERR,
+                   "Failed to open configuration file [%s]",
+                   strcfgfile.c_str());
+            return false;
+        }
+        in >> j;
+    }
+    catch (const std::exception& ex) {
+        SYSLOG(LOG_ERR,
+               "Failed to parse JSON configuration file [%s]: %s",
+               strcfgfile.c_str(),
+               ex.what());
+        return false;
+    }
+    catch (...) {
+        SYSLOG(LOG_ERR,
+               "Failed to parse JSON configuration file [%s]",
                strcfgfile.c_str());
         return false;
     }
 
-    XML_Parser xmlParser = XML_ParserCreate("UTF-8");
-    XML_SetUserData(xmlParser, this);
-    XML_SetElementHandler(xmlParser,
-                          startFullConfigParser,
-                          endFullConfigParser);
-    XML_SetCharacterDataHandler(xmlParser, handleFullConfigData);
-
-    void* buf = XML_GetBuffer(xmlParser, XML_BUFF_SIZE);
-    if (NULL == buf) {
-        XML_ParserFree(xmlParser);
-        fclose(fp);
-        syslog(LOG_ERR,
-               "Failed to allocate buffer for configuration file [%s]",
-               strcfgfile.c_str());
+    auto get_string = [](const json& node,
+                         const char* key,
+                         std::string& out) {
+        if (node.contains(key) && node[key].is_string()) {
+            out = node[key].get<std::string>();
+            return true;
+        }
         return false;
+    };
+
+    auto get_bool = [](const json& node, const char* key, bool& out) {
+        if (!node.contains(key)) {
+            return false;
+        }
+        if (node[key].is_boolean()) {
+            out = node[key].get<bool>();
+            return true;
+        }
+        if (node[key].is_string()) {
+            std::string v = node[key].get<std::string>();
+            vscp_makeLower(v);
+            out = ("true" == v) || ("1" == v) || ("yes" == v);
+            return true;
+        }
+        if (node[key].is_number_integer()) {
+            out = (0 != node[key].get<int>());
+            return true;
+        }
+        return false;
+    };
+
+    auto get_uint = [](const json& node, const char* key, uint32_t& out) {
+        if (node.contains(key) && node[key].is_number_integer()) {
+            out = node[key].get<uint32_t>();
+            return true;
+        }
+        return false;
+    };
+
+    // Top-level/general fields.
+    get_string(j, "runasuser", m_runAsUser);
+    get_string(j, "servername", m_strServerName);
+
+    if (j.contains("guid") && j["guid"].is_string()) {
+        m_guid.getFromString(j["guid"].get<std::string>());
     }
 
-    size_t file_size = 0;
-    file_size        = fread(buf, sizeof(char), XML_BUFF_SIZE, fp);
-
-    if (!XML_ParseBuffer(xmlParser, file_size, file_size == 0)) {
-        syslog(LOG_ERR, "Failed parse XML configuration file.");
-        fclose(fp);
-        XML_ParserFree(xmlParser);
-        return false;
+    if (j.contains("debug") && j["debug"].is_number_integer()) {
+        m_debugFlags[0] = j["debug"].get<uint32_t>();
     }
 
-    fclose(fp);
-    XML_ParserFree(xmlParser);
+    // Optional legacy/general object support.
+    if (j.contains("general") && j["general"].is_object()) {
+        const json& g = j["general"];
+        get_string(g, "runasuser", m_runAsUser);
+        get_string(g, "servername", m_strServerName);
+        if (g.contains("guid") && g["guid"].is_string()) {
+            m_guid.getFromString(g["guid"].get<std::string>());
+        }
+        if (g.contains("clientbuffersize") &&
+            g["clientbuffersize"].is_number_integer()) {
+            m_maxItemsInClientReceiveQueue =
+              g["clientbuffersize"].get<uint32_t>();
+        }
+        bool b = false;
+        if (get_bool(g, "webadminif", b)) {
+            m_enableWebAdminIf = b;
+        }
+    }
+
+    // Security.
+    if (j.contains("security") && j["security"].is_object()) {
+        const json& sec = j["security"];
+        get_string(sec, "admin", m_admin_user);
+        get_string(sec, "password", m_admin_password);
+        get_string(sec, "allowfrom", m_admin_allowfrom);
+        get_string(sec, "vscptoken", m_vscptoken);
+        get_string(sec, "authentication_domain", m_web_authentication_domain);
+        if (sec.contains("vscpkey") && sec["vscpkey"].is_string()) {
+            vscp_hexStr2ByteArray(m_systemKey,
+                                  32,
+                                  sec["vscpkey"].get<std::string>().c_str());
+        }
+    }
+
+    // TCP/IP section.
+    if (j.contains("tcpip") && j["tcpip"].is_object()) {
+        const json& t = j["tcpip"];
+        bool b = false;
+        uint32_t n = 0;
+
+        if (get_bool(t, "enable", b)) m_enableTcpip = b;
+        get_string(t, "interface", m_strTcpInterfaceAddress);
+        get_string(t, "ssl_certificate", m_tcpip_ssl_certificate);
+        get_string(t, "ssl_certificate_chain", m_tcpip_ssl_certificate_chain);
+        if (get_uint(t, "ssl_verify_peer", n)) m_tcpip_ssl_verify_peer = n;
+        get_string(t, "ssl_ca_path", m_tcpip_ssl_ca_path);
+        get_string(t, "ssl_ca_file", m_tcpip_ssl_ca_file);
+        if (get_uint(t, "ssl_verify_depth", n)) m_tcpip_ssl_verify_depth = n;
+        if (get_bool(t, "ssl_default_verify_paths", b)) {
+            m_tcpip_ssl_default_verify_paths = b;
+        }
+        get_string(t, "ssl_cipher_list", m_tcpip_ssl_cipher_list);
+        if (get_uint(t, "ssl_protocol_version", n)) {
+            m_tcpip_ssl_protocol_version = n;
+        }
+        if (get_bool(t, "ssl_short_trust", b)) m_tcpip_ssl_short_trust = b;
+    }
+
+    // Web server section.
+    if (j.contains("webserver") && j["webserver"].is_object()) {
+        const json& w = j["webserver"];
+        bool b = false;
+        uint32_t n = 0;
+
+        if (get_bool(w, "enable", b)) m_web_bEnable = b;
+        get_string(w, "document_root", m_web_document_root);
+        get_string(w, "listening_ports", m_web_listening_ports);
+        get_string(w, "index_files", m_web_index_files);
+        get_string(w, "authentication_domain", m_web_authentication_domain);
+        if (get_bool(w, "enable_auth_domain_check", b)) {
+            m_enable_auth_domain_check = b;
+        }
+
+        get_string(w, "ssl_certificat", m_web_ssl_certificate);
+        get_string(w, "ssl_certificat_chain", m_web_ssl_certificate_chain);
+        if (get_bool(w, "ssl_verify_peer", b)) m_web_ssl_verify_peer = b;
+        get_string(w, "ssl_ca_path", m_web_ssl_ca_path);
+        get_string(w, "ssl_ca_file", m_web_ssl_ca_file);
+        if (get_uint(w, "ssl_verify_depth", n)) m_web_ssl_verify_depth = n;
+        if (get_bool(w, "ssl_default_verify_paths", b)) {
+            m_web_ssl_default_verify_paths = b;
+        }
+        get_string(w, "ssl_cipher_list", m_web_ssl_cipher_list);
+        if (get_uint(w, "ssl_protcol_version", n)) {
+            m_web_ssl_protocol_version = n;
+        }
+        if (get_bool(w, "ssl_short_trust", b)) m_web_ssl_short_trust = b;
+
+        get_string(w, "cgi_interpreter", m_web_cgi_interpreter);
+        get_string(w, "cgi_pattern", m_web_cgi_patterns);
+        get_string(w, "cgi_environment", m_web_cgi_environment);
+        get_string(w, "protect_uri", m_web_protect_uri);
+        get_string(w, "trottle", m_web_trottle);
+        if (get_bool(w, "enable_directory_listing", b)) {
+            m_web_enable_directory_listing = b;
+        }
+        if (get_bool(w, "enable_keep_alive", b)) m_web_enable_keep_alive = b;
+        if (get_uint(w, "keep_alive_timeout_ms", n)) m_web_keep_alive_timeout_ms = n;
+        get_string(w, "access_control_list", m_web_access_control_list);
+        get_string(w, "extra_mime_types", m_web_extra_mime_types);
+        if (get_uint(w, "num_threads", n)) m_web_num_threads = n;
+        get_string(w, "hide_file_pattern", m_web_hide_file_patterns);
+        get_string(w, "hide_file_patterns", m_web_hide_file_patterns);
+        get_string(w, "url_rewrite_patterns", m_web_url_rewrite_patterns);
+        if (get_uint(w, "request_timeout_ms", n)) m_web_request_timeout_ms = n;
+        if (get_uint(w, "linger_timeout_ms", n)) m_web_linger_timeout_ms = n;
+        if (get_bool(w, "decode_url", b)) m_web_decode_url = b;
+        get_string(w, "global_auth_file", m_web_global_auth_file);
+        get_string(w, "web_per_directory_auth_file", m_web_per_directory_auth_file);
+        get_string(w, "access_control_allow_origin", m_web_access_control_allow_origin);
+        get_string(w, "access_control_allow_methods", m_web_access_control_allow_methods);
+        get_string(w, "access_control_allow_headers", m_web_access_control_allow_headers);
+        get_string(w, "error_pages", m_web_error_pages);
+        if (get_uint(w, "tcp_nodelay", n)) m_web_tcp_nodelay = n;
+        get_string(w, "static_file_cache_control", m_web_static_file_cache_control);
+        if (get_uint(w, "static_file_max_age", n)) m_web_static_file_max_age = n;
+        if (get_uint(w, "strict_transport_security_max_age", n)) {
+            m_web_strict_transport_security_max_age = n;
+        }
+        if (get_bool(w, "sendfile_call", b)) m_web_allow_sendfile_call = b;
+        get_string(w, "additional_headers", m_web_additional_header);
+        if (get_uint(w, "max_request_size", n)) m_web_max_request_size = n;
+        if (get_bool(w, "web_allow_index_script_resource", b)) {
+            m_web_allow_index_script_resource = b;
+        }
+        get_string(w, "duktape_script_patterns", m_web_duktape_script_patterns);
+        get_string(w, "lua_preload_file", m_web_lua_preload_file);
+        get_string(w, "lua_script_patterns", m_web_lua_script_patterns);
+        get_string(w, "lua_server_page_patterns", m_web_lua_server_page_patterns);
+        get_string(w, "lua_websockets_patterns", m_web_lua_websocket_patterns);
+        get_string(w, "lua_background_script", m_web_lua_background_script);
+        get_string(w,
+                   "lua_background_script_params",
+                   m_web_lua_background_script_params);
+    }
+
+    // REST and websocket sections.
+    if (j.contains("restapi") && j["restapi"].is_object()) {
+        bool b = false;
+        if (get_bool(j["restapi"], "enable", b)) {
+            m_bEnableRestApi = b;
+        }
+    }
+
+    if (j.contains("websockets") && j["websockets"].is_object()) {
+        const json& ws = j["websockets"];
+        bool b = false;
+        uint32_t n = 0;
+        if (get_bool(ws, "enable", b)) m_bWebsocketsEnable = b;
+        get_string(ws, "document_root", m_websocket_document_root);
+        if (get_uint(ws, "timeout_ms", n)) m_websocket_timeout_ms = n;
+        if (get_bool(ws, "enable_websocket_ping_pong", b)) {
+            bEnable_websocket_ping_pong = b;
+        }
+        get_string(ws, "web-lua_websocket_pattern", lua_websocket_pattern);
+    }
+
+    // Users.
+    if (j.contains("remoteuser") && j["remoteuser"].is_array()) {
+        for (const auto& u : j["remoteuser"]) {
+            if (!u.is_object()) {
+                continue;
+            }
+
+            std::string name;
+            std::string password;
+            std::string fullname;
+            std::string note;
+            std::string privilege;
+            std::string allowfrom;
+            std::string allowevent;
+            std::string filter;
+            std::string mask;
+
+            get_string(u, "name", name);
+            get_string(u, "password", password);
+            get_string(u, "fullname", fullname);
+            get_string(u, "note", note);
+            get_string(u, "privilege", privilege);
+            get_string(u, "allowfrom", allowfrom);
+            get_string(u, "allowevent", allowevent);
+            get_string(u, "filter", filter);
+            get_string(u, "mask", mask);
+
+            if (name.empty() || password.empty()) {
+                continue;
+            }
+
+            vscpEventFilter vfilter;
+            vscp_clearVSCPFilter(&vfilter);
+            bool hasFilter = false;
+
+            if (!filter.empty() && !mask.empty()) {
+                hasFilter = vscp_readFilterFromString(&vfilter, filter) &&
+                            vscp_readMaskFromString(&vfilter, mask);
+            }
+
+            m_userList.addUser(name,
+                               password,
+                               fullname,
+                               note,
+                               m_web_authentication_domain,
+                               hasFilter ? &vfilter : NULL,
+                               privilege,
+                               allowfrom,
+                               allowevent,
+                               0);
+        }
+    }
+
+    // Drivers.
+    if (j.contains("drivers") && j["drivers"].is_object()) {
+        const json& drivers = j["drivers"];
+
+        if (drivers.contains("level1") && drivers["level1"].is_array()) {
+            for (const auto& drv : drivers["level1"]) {
+                if (!drv.is_object() ||
+                    !drv.value("enable", false) ||
+                    !drv.contains("name") ||
+                    !drv.contains("config") ||
+                    !drv.contains("path") ||
+                    !drv.contains("flags") ||
+                    !drv.contains("guid") ||
+                    !drv.contains("translation")) {
+                    continue;
+                }
+
+                std::string strName = drv["name"].get<std::string>();
+                std::replace(strName.begin(), strName.end(), ' ', '_');
+
+                cguid guid;
+                guid.getFromString(drv["guid"].get<std::string>());
+
+                if (!m_deviceList.addItem(strName,
+                                          drv["config"].get<std::string>(),
+                                          drv["path"].get<std::string>(),
+                                          drv["flags"].get<uint32_t>(),
+                                          guid,
+                                          VSCP_DRIVER_LEVEL1,
+                                          true,
+                                          drv["translation"].get<uint32_t>())) {
+                    SYSLOG(LOG_ERR,
+                           "Level I driver not added name=%s. Path does not exist. - [%s]",
+                           strName.c_str(),
+                           drv["path"].get<std::string>().c_str());
+                }
+            }
+        }
+
+        if (drivers.contains("level2") && drivers["level2"].is_array()) {
+            for (const auto& drv : drivers["level2"]) {
+                if (!drv.is_object() ||
+                    !drv.value("enable", false) ||
+                    !drv.contains("name") ||
+                    !drv.contains("path-config") ||
+                    !drv.contains("path-driver") ||
+                    !drv.contains("guid")) {
+                    continue;
+                }
+
+                std::string strName = drv["name"].get<std::string>();
+                std::replace(strName.begin(), strName.end(), ' ', '_');
+
+                cguid guid;
+                guid.getFromString(drv["guid"].get<std::string>());
+
+                if (!m_deviceList.addItem(strName,
+                                          drv["path-config"].get<std::string>(),
+                                          drv["path-driver"].get<std::string>(),
+                                          0,
+                                          guid,
+                                          VSCP_DRIVER_LEVEL2,
+                                          true)) {
+                    SYSLOG(LOG_ERR,
+                           "Level II driver not added name=%s. Path does not exist. - [%s]",
+                           strName.c_str(),
+                           drv["path-driver"].get<std::string>().c_str());
+                }
+            }
+        }
+    }
 
     return true;
-} // XML config
+} // JSON config
 
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////

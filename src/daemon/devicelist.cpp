@@ -35,6 +35,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <syslog.h>
+#include <canal_macro.h>
 #include <unistd.h>
 
 #include "devicelist.h"
@@ -67,7 +68,7 @@ Driver3Process::OnTerminate(int pid, int status)
 {
     // TODO
     // http://man7.org/linux/man-pages/man2/waitpid.2.html
-    syslog(LOG_DEBUG, "[Diver Level III] - Terminating.");
+    SYSLOG(LOG_DEBUG, "[Diver Level III] - Terminating.");
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -169,7 +170,7 @@ CDeviceItem::startDriver(CControlObject *pCtrlObject)
 {
     // Just start if enabled
     if (!m_bEnable) {
-        syslog(LOG_INFO,
+        SYSLOG(LOG_INFO,
                "[Driver %s] Start - VSCP driver is disabled.",
                m_strName.c_str());
         return true;
@@ -183,13 +184,13 @@ CDeviceItem::startDriver(CControlObject *pCtrlObject)
     m_pObj = pCtrlObject;
 
     if (pthread_create(&m_deviceThreadHandle, NULL, deviceThread, this)) {
-        syslog(LOG_ERR,
+        SYSLOG(LOG_ERR,
                "[Driver %s] - Unable to start the device thread.",
                m_strName.c_str());
         return false;
     }
 
-    syslog(
+    SYSLOG(
       LOG_INFO, "[Driver %s] - Started VSCP device driver.", m_strName.c_str());
 
     return true;
@@ -204,7 +205,7 @@ CDeviceItem::stopDriver()
 {
     if (m_bEnable) {
         m_bQuit = true;
-        syslog(LOG_INFO,
+        SYSLOG(LOG_INFO,
                "Driver %s: Driver asked to stop operation.",
                m_strName.c_str());
 
@@ -212,12 +213,12 @@ CDeviceItem::stopDriver()
         pthread_join(m_deviceThreadHandle, NULL);
         pthread_mutex_unlock(&m_mutexdeviceThread);
 
-        syslog(LOG_ERR,
+        SYSLOG(LOG_ERR,
                "CDeviceItem: Driver stopping. [%s]\n",
                (const char *)m_strName.c_str());
     } else {
         if (!m_bEnable) {
-            syslog(LOG_INFO,
+            SYSLOG(LOG_INFO,
                    "[Driver %s] Stop - VSCP driver is disabled.",
                    m_strName.c_str());
             return true;
@@ -315,7 +316,7 @@ CDeviceList::addItem(const std::string &strName,
             pDeviceItem->m_DeviceFlags = flags;
 
         } else {
-            syslog(LOG_ERR,
+            SYSLOG(LOG_ERR,
                     "Driver '%s' is not available at this path %s. Dropped!",
                     strName.c_str(),
                     strPath.c_str() );

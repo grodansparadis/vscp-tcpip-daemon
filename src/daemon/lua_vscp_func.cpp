@@ -35,6 +35,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <canal_macro.h>
 
 #include <json.hpp> // Needs C++11  -std=c++11
 
@@ -226,7 +227,7 @@ lua_vscp_log(struct lua_State* L)
         type = lua_tointeger(L, 3);
     }
 
-    syslog(type, "%s", msg.c_str());
+    SYSLOG(type, "%s", msg.c_str());
 
     return 1;
 }

@@ -32,15 +32,60 @@
 #define UNLOCK_MUTEX( x )       ( ReleaseMutex( x ) )
 #define SLEEP( x )              ( Sleep( x ) )
 #define BZERO( a )              ( memset( ( _u8* )&a, 0, sizeof( a ) ) )
-#define SYSLOG( a, b )
+#define SYSLOG(...)
 
 #else
+
+#ifdef __cplusplus
+#include <cstdarg>
+#include <cstdio>
+#include <spdlog/spdlog.h>
+
+inline void
+vscp_spdlog_from_syslog(int priority, const char *fmt, ...)
+{
+	char buffer[2048];
+	va_list args;
+	va_start(args, fmt);
+	vsnprintf(buffer, sizeof(buffer), fmt, args);
+	va_end(args);
+
+	int level = (priority & LOG_PRIMASK);
+	switch (level) {
+		case LOG_EMERG:
+		case LOG_ALERT:
+		case LOG_CRIT:
+			spdlog::critical("{}", buffer);
+			break;
+
+		case LOG_ERR:
+			spdlog::error("{}", buffer);
+			break;
+
+		case LOG_WARNING:
+			spdlog::warn("{}", buffer);
+			break;
+
+		case LOG_INFO:
+			spdlog::info("{}", buffer);
+			break;
+
+		default:
+			spdlog::debug("{}", buffer);
+			break;
+	}
+}
+
+#define openlog(ident, option, facility) ((void)0)
+#define closelog() ((void)0)
+#define syslog(priority, fmt, ...) vscp_spdlog_from_syslog(priority, fmt, ##__VA_ARGS__)
+#endif
 
 #define LOCK_MUTEX( x )         ( pthread_mutex_lock( &x ) )
 #define UNLOCK_MUTEX( x )       ( pthread_mutex_unlock( &x ) )
 #define SLEEP( x )              ( usleep( ( 1000 * x ) ) )      // ms
 #define BZERO( a )              ( bzero( ( _u8* )&a, sizeof( a ) ) )
-#define SYSLOG( a, b )          ( syslog( a, b ) )
+#define SYSLOG(...)             ( syslog(__VA_ARGS__) )
 
 #endif
 
