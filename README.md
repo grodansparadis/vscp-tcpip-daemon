@@ -1,4 +1,15 @@
 # vscp-tcpip-daemon
+
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+[![Build VSCP library on Linux](https://github.com/grodansparadis/vscp-tcpip-daemon/actions/workflows/build.yml/badge.svg)](https://github.com/grodansparadis/vscp-tcpip-daemon/actions/workflows/build.yml)
+[![Build VSCP library on Windows](https://github.com/grodansparadis/vscp-tcpip-daemon/actions/workflows/build-windows.yml/badge.svg)](https://github.com/grodansparadis/vscp-tcpip-daemon/actions/workflows/build-windows.yml)
+[![Build VSCP library on macOS](https://github.com/grodansparadis/vscp-tcpip-daemon/actions/workflows/build-macos.yml/badge.svg)](https://github.com/grodansparadis/vscp-tcpip-daemon/actions/workflows/build-macos.yml)
+[![Release](https://img.shields.io/github/release/grodansparadis/vscp-tcpip-daemon.svg)](https://github.com/grodansparadis/vscp-tcpip-daemon/releases)
+[![Project Status: Active – The project has reached a stable, usable state and is being actively developed.](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active)
+
+![VSCP Logo](https://github.com/grodansparadis/vscp-logo/blob/master/logo_100.png)
+
+
 A central VSCP daemon that exports a VSCP tcp/ip link interface and handles level I and level II drivers.
 
 ## Windows service

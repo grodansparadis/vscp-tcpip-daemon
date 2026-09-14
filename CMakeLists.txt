@@ -13,7 +13,7 @@
 #   cmake -B build
 #   cmake --build build
 #
-# Copyright (C) 2000-2026 Ake Hedman, the VSCP project
+# Copyright (C) 2000-2026 Ake Hedman and contributors, the VSCP project
 # SPDX-License-Identifier: MIT
 
 cmake_minimum_required(VERSION 3.16...3.31)
@@ -53,62 +53,62 @@ find_package(OpenSSL REQUIRED)
 find_package(EXPAT REQUIRED)
 find_package(ZLIB REQUIRED)
 
-# ---- Add the VSCP common submodule ----
-# This builds vscp_common static library and
-# exports all of their PUBLIC include directories (nlohmann/json, spdlog,
-# mustache, OpenSSL, Mosquitto, Expat, CURL …) so that the daemon target
-# inherits them automatically via target_link_libraries.
-set(VSCP_INSTALL OFF CACHE BOOL "Skip install of vscp submodule targets" FORCE)
-set(VSCP_BUILD_TESTS OFF CACHE BOOL "Skip tests inside vscp submodule" FORCE)
-# Do not include all submodule targets in the default `all` build.
-# The daemon still builds required library dependencies via target links.
-add_subdirectory(third-party/vscp EXCLUDE_FROM_ALL)
+include(FetchContent)
+
+FetchContent_Declare(
+  spdlog
+  GIT_REPOSITORY https://github.com/gabime/spdlog.git
+  GIT_TAG v1.17.0
+)
+FetchContent_MakeAvailable(spdlog)
+
+FetchContent_Declare(
+    json 
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.12.0
+)
+FetchContent_MakeAvailable(json)
+
+FetchContent_Declare(
+    mongoose
+    GIT_REPOSITORY https://github.com/cesanta/mongoose.git
+    GIT_TAG 7.23
+)
+FetchContent_MakeAvailable(mongoose)
+
+
+# FetchContent_Declare(
+#     mustache
+#     GIT_REPOSITORY https://github.com/kainjow/Mustache.git
+#     GIT_TAG v4.1
+# )
+# FetchContent_MakeAvailable(mustache)
 
 # ---- Convenience alias for the submodule source root ----
 set(VSCP_SUB "${CMAKE_CURRENT_SOURCE_DIR}/third-party/vscp")
 
 # Use a platform-appropriate daemon entrypoint.
 if(WIN32)
-    set(VSCPD_MAIN_SOURCE "${VSCP_SUB}/src/vscp/daemon/vscpd.cpp")
+    set(VSCPD_MAIN_SOURCE "${VSCP_SUB}/src/vscp/vscpd.cpp")
 else()
-    set(VSCPD_MAIN_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/linux/vscpd.cpp")
+    set(VSCPD_MAIN_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/src/linux/vscpd.cpp")
 endif()
 
 # ---- Daemon source files ----
 # Build the daemon using vscp submodule for common functionality.
 set(VSCPD_SOURCES
     "${VSCPD_MAIN_SOURCE}"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/controlobject.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/controlobject.cpp"
     "${VSCP_SUB}/src/vscp/common/tcpipsrv.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/interfacelist.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/userlist.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/devicethread.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/websrv.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/websocketsrv.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/restsrv.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/interfacelist.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/userlist.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/devicethread.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/websocketsrv.cpp"
     # Use vscphelper_compat from daemon.
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/vscphelper_compat.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/vscphelper_compat.cpp"
     "${VSCP_SUB}/src/vscp/common/automation.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/devicelist.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/mdf.cpp"
-    # Lua scripting extensions
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/lua_vscp_func.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/lua_vscp_wrkthread.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/civetweb.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/sockettcp.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/dllist.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/configfile.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/crc.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/crc8.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/randpassword.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/third_party/LuaXML_lib.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/third_party/lua_all.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/vscp_aes.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/third_party/sqlite3-3.30.1/sqlite3.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/third_party/sqlite3math.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/fastpbkdf2.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/vscpmd5.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/vscpbase64.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/devicelist.cpp"
+
 )
 
 # ---- Build the vscpd executable ----
@@ -119,19 +119,15 @@ set_target_properties(vscpd PROPERTIES OUTPUT_NAME "tcpip-vscpd")
 target_include_directories(vscpd
     PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/linux"
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common"
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/third_party"
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/third_party/nlohmann"
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/third_party/lua-5.3.5/src"
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/legacy_common/third_party/sqlite3-3.30.1"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/linux"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/legacy_common"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/legacy_common/third_party"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/legacy_common/third_party/sqlite3-3.30.1"
         "${VSCP_SUB}/src/vscp/common"
         "${VSCP_SUB}/src/common"
-        "${VSCP_SUB}/third_party/nlohmann/include"
-        "${VSCP_SUB}/third_party/spdlog/include"
-        "${VSCP_SUB}/third_party/mustache"
-        "${VSCP_SUB}/third_party/maddy/include"
+        "${VSCP_SUB}/third-party/mustache"
+        "${VSCP_SUB}/third-party/maddy/include"
 )
 
 if(WIN32)
@@ -142,9 +138,8 @@ if(WIN32)
 
     target_include_directories(vscpd
         PRIVATE
-            "${CMAKE_CURRENT_SOURCE_DIR}/src/daemon/win32helpers"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/win32helpers"
             "${VSCP_SUB}/src/vscp/common/win32helpers"
-            "${VSCP_SUB}/src/vscp/daemon"
     )
 endif()
 
@@ -159,7 +154,7 @@ target_compile_definitions(vscpd PRIVATE
 target_link_libraries(vscpd
     PRIVATE
         Threads::Threads
-        vscp_common
+        spdlog::spdlog
 )
 
 if(TARGET EXPAT::EXPAT)

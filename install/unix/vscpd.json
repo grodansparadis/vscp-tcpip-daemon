@@ -1,5 +1,5 @@
 {
-  "_comment": "VSCP Daemon configuration file — JSON format",
+  "_comment": "VSCP tcp/ip Daemon configuration file — JSON format",
   "_docs": "https://docs.vscp.org/vscpd/15.0/#/configuring_the_vscp_daemon",
   "runasuser": "vscp",
   "debug": 0,
@@ -19,79 +19,19 @@
     "file-max-files": 7,
     "console-enable-log": true,
     "console-log-level": "info",
-    "console-pattern": "[vscpd: %c] [%^%l%$] %v"
+    "console-pattern": "[vscpd: %c] [%^%l%$] %v",
+    "syslog-enable-log" : true,
+    "syslog-log-level" : "info",
+    "syslog-ident" : "mqttvscpd",
+    "udp-enable-log": true,
+    "udp-log-level" : "info",
+    "udp-pattern" : "[mqttvscpd] [%^%l%$] %v",
+    "udp-host" : "127.0.0.1",
+    "udp-port" : 9999
   },
 
-  "mqtt": {
-    "bind": "",
-    "host": "localhost",
-    "port": 1883,
-    "mqtt-options": {
-      "tcp-nodelay": true,
-      "protocol-version": 311,
-      "receive-maximum": 20,
-      "send-maximum": 20,
-      "ssl-ctx-with-defaults": 0,
-      "tls-ocsp-required": 0,
-      "tls-use-os-certs": 0
-    },
-    "user": "vscp",
-    "password": "secret",
-    "clientid": "",
-    "publish-format": "json",
-    "subscribe-format": "auto",
-    "qos": 1,
-    "bcleansession": false,
-    "bretain": false,
-    "keepalive": 60,
-    "bjsonmeasurementblock": true,
-    "topic-daemon-base": "vscp-daemon/status/{{guid}}/",
-    "topic-drivers": "drivers",
-    "topic-discovery": "discovery",
-    "reconnect": {
-      "delay": 2,
-      "delay-max": 10,
-      "exponential-backoff": false
-    },
-    "tls": {
-      "cafile": "",
-      "capath": "",
-      "certfile": "",
-      "keyfile": "",
-      "pwkeyfile": "",
-      "no-hostname-checking": true,
-      "cert-reqs": 0,
-      "version": "",
-      "ciphers": "",
-      "psk": "",
-      "psk-identity": ""
-    },
-    "will": {
-      "topic": "vscp-daemon/status/{{guid}}/will",
-      "qos": 1,
-      "retain": true,
-      "payload": "VSCP Daemon is down"
-    },
-    "subscribe": [
-      {
-        "topic": "vscp/{{guid}}/command/#",
-        "qos": 0,
-        "v5-options": 0,
-        "format": "auto"
-      }
-    ],
-    "bescape-pub-topics": true,
-    "publish": [
-      {
-        "topic": "vscp/{{guid}}/event",
-        "qos": 0,
-        "retain": false,
-        "format": "json"
-      }
-    ],
-    "v5": {
-      "user-properties": {}
-    }
+  "tcpip": {
+    
   },
 
   "drivers": {
