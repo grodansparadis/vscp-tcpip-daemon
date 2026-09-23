@@ -55,7 +55,6 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
-#include <syslog.h>
 #include <unistd.h>
 #ifdef WITH_SYSTEMD
 #include <systemd/sd-daemon.h>
@@ -69,30 +68,35 @@
 #include <set>
 #include <string>
 
+#include "version.h"
+
 #include <mongoose.h>
 #include <nlohmann/json.hpp>
 
+#include "spdlog/spdlog.h"
+#include "spdlog/sinks/stdout_color_sinks.h"
+#include "spdlog/sinks/basic_file_sink.h"
+#include "spdlog/sinks/rotating_file_sink.h"
+#include "spdlog/sinks/udp_sink.h"
+#ifdef __linux__
+#include "spdlog/sinks/syslog_sink.h"
+#include <syslog.h> // for LOG_PID, LOG_USER, etc.
+#endif
+
 #include <vscp-aes.h>
 
-#include "vscphelper_compat.h"
-#include <actioncodes.h>
-#include <automation.h>
-#include <canal_macro.h>
+#include <canal-macro.h>
 #include <configfile.h>
 #include <crc.h>
 #include <devicelist.h>
 #include <devicethread.h>
 #include <randpassword.h>
-#include <remotevariablecodes.h>
-#include <version.h>
 #include <vscp.h>
-#include <vscp_debug.h>
 #include <vscpd_caps.h>
 #include <vscpdb.h>
 #include <vscphelper.h>
 #include <vscpmd5.h>
-#include <websocket.h>
-#include <websrv.h>
+#include <guid.h>
 
 #define UNUSED(x) (void)(x)
 void
@@ -126,56 +130,54 @@ CControlObject::CControlObject()
 {
     // Open syslog
 
-    if (__VSCP_DEBUG_EXTRA) {
-        SYSLOG(LOG_DEBUG, "Starting the vscpd daemon");
-    }
+    spdlog::debug( "Starting the vscpd daemon");
 
     m_bQuit = false; // true  for app termination
     m_bQuit_clientMsgWorkerThread =
       false; // true for clientWorkerThread termination
 
     if (-1 == sem_init(&m_semClientOutputQueue, 0, 0)) {
-        SYSLOG(LOG_ERR, "Unable to init m_semClientOutputQueue");
+        spdlog::error( "Unable to init m_semClientOutputQueue");
         return;
     }
 
     if (-1 == sem_init(&m_semSentToAllClients, 0, 0)) {
-        SYSLOG(LOG_ERR, "Unable to init m_semSentToAllClients");
+        spdlog::error( "Unable to init m_semSentToAllClients");
         return;
     }
 
     if (0 != pthread_mutex_init(&m_mutex_ClientOutputQueue, NULL)) {
-        SYSLOG(LOG_ERR, "Unable to init m_mutex_ClientOutputQueue");
+        spdlog::error( "Unable to init m_mutex_ClientOutputQueue");
         return;
     }
 
     if (0 != pthread_mutex_init(&m_mutex_websrvSession, NULL)) {
-        SYSLOG(LOG_ERR, "Unable to init m_mutex_websrvSession");
+        spdlog::error( "Unable to init m_mutex_websrvSession");
         return;
     }
 
     if (0 != pthread_mutex_init(&m_mutex_restSession, NULL)) {
-        SYSLOG(LOG_ERR, "Unable to init m_mutex_restSession");
+        spdlog::error( "Unable to init m_mutex_restSession");
         return;
     }
 
     if (0 != pthread_mutex_init(&m_mutex_websocketSession, NULL)) {
-        SYSLOG(LOG_ERR, "Unable to init m_mutex_websocketSession");
+        spdlog::error( "Unable to init m_mutex_websocketSession");
         return;
     }
 
     if (0 != pthread_mutex_init(&m_mutex_DeviceList, NULL)) {
-        SYSLOG(LOG_ERR, "Unable to init m_mutex_DeviceList");
+        spdlog::error( "Unable to init m_mutex_DeviceList");
         return;
     }
 
     if (0 != pthread_mutex_init(&m_mutex_clientList, NULL)) {
-        SYSLOG(LOG_ERR, "Unable to init m_mutex_clientList");
+        spdlog::error( "Unable to init m_mutex_clientList");
         return;
     }
 
     if (0 != pthread_mutex_init(&m_mutex_UserList, NULL)) {
-        SYSLOG(LOG_ERR, "Unable to init m_mutex_UserList");
+        spdlog::error( "Unable to init m_mutex_UserList");
         return;
     }
 
@@ -193,7 +195,7 @@ CControlObject::CControlObject()
                           "A4A86F7D7E119BA3F0CD06881E371B989B"
                           "33B6D606A863B633EF529D64544F8E");
 
-    m_automation.setControlObject(this);
+    //m_automation.setControlObject(this);
     m_maxItemsInClientReceiveQueue = MAX_ITEMS_CLIENT_RECEIVE_QUEUE;
 
     // Nill the GUID
@@ -291,11 +293,11 @@ CControlObject::CControlObject()
     // Init. web server subsystem - All features enabled
     // ssl mt locks will we initiated here for openssl 1.0
     // if (0 == mg_init_library(MG_ENABLE_IPV6)) {
-    //     SYSLOG(LOG_ERR, "Failed to initialize webserver subsystem.");
+    //     spdlog::error( "Failed to initialize webserver subsystem.");
     // }
 
     struct mg_mgr mgr; // Event manager
-    mg_mgr_init(&mgr); // Init manager
+    //mg_mgr_init(&mgr); // Init manager
 
     // mg_http_listen(&mgr,
     //                "http://0.0.0.0:8000",
@@ -319,9 +321,8 @@ CControlObject::CControlObject()
 
 CControlObject::~CControlObject()
 {
-    if (__VSCP_DEBUG_EXTRA) {
-        SYSLOG(LOG_DEBUG, "Cleaning up");
-    }
+
+    spdlog::debug( "Cleaning up");
 
     // Remove objects in Client send queue
     std::list<vscpEvent*>::iterator iterVSCP;
@@ -339,54 +340,52 @@ CControlObject::~CControlObject()
     m_clientList.removeAllClients();
 
     // Clean up civetweb
-    //mg_exit_library();
+    // mg_exit_library();
 
     if (0 != sem_destroy(&m_semClientOutputQueue)) {
-        SYSLOG(LOG_ERR, "Unable to destroy m_semClientOutputQueue");
+        spdlog::error( "Unable to destroy m_semClientOutputQueue");
     }
 
     if (0 != sem_destroy(&m_semSentToAllClients)) {
-        SYSLOG(LOG_ERR, "Unable to destroy m_semSentToAllClients");
+        spdlog::error( "Unable to destroy m_semSentToAllClients");
     }
 
     if (0 != pthread_mutex_destroy(&m_mutex_ClientOutputQueue)) {
-        SYSLOG(LOG_ERR, "Unable to destroy m_mutex_ClientOutputQueue");
+        spdlog::error( "Unable to destroy m_mutex_ClientOutputQueue");
         return;
     }
 
     if (0 != pthread_mutex_destroy(&m_mutex_websrvSession)) {
-        SYSLOG(LOG_ERR, "Unable to destroy m_mutex_websrvSession");
+        spdlog::error( "Unable to destroy m_mutex_websrvSession");
         return;
     }
 
     if (0 != pthread_mutex_destroy(&m_mutex_restSession)) {
-        SYSLOG(LOG_ERR, "Unable to destroy m_mutex_restSession");
+        spdlog::error( "Unable to destroy m_mutex_restSession");
         return;
     }
 
     if (0 != pthread_mutex_destroy(&m_mutex_websocketSession)) {
-        SYSLOG(LOG_ERR, "Unable to destroy m_mutex_websocketSession");
+        spdlog::error( "Unable to destroy m_mutex_websocketSession");
         return;
     }
 
     if (0 != pthread_mutex_destroy(&m_mutex_DeviceList)) {
-        SYSLOG(LOG_ERR, "Unable to destroy m_mutex_DeviceList");
+        spdlog::error( "Unable to destroy m_mutex_DeviceList");
         return;
     }
 
     if (0 != pthread_mutex_destroy(&m_mutex_clientList)) {
-        SYSLOG(LOG_ERR, "Unable to destroy m_mutex_clientList");
+        spdlog::error( "Unable to destroy m_mutex_clientList");
         return;
     }
 
     if (0 != pthread_mutex_destroy(&m_mutex_UserList)) {
-        SYSLOG(LOG_ERR, "Unable to destroy m_mutex_UserList");
+        spdlog::error( "Unable to destroy m_mutex_UserList");
         return;
     }
 
-    if (__VSCP_DEBUG_EXTRA) {
-        SYSLOG(LOG_DEBUG, "Terminating the vscpd daemon");
-    }
+    spdlog::debug( "Terminating the vscpd daemon");
 
     // Close syslog
 }
@@ -405,7 +404,7 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
 
     // Root folder must exist
     if (!vscp_fileExists(m_rootFolder.c_str())) {
-        SYSLOG(LOG_ERR,
+        spdlog::error(
                "The specified rootfolder does not exist (%s).",
                (const char*)m_rootFolder.c_str());
         return false;
@@ -420,7 +419,7 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
     // A configuration file must be available
     if (!vscp_fileExists(strcfgfile.c_str())) {
         printf("No configuration file. Can't initialize!.");
-        SYSLOG(LOG_ERR,
+        spdlog::error(
                "No configuration file. Can't initialize!. Path=%s",
                strcfgfile.c_str());
         return false;
@@ -431,14 +430,13 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
     ////////////////////////////////////////////////////////////////////////////
 
     // Read JSON configuration
-    if (__VSCP_DEBUG_EXTRA) {
-        SYSLOG(LOG_DEBUG, "Reading configuration file");
-    }
+
+    spdlog::debug( "Reading configuration file");
 
     // Read JSON configuration
     try {
         if (!readConfiguration(strcfgfile)) {
-            SYSLOG(LOG_ERR,
+            spdlog::error(
                    "Unable to open/parse configuration file. Can't initialize! "
                    "Path =%s",
                    strcfgfile.c_str());
@@ -446,7 +444,7 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
         }
     }
     catch (...) {
-        SYSLOG(LOG_ERR, "Exception when reading configuration file");
+        spdlog::error( "Exception when reading configuration file");
         return FALSE;
     }
 
@@ -454,20 +452,18 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
     if (m_runAsUser.length()) {
         struct passwd* pw;
         if (NULL == (pw = getpwnam(m_runAsUser.c_str()))) {
-            SYSLOG(LOG_ERR, "Unknown user.");
+            spdlog::error( "Unknown user.");
         }
         else if (setgid(pw->pw_gid) != 0) {
-            SYSLOG(LOG_ERR, "setgid() failed. [%s]", strerror(errno));
+            spdlog::error( "setgid() failed. [%s]", strerror(errno));
         }
         else if (setuid(pw->pw_uid) != 0) {
-            SYSLOG(LOG_ERR, "setuid() failed. [%s]", strerror(errno));
+            spdlog::error( "setuid() failed. [%s]", strerror(errno));
         }
     }
 #endif
 
-    if (__VSCP_DEBUG_EXTRA) {
-        SYSLOG(LOG_DEBUG, "Using configuration file: %s", strcfgfile.c_str());
-    }
+    spdlog::debug( "Using configuration file: %s", strcfgfile.c_str());
 
     //==========================================================================
     //                           Add admin user
@@ -498,7 +494,7 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
     m_driverPassword = buf;
 
     std::string drvhash;
-    vscp_makePasswordHash(drvhash, std::string(buf));
+    //vscp_makePasswordHash(drvhash, std::string(buf));
 
     m_userList.addUser(m_driverUsername,
                        drvhash,                     // salt;hash
@@ -533,14 +529,14 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
     str += VSCPD_DISPLAY_VERSION;
     str += " - ";
     str += VSCPD_COPYRIGHT;
-    SYSLOG(LOG_INFO, "%s", str.c_str());
+    spdlog::info( "{}", str.c_str());
 
     // Start daemon internal client worker thread
     try {
         startClientMsgWorkerThread();
     }
     catch (...) {
-        SYSLOG(LOG_ERR, "Exception when starting message worker thread");
+        spdlog::error( "Exception when starting message worker thread");
         return FALSE;
     }
 
@@ -549,10 +545,10 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
     // Must be started before the tcp/ip server as
     // ssl initializarion is done here
     try {
-        start_webserver();
+        //start_webserver();
     }
     catch (...) {
-        SYSLOG(LOG_ERR, "Exception when starting web server");
+        spdlog::error( "Exception when starting web server");
         return FALSE;
     }
 
@@ -561,7 +557,7 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
         startTcpipSrvThread();
     }
     catch (...) {
-        SYSLOG(LOG_ERR, "Exception when starting tcp/ip server");
+        spdlog::error( "Exception when starting tcp/ip server");
         return FALSE;
     }
 
@@ -570,7 +566,7 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
         startDeviceWorkerThreads();
     }
     catch (...) {
-        SYSLOG(LOG_ERR, "Exception when loading drivers");
+        spdlog::error( "Exception when loading drivers");
         return FALSE;
     }
 
@@ -591,7 +587,7 @@ CControlObject::run(void)
     // We need to create a clientItem and add this object to the list
     CClientItem* pClientItem = new CClientItem;
     if (NULL == pClientItem) {
-        SYSLOG(LOG_ERR, "Unable to allocate Client item, Ending.");
+        spdlog::error( "Unable to allocate Client item, Ending.");
         return false;
     }
 
@@ -606,16 +602,14 @@ CControlObject::run(void)
     if (!addClient(pClientItem, CLIENT_ID_INTERNAL)) {
         // Failed to add client
         delete pClientItem;
-        SYSLOG(LOG_ERR, "ControlObject: Failed to add internal client.");
+        spdlog::error( "ControlObject: Failed to add internal client.");
         pthread_mutex_unlock(&m_clientList.m_mutexItemList);
         delete pClientItem;
         return false;
     }
     pthread_mutex_unlock(&m_clientList.m_mutexItemList);
 
-    if (__VSCP_DEBUG_EXTRA) {
-        SYSLOG(LOG_DEBUG, "Mainloop starting");
-    }
+    spdlog::debug( "Mainloop starting");
 
 #ifdef WITH_SYSTEMD
     sd_notify(0, "READY=1");
@@ -640,7 +634,7 @@ CControlObject::run(void)
             clock_gettime(CLOCK_REALTIME, &old_now);
 
             if (!automation(pClientItem)) {
-                SYSLOG(LOG_ERR, "Failed to send automation events!");
+                spdlog::error( "Failed to send automation events!");
             }
         }
 
@@ -651,7 +645,7 @@ CControlObject::run(void)
         }
 
         // Send events to websocket clients
-        websock_post_incomingEvents();
+        //websock_post_incomingEvents();
 
         //----------------------------------------------------------------------
         //                         Event received here
@@ -683,9 +677,7 @@ CControlObject::run(void)
 
     // Clean up is called in main file
 
-    if (__VSCP_DEBUG_EXTRA) {
-        SYSLOG(LOG_DEBUG, "Mainloop ending");
-    }
+    spdlog::debug( "Mainloop ending");
 
     return true;
 }
@@ -716,7 +708,7 @@ CControlObject::automation(CClientItem* pClientItem)
     ex.data[2] = 0; // subzone
 
     if (!sendEvent(pClientItem, &ex)) {
-        SYSLOG(LOG_ERR, "Failed to send Class1 heartbeat");
+        spdlog::error( "Failed to send Class1 heartbeat");
     }
 
     // Send VSCP_CLASS2_INFORMATION,
@@ -738,7 +730,7 @@ CControlObject::automation(CClientItem* pClientItem)
            std::min((int)strlen(m_strServerName.c_str()), 64));
 
     if (!sendEvent(pClientItem, &ex)) {
-        SYSLOG(LOG_ERR, "Failed to send Class2 heartbeat");
+        spdlog::error( "Failed to send Class2 heartbeat");
     }
 
     // Send VSCP_CLASS1_PROTOCOL,
@@ -765,7 +757,7 @@ CControlObject::automation(CClientItem* pClientItem)
     ex.data[4] = (uint8_t)((time32) & 0xff); // Time since epoch LSB
 
     if (!sendEvent(pClientItem, &ex)) {
-        SYSLOG(LOG_ERR, "Failed to send segment controller heartbeat");
+        spdlog::error( "Failed to send segment controller heartbeat");
     }
 
     // Send VSCP_CLASS2_PROTOCOL,
@@ -806,7 +798,7 @@ CControlObject::automation(CClientItem* pClientItem)
     ex.sizeData = 104;
 
     if (!sendEvent(pClientItem, &ex)) {
-        SYSLOG(LOG_ERR, "Failed to send high end server capabilities.");
+        spdlog::error( "Failed to send high end server capabilities.");
     }
 
     return true;
@@ -818,72 +810,58 @@ CControlObject::automation(CClientItem* pClientItem)
 bool
 CControlObject::cleanup(void)
 {
-    if (__VSCP_DEBUG_EXTRA) {
-        SYSLOG(LOG_DEBUG,
-               "ControlObject: cleanup - Giving worker threads time to stop "
-               "operations...");
-    }
 
-    if (__VSCP_DEBUG_EXTRA) {
-        SYSLOG(LOG_DEBUG,
-               "ControlObject: cleanup - Stopping device worker thread...");
-    }
+    spdlog::debug(
+           "ControlObject: cleanup - Giving worker threads time to stop "
+           "operations...");
+
+    spdlog::debug(
+           "ControlObject: cleanup - Stopping device worker thread...");
 
     try {
         stopDeviceWorkerThreads();
     }
     catch (...) {
-        SYSLOG(LOG_ERR,
+        spdlog::error(
                "REST: Exception occurred when stoping device worker threads");
     }
 
-    if (__VSCP_DEBUG_EXTRA) {
-        SYSLOG(
-          LOG_DEBUG,
-          "ControlObject: cleanup - Stopping VSCP Server worker thread...");
-    }
+    spdlog::debug(
+           "ControlObject: cleanup - Stopping VSCP Server worker thread...");
 
     // stopDaemonWorkerThread(); *****
 
-    if (__VSCP_DEBUG_EXTRA) {
-        SYSLOG(LOG_DEBUG,
-               "ControlObject: cleanup - Stopping client worker thread...");
-    }
+    spdlog::debug(
+           "ControlObject: cleanup - Stopping client worker thread...");
 
     try {
         stopClientMsgWorkerThread();
     }
     catch (...) {
-        SYSLOG(LOG_ERR, "Exception occurred when stoping client worker thread");
+        spdlog::error( "Exception occurred when stoping client worker thread");
     }
 
-    if (__VSCP_DEBUG_EXTRA) {
-        SYSLOG(LOG_DEBUG,
-               "ControlObject: cleanup - Stopping Web Server worker thread...");
-    }
+    spdlog::debug(
+           "ControlObject: cleanup - Stopping Web Server worker thread...");
 
     try {
-        stop_webserver();
+        //stop_webserver();
     }
     catch (...) {
-        SYSLOG(LOG_ERR, "REST: Exception occurred when stoping web server");
+        spdlog::error( "REST: Exception occurred when stoping web server");
     }
 
-    if (__VSCP_DEBUG_EXTRA) {
-        SYSLOG(LOG_DEBUG,
-               "ControlObject: cleanup - Stopping TCP/IP worker thread...");
-    }
+    spdlog::debug(
+           "ControlObject: cleanup - Stopping TCP/IP worker thread...");
 
     try {
         stopTcpipSrvThread();
     }
     catch (...) {
-        SYSLOG(LOG_ERR, "REST: Exception occurred when stoping tcp/ip server");
+        spdlog::error( "REST: Exception occurred when stoping tcp/ip server");
     }
 
-    if (__VSCP_DEBUG_EXTRA) {
-        SYSLOG(LOG_DEBUG, "Controlobject: ControlObject: Cleanup done.");
-    }
+    spdlog::debug( "Controlobject: ControlObject: Cleanup done.");
 
     return true;
 }
@@ -895,16 +873,15 @@ CControlObject::cleanup(void)
 bool
 CControlObject::startClientMsgWorkerThread(void)
 {
-    if (__VSCP_DEBUG_EXTRA) {
-        SYSLOG(LOG_DEBUG, "Controlobject: Starting client worker thread...");
-    }
+
+    spdlog::debug( "Controlobject: Starting client worker thread...");
 
     if (pthread_create(&m_clientMsgWorkerThread,
                        NULL,
                        clientMsgWorkerThread,
                        this)) {
 
-        SYSLOG(LOG_ERR, "Controlobject: Unable to start client thread.");
+        spdlog::error( "Controlobject: Unable to start client thread.");
         return false;
     }
 
@@ -933,20 +910,20 @@ bool
 CControlObject::startTcpipSrvThread(void)
 {
     if (!m_enableTcpip) {
-        if (__VSCP_DEBUG_TCP) {
-            SYSLOG(LOG_DEBUG, "Controlobject: TCP/IP interface disabled.");
-        }
+
+            spdlog::debug( "Controlobject: TCP/IP interface disabled.");
+        
         return true;
     }
 
-    if (__VSCP_DEBUG_TCP) {
-        SYSLOG(LOG_DEBUG, "Controlobject: Starting TCP/IP interface...");
-    }
+
+        spdlog::debug( "Controlobject: Starting TCP/IP interface...");
+    
 
     // Create the tcp/ip server data object
     m_ptcpipSrvObject = (tcpipListenThreadObj*)new tcpipListenThreadObj(this);
     if (NULL == m_ptcpipSrvObject) {
-        SYSLOG(LOG_ERR,
+        spdlog::error(
                "Controlobject: Failed to allocate storage for tcp/ip.");
     }
 
@@ -959,7 +936,7 @@ CControlObject::startTcpipSrvThread(void)
                        m_ptcpipSrvObject)) {
         delete m_ptcpipSrvObject;
         m_ptcpipSrvObject = NULL;
-        SYSLOG(LOG_ERR,
+        spdlog::error(
                "Controlobject: Unable to start the tcp/ip listen thread.");
         return false;
     }
@@ -977,17 +954,17 @@ CControlObject::stopTcpipSrvThread(void)
     // Tell the thread it's time to quit
     m_ptcpipSrvObject->m_nStopTcpIpSrv = VSCP_TCPIP_SRV_STOP;
 
-    if (__VSCP_DEBUG_TCP) {
-        SYSLOG(LOG_DEBUG, "Controlobject: Terminating TCP thread.");
-    }
+
+        spdlog::debug( "Controlobject: Terminating TCP thread.");
+    
 
     pthread_join(m_tcpipListenThread, NULL);
     delete m_ptcpipSrvObject;
     m_ptcpipSrvObject = NULL;
 
-    if (__VSCP_DEBUG_TCP) {
-        SYSLOG(LOG_DEBUG, "Controlobject: Terminated TCP thread.");
-    }
+
+        spdlog::debug( "Controlobject: Terminated TCP thread.");
+
 
     return true;
 }
@@ -1000,9 +977,8 @@ bool
 CControlObject::startDeviceWorkerThreads(void)
 {
     CDeviceItem* pDeviceItem;
-    if (__VSCP_DEBUG_EXTRA) {
-        SYSLOG(LOG_DEBUG, "[Controlobject][Driver] - Starting drivers...");
-    }
+
+    spdlog::debug( "[Controlobject][Driver] - Starting drivers...");
 
     std::deque<CDeviceItem*>::iterator it;
     for (it = m_deviceList.m_devItemList.begin();
@@ -1012,21 +988,17 @@ CControlObject::startDeviceWorkerThreads(void)
         pDeviceItem = *it;
         if (NULL != pDeviceItem) {
 
-            if (__VSCP_DEBUG_EXTRA) {
-                SYSLOG(LOG_DEBUG,
-                       "Controlobject: [Driver] - Preparing: %s ",
-                       pDeviceItem->m_strName.c_str());
-            }
+            spdlog::debug(
+                   "Controlobject: [Driver] - Preparing: %s ",
+                   pDeviceItem->m_strName.c_str());
 
             // Just start if enabled
             if (!pDeviceItem->m_bEnable)
                 continue;
 
-            if (__VSCP_DEBUG_EXTRA) {
-                SYSLOG(LOG_DEBUG,
-                       "Controlobject: [Driver] - Starting: %s ",
-                       pDeviceItem->m_strName.c_str());
-            }
+            spdlog::debug(
+                   "Controlobject: [Driver] - Starting: %s ",
+                   pDeviceItem->m_strName.c_str());
 
             // Start  the driver logic
             pDeviceItem->startDriver(this);
@@ -1046,9 +1018,8 @@ CControlObject::stopDeviceWorkerThreads(void)
 {
     CDeviceItem* pDeviceItem;
 
-    if (__VSCP_DEBUG_EXTRA) {
-        SYSLOG(LOG_DEBUG, "[Controlobject][Driver] - Stopping drivers...");
-    }
+    spdlog::debug( "[Controlobject][Driver] - Stopping drivers...");
+
     std::deque<CDeviceItem*>::iterator iter;
     for (iter = m_deviceList.m_devItemList.begin();
          iter != m_deviceList.m_devItemList.end();
@@ -1056,11 +1027,11 @@ CControlObject::stopDeviceWorkerThreads(void)
 
         pDeviceItem = *iter;
         if (NULL != pDeviceItem) {
-            if (__VSCP_DEBUG_EXTRA) {
-                SYSLOG(LOG_DEBUG,
-                       "Controlobject: [Driver] - Stopping: %s ",
-                       pDeviceItem->m_strName.c_str());
-            }
+
+            spdlog::debug(
+                   "Controlobject: [Driver] - Stopping: %s ",
+                   pDeviceItem->m_strName.c_str());
+
             pDeviceItem->stopDriver();
         }
     }
@@ -1204,19 +1175,19 @@ CControlObject::sendEventToClient(CClientItem* pClientItem, vscpEvent* pEvent)
 {
     // Must be valid pointers
     if (NULL == pClientItem) {
-        SYSLOG(LOG_ERR, "sendEventToClient - Pointer to clientitem is null");
+        spdlog::error( "sendEventToClient - Pointer to clientitem is null");
         return false;
     }
     if (NULL == pEvent) {
-        SYSLOG(LOG_ERR, "sendEventToClient - Pointer to event is null");
+        spdlog::error( "sendEventToClient - Pointer to event is null");
         return false;
     }
 
     // Check if filtered out - if so do nothing here
     if (!vscp_doLevel2Filter(pEvent, &pClientItem->m_filter)) {
-        if (__VSCP_DEBUG_EXTRA) {
-            SYSLOG(LOG_DEBUG, "sendEventToClient - Filtered out");
-        }
+
+        spdlog::debug( "sendEventToClient - Filtered out");
+
         return false;
     }
 
@@ -1224,9 +1195,9 @@ CControlObject::sendEventToClient(CClientItem* pClientItem, vscpEvent* pEvent)
     // client will not receive the message
     if (pClientItem->m_clientInputQueue.size() >
         m_maxItemsInClientReceiveQueue) {
-        if (__VSCP_DEBUG_EXTRA) {
-            SYSLOG(LOG_DEBUG, "sendEventToClient - overrun");
-        }
+
+        spdlog::debug( "sendEventToClient - overrun");
+
         // Overrun
         pClientItem->m_statistics.cntOverruns++;
         return false;
@@ -1263,7 +1234,7 @@ CControlObject::sendEventAllClients(vscpEvent* pEvent, uint32_t excludeID)
     std::deque<CClientItem*>::iterator it;
 
     if (NULL == pEvent) {
-        SYSLOG(LOG_ERR, "sendEventAllClients - null event");
+        spdlog::error( "sendEventAllClients - null event");
         return false;
     }
 
@@ -1274,13 +1245,13 @@ CControlObject::sendEventAllClients(vscpEvent* pEvent, uint32_t excludeID)
         pClientItem = *it;
 
         if ((NULL != pClientItem) && (excludeID != pClientItem->m_clientID)) {
-            if (__VSCP_DEBUG_EXTRA) {
-                SYSLOG(LOG_DEBUG,
-                       "Send event to client [%s]",
-                       pClientItem->m_strDeviceName.c_str());
-            }
+
+            spdlog::debug(
+                   "Send event to client [%s]",
+                   pClientItem->m_strDeviceName.c_str());
+
             if (!sendEventToClient(pClientItem, pEvent)) {
-                SYSLOG(LOG_ERR, "sendEventAllClients - Failed to send event");
+                spdlog::error( "sendEventAllClients - Failed to send event");
             }
         }
     }
@@ -1303,11 +1274,11 @@ CControlObject::sendEvent(CClientItem* pClientItem, vscpEvent* peventToSend)
 
     // Check pointers
     if (NULL == pClientItem) {
-        SYSLOG(LOG_ERR, "sendEvent - null clientItem");
+        spdlog::error( "sendEvent - null clientItem");
         return false;
     }
     if (NULL == peventToSend) {
-        SYSLOG(LOG_ERR, "sendEvent - null event");
+        spdlog::error( "sendEvent - null event");
         return false;
     }
 
@@ -1328,7 +1299,7 @@ CControlObject::sendEvent(CClientItem* pClientItem, vscpEvent* peventToSend)
 
     vscpEvent* pEvent = new vscpEvent; // Create new VSCP Event
     if (NULL == pEvent) {
-        SYSLOG(LOG_ERR, "sendEvent - Allocation of event failed");
+        spdlog::error( "sendEvent - Allocation of event failed");
         return false;
     }
 
@@ -1337,7 +1308,7 @@ CControlObject::sendEvent(CClientItem* pClientItem, vscpEvent* peventToSend)
     // Copy event
     if (!vscp_copyEvent(pEvent, peventToSend)) {
         vscp_deleteEvent_v2(&pEvent);
-        SYSLOG(LOG_ERR, "sendEvent - Event copy failed");
+        spdlog::error( "sendEvent - Event copy failed");
         return false;
     }
 
@@ -1363,28 +1334,26 @@ CControlObject::sendEvent(CClientItem* pClientItem, vscpEvent* peventToSend)
         destguid.setAt(14, 0); // Interface GUID's have LSB bytes nilled
         destguid.setAt(15, 0);
 
-        if (__VSCP_DEBUG_EXTRA) {
-            SYSLOG(LOG_DEBUG,
-                   "Level I event over Level II "
-                   "dest = %02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:"
-                   "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:",
-                   destguid.getAt(0),
-                   destguid.getAt(1),
-                   destguid.getAt(2),
-                   destguid.getAt(3),
-                   destguid.getAt(4),
-                   destguid.getAt(5),
-                   destguid.getAt(6),
-                   destguid.getAt(7),
-                   destguid.getAt(8),
-                   destguid.getAt(9),
-                   destguid.getAt(10),
-                   destguid.getAt(11),
-                   destguid.getAt(12),
-                   destguid.getAt(13),
-                   destguid.getAt(14),
-                   destguid.getAt(15));
-        }
+        spdlog::debug(
+               "Level I event over Level II "
+               "dest = %02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:"
+               "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:",
+               destguid.getAt(0),
+               destguid.getAt(1),
+               destguid.getAt(2),
+               destguid.getAt(3),
+               destguid.getAt(4),
+               destguid.getAt(5),
+               destguid.getAt(6),
+               destguid.getAt(7),
+               destguid.getAt(8),
+               destguid.getAt(9),
+               destguid.getAt(10),
+               destguid.getAt(11),
+               destguid.getAt(12),
+               destguid.getAt(13),
+               destguid.getAt(14),
+               destguid.getAt(15));
 
         // Find client
         pthread_mutex_lock(&m_clientList.m_mutexItemList);
@@ -1395,39 +1364,38 @@ CControlObject::sendEvent(CClientItem* pClientItem, vscpEvent* peventToSend)
              ++it) {
 
             CClientItem* pItem = *it;
-            if (__VSCP_DEBUG_EXTRA) {
-                SYSLOG(LOG_DEBUG,
-                       "Test if = "
-                       "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:"
-                       "%02X:%02X:%02X:%02X:%02X:  - %s",
-                       pItem->m_guid.getAt(0),
-                       pItem->m_guid.getAt(1),
-                       pItem->m_guid.getAt(2),
-                       pItem->m_guid.getAt(3),
-                       pItem->m_guid.getAt(4),
-                       pItem->m_guid.getAt(5),
-                       pItem->m_guid.getAt(6),
-                       pItem->m_guid.getAt(7),
-                       pItem->m_guid.getAt(8),
-                       pItem->m_guid.getAt(9),
-                       pItem->m_guid.getAt(10),
-                       pItem->m_guid.getAt(11),
-                       pItem->m_guid.getAt(12),
-                       pItem->m_guid.getAt(13),
-                       pItem->m_guid.getAt(14),
-                       pItem->m_guid.getAt(15),
-                       pItem->m_strDeviceName.c_str());
-                SYSLOG(LOG_DEBUG,
-                       "Match = %s",
-                       (pItem->m_guid == destguid) ? "true" : "false");
-            }
+
+            spdlog::debug(
+                   "Test if = "
+                   "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:"
+                   "%02X:%02X:%02X:%02X:%02X:  - %s",
+                   pItem->m_guid.getAt(0),
+                   pItem->m_guid.getAt(1),
+                   pItem->m_guid.getAt(2),
+                   pItem->m_guid.getAt(3),
+                   pItem->m_guid.getAt(4),
+                   pItem->m_guid.getAt(5),
+                   pItem->m_guid.getAt(6),
+                   pItem->m_guid.getAt(7),
+                   pItem->m_guid.getAt(8),
+                   pItem->m_guid.getAt(9),
+                   pItem->m_guid.getAt(10),
+                   pItem->m_guid.getAt(11),
+                   pItem->m_guid.getAt(12),
+                   pItem->m_guid.getAt(13),
+                   pItem->m_guid.getAt(14),
+                   pItem->m_guid.getAt(15),
+                   pItem->m_strDeviceName.c_str());
+            spdlog::debug(
+                   "Match = %s",
+                   (pItem->m_guid == destguid) ? "true" : "false");
 
             if (pItem->m_guid == destguid) {
                 // Found
                 // pDestClientItem = pItem;
                 bSent = true;
                 if (!sendEventToClient(pItem, pEvent)) {
-                    SYSLOG(LOG_DEBUG, "sendEventToClient: Failed!");
+                    spdlog::debug( "sendEventToClient: Failed!");
                 }
                 break;
             }
@@ -1453,9 +1421,9 @@ CControlObject::sendEvent(CClientItem* pClientItem, vscpEvent* peventToSend)
             sem_post(&m_semClientOutputQueue);
         }
         else {
-            if (__VSCP_DEBUG_EXTRA) {
-                SYSLOG(LOG_DEBUG, "sendEvent - overrun");
-            }
+
+            spdlog::debug( "sendEvent - overrun");
+
             pClientItem->m_statistics.cntOverruns++;
             vscp_deleteEvent_v2(&pEvent);
             return false;
@@ -1476,12 +1444,12 @@ CControlObject::sendEvent(CClientItem* pClientItem, vscpEventEx* pex)
     vscpEvent ev;
 
     if (!vscp_convertEventExToEvent(&ev, pex)) {
-        SYSLOG(LOG_ERR, "sendEvent: Failed in vscp_convertEventExToEvent");
+        spdlog::error( "sendEvent: Failed in vscp_convertEventExToEvent");
         return false;
     }
 
     if (!(rv = sendEvent(pClientItem, &ev))) {
-        SYSLOG(LOG_ERR, "sendEvent: Failed to send event");
+        spdlog::error( "sendEvent: Failed to send event");
     }
 
     vscp_deleteEvent(&ev);
@@ -1660,16 +1628,15 @@ CControlObject::getMacAddress(cguid& guid)
     if (0 == ioctl(fd, SIOCGIFHWADDR, &s)) {
 
         // ptr = (unsigned char *)&s.ifr_ifru.ifru_hwaddr.sa_data[0];
-        if (__VSCP_DEBUG_EXTRA) {
-            SYSLOG(LOG_DEBUG,
-                   "Ethernet MAC address: %02X:%02X:%02X:%02X:%02X:%02X",
-                   (uint8_t)s.ifr_addr.sa_data[0],
-                   (uint8_t)s.ifr_addr.sa_data[1],
-                   (uint8_t)s.ifr_addr.sa_data[2],
-                   (uint8_t)s.ifr_addr.sa_data[3],
-                   (uint8_t)s.ifr_addr.sa_data[4],
-                   (uint8_t)s.ifr_addr.sa_data[5]);
-        }
+
+        spdlog::debug(
+               "Ethernet MAC address: %02X:%02X:%02X:%02X:%02X:%02X",
+               (uint8_t)s.ifr_addr.sa_data[0],
+               (uint8_t)s.ifr_addr.sa_data[1],
+               (uint8_t)s.ifr_addr.sa_data[2],
+               (uint8_t)s.ifr_addr.sa_data[3],
+               (uint8_t)s.ifr_addr.sa_data[4],
+               (uint8_t)s.ifr_addr.sa_data[5]);
 
         guid.setAt(0, 0xff);
         guid.setAt(1, 0xff);
@@ -1689,7 +1656,7 @@ CControlObject::getMacAddress(cguid& guid)
         guid.setAt(15, 0);
     }
     else {
-        SYSLOG(LOG_ERR, "Failed to get hardware address (must be root?).");
+        spdlog::error( "Failed to get hardware address (must be root?).");
         rv = false;
     }
 
@@ -1797,33 +1764,32 @@ CControlObject::getSystemKeyMD5(std::string& strKey)
 bool
 CControlObject::readConfiguration(const std::string& strcfgfile)
 {
-    if (__VSCP_DEBUG_EXTRA) {
-        SYSLOG(LOG_DEBUG,
-               "Reading full JSON configuration from [%s]",
-               (const char*)strcfgfile.c_str());
-    }
+
+    spdlog::debug(
+           "Reading full JSON configuration from {}",
+           strcfgfile.c_str());
 
     json j;
     try {
         std::ifstream in(strcfgfile, std::ifstream::in);
         if (!in.is_open()) {
-            SYSLOG(LOG_ERR,
-                   "Failed to open configuration file [%s]",
+            spdlog::error(
+                   "Failed to open configuration file {}",
                    strcfgfile.c_str());
             return false;
         }
         in >> j;
     }
     catch (const std::exception& ex) {
-        SYSLOG(LOG_ERR,
-               "Failed to parse JSON configuration file [%s]: %s",
+        spdlog::error(
+               "Failed to parse JSON configuration file {}: {}",
                strcfgfile.c_str(),
                ex.what());
         return false;
     }
     catch (...) {
-        SYSLOG(LOG_ERR,
-               "Failed to parse JSON configuration file [%s]",
+        spdlog::error(
+               "Failed to parse JSON configuration file {}",
                strcfgfile.c_str());
         return false;
     }
@@ -2146,7 +2112,7 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
                                           VSCP_DRIVER_LEVEL1,
                                           true,
                                           drv["translation"].get<uint32_t>())) {
-                    SYSLOG(LOG_ERR,
+                    spdlog::error(
                            "Level I driver not added name=%s. Path does not "
                            "exist. - [%s]",
                            strName.c_str(),
@@ -2176,7 +2142,7 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
                                           guid,
                                           VSCP_DRIVER_LEVEL2,
                                           true)) {
-                    SYSLOG(LOG_ERR,
+                    spdlog::error(
                            "Level II driver not added name=%s. Path does not "
                            "exist. - [%s]",
                            strName.c_str(),

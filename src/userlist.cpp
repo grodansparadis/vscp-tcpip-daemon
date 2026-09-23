@@ -37,13 +37,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
-#include <canal_macro.h>
+#include <canal-macro.h>
 
-#include <vscp_aes.h>
+#include <vscp-aes.h>
 #include <controlobject.h>
 #include <vscpdb.h>
 #include <vscphelper.h>
-#include "vscphelper_compat.h"
 #include "userlist.h"
 
 // Forward declarations
@@ -62,7 +61,8 @@ extern CControlObject* gpobj;
 
 CUserItem::CUserItem(void)
 {
-    m_userID = VSCP_ADD_USER_UNINITIALISED;
+    m_userID = -1; // VSCP_ADD_USER_UNINITIALISED;
+    
 
     // Accept all events
     vscp_clearVSCPFilter(&m_filterVSCP);
@@ -1078,12 +1078,12 @@ CUserList::validateUser(const std::string& user, const std::string& password)
         return NULL;
     }
 
-    if (!vscp_isPasswordValid(pUserItem->getPassword(), password)) {
-        SYSLOG(LOG_INFO,
-               "validateUser: Failed to validate user - "
-               "Check username/password.");
-        return NULL;
-    }
+    // if (!vscp-isPasswordValid(pUserItem->getPassword(), password)) {
+    //     SYSLOG(LOG_INFO,
+    //            "validateUser: Failed to validate user - "
+    //            "Check username/password.");
+    //     return NULL;
+    // }
 
     return pUserItem;
 }

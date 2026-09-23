@@ -29,17 +29,44 @@
 #if !defined(CONTROLOBJECT_H__INCLUDED_)
 #define CONTROLOBJECT_H__INCLUDED_
 
-#include <set>
-
-#include <automation.h>
 #include <clientlist.h>
 #include <devicelist.h>
 #include <interfacelist.h>
 #include <tcpipsrv.h>
 #include <userlist.h>
 #include <vscp.h>
-#include <websocket.h>
-#include <websrv.h>
+
+#include <atomic>
+#include <map>
+#include <set>
+
+#include <sqlite3.h>
+#include <mustache.hpp>
+#include <nlohmann/json.hpp> // Needs C++11  -std=c++11
+
+#include "spdlog/sinks/rotating_file_sink.h"
+#include "spdlog/spdlog.h"
+
+// https://github.com/nlohmann/json
+using json = nlohmann::json;
+
+using namespace kainjow::mustache;
+
+// Needed on Linux
+#ifndef VSCPMIN
+#define VSCPMIN(X, Y) ((X) < (Y) ? (X) : (Y))
+#endif
+
+#ifndef VSCPMAX
+#define VSCPMAX(a, b)                                                          \
+    ({                                                                         \
+        __typeof__(a) _a = (a);                                                \
+        __typeof__(b) _b = (b);                                                \
+        _a > _b ? _a : _b;                                                     \
+    })
+#endif
+
+#define VSCP_MAX_DEVICES 1024 // abs. max. is 0xffff
 
 // Forward declarations
 class TCPListenThread;
@@ -82,6 +109,10 @@ class TCPListenThread;
 
 class CControlObject {
   public:
+    // Will quit if set to true
+    // Atomic: set from signal handler / other threads, read in main loop
+    std::atomic<bool> m_bQuit;
+
     /*!
         Constructor
      */
@@ -166,26 +197,6 @@ class CControlObject {
     bool stopTcpipSrvThread(void);
 
     /*!
-        Start the UDP worker thread
-    */
-    // bool startUDPSrvThread(void);
-
-    /*!
-        Stop the UDP Workerthread
-    */
-    // bool stopUDPSrvThread(void);
-
-    /*!
-        Start the Multicast worker threads
-    */
-    bool startMulticastWorkerThreads(void);
-
-    /*!
-        Stop the Multicast Workerthreads
-    */
-    bool stopMulticastWorkerThreads(void);
-
-    /*!
         Starting Client worker thread
         @return true on success
      */
@@ -208,7 +219,7 @@ class CControlObject {
     bool addClient(CClientItem* pClientItem, uint32_t id = 0);
 
     /*!
-        Add a new client to the client list using GUID. 
+        Add a new client to the client list using GUID.
 
         This add client method is for drivers that specify a
         full GUID (two lsb nilled).
@@ -328,9 +339,6 @@ class CControlObject {
     // This is the root folder for the VSCP daemon, it will look for
     // the configuration database here
     std::string m_rootFolder;
-
-    // Set to true if we should quit application
-    bool m_bQuit;
 
     // Set to true of the clientWorkerThread should terminate
     bool m_bQuit_clientMsgWorkerThread;
@@ -526,7 +534,65 @@ class CControlObject {
     pthread_mutex_t m_mutex_websocketSession;
 
     // List of active websocket sessions
-    std::list<websock_session*> m_websocketSessions;
+    // std::list<websock_session*> m_websocketSessions;
+
+    //**************************************************************************
+    //                                DATABASE
+    //**************************************************************************
+
+    /*!
+        Path to class/type definition database
+    */
+    std::string m_pathClassTypeDefinitionDb;
+
+    std::map<uint16_t, std::string>
+      m_map_class_id2Token; // vscp_class -> class_token
+    std::map<std::string, uint16_t>
+      m_map_class_token2Id; // class_token -> vscp_class
+
+    std::map<uint32_t, std::string>
+      m_map_type_id2Token; // ((vscp_class << 16) + vscp_type) -> type_token
+    std::map<std::string, uint32_t>
+      m_map_type_token2Id; // type_token -> ((vscp_class << 16) + vscp_type)
+
+    /*!
+    Path to discovery database
+    Set empty to disable functionality
+*/
+    std::string m_pathMainDb;
+    sqlite3* m_db_vscp_daemon;
+
+    std::map<std::string, std::string>
+      m_map_discoveryGuidToName; // key = GUID, value = name
+
+    // Protects m_map_discoveryGuidToName, discovery db writes and discovery
+    // publish. discovery() is called concurrently from all device threads.
+    pthread_mutex_t m_mutex_discovery;
+
+    //**************************************************************************
+    //                            LOGGER (SPDLOG)
+    //**************************************************************************
+
+    bool m_bEnableFileLog;
+    spdlog::level::level_enum m_fileLogLevel;
+    std::string m_fileLogPattern;
+    std::string m_path_to_log_file;
+    uint32_t m_max_log_size;
+    uint16_t m_max_log_files;
+
+    bool m_bEnableConsoleLog;
+    spdlog::level::level_enum m_consoleLogLevel;
+    std::string m_consoleLogPattern;
+
+    bool m_bEnableSysLog;
+    spdlog::level::level_enum m_sysLogLevel;
+    std::string m_sysLogIdent;
+
+    bool m_bEnableUdpLog;
+    spdlog::level::level_enum m_udpLogLevel;
+    std::string m_udpLogPattern;
+    std::string m_udpLogHost;
+    uint16_t m_udpLogPort;
 
     //**************************************************************************
     //                                 DRIVERS
@@ -548,7 +614,7 @@ class CControlObject {
     pthread_mutex_t m_mutex_deviceList;
 
     // Automation Object
-    CAutomation m_automation;
+    // CAutomation m_automation;
 
     // Username for level III drivers
     std::string m_driverUsername; // TODO remove

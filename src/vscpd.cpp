@@ -4,7 +4,7 @@
 //
 // The MIT License (MIT)
 //
-// Copyright (C) 2000-2026 Ake Hedman and contributors, the VSCP Project
+// Copyright (C) 2000-2026 Ake Hedman, contributors, the VSCP project
 // <info@vscp.org>
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -26,12 +26,27 @@
 // SOFTWARE.
 //
 
-#include <deque>
-#include <string>
+#ifdef WIN32
+// For getopt
+#define __GNU_LIBRARY__
+#include <pch.h>
+#endif
 
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
+#include <pthread.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#ifdef WIN32
+#include <direct.h>
+#endif
+
+#ifndef WIN32
 #ifdef __linux__
 #include <linux/if_ether.h>
 #include <linux/if_packet.h>
@@ -40,361 +55,420 @@
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <netdb.h>
-#include <pthread.h>
-#include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/ioctl.h>
 #include <sys/msg.h>
 #include <sys/socket.h>
-#include <sys/stat.h>
 #include <sys/time.h>
-#include <sys/types.h>
-#include <syslog.h>
 #include <unistd.h>
+#else
 
-#include "canal_macro.h"
+#endif
+
+
+#include "canal-macro.h"
 #include "vscpd.h"
-#include <controlobject.h>
+#include "controlobject.h"
 #include <crc.h>
 #include <version.h>
 #include <vscphelper.h>
 
-//#define DEBUG
-uint32_t m_gdebugArray[8];
+#include <deque>
+#include <string>
+
+#include <spdlog/async.h>
+#include <spdlog/sinks/basic_file_sink.h>
+#include <spdlog/sinks/rotating_file_sink.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/spdlog.h>
+
+// #define DEBUG
+
+#if defined(WIN32) && defined(_MSC_VER)
+char *optarg = nullptr;
+#endif
 
 // Globals for the daemon
 int gbStopDaemon;
-int gnDebugLevel       = 0;
 bool gbDontRunAsDaemon = false;
-bool gbRestart         = false;
-std::string systemKey;
+
+// The default random encryption key
+uint8_t __vscp_key[32] = { 0x2d, 0xbb, 0x07, 0x9a, 0x38, 0x98, 0x5a, 0xf0, 0x0e, 0xbe, 0xef,
+                           0xe2, 0x2f, 0x9f, 0xfa, 0x0e, 0x7f, 0x72, 0xdf, 0x06, 0xeb, 0xe4,
+                           0x45, 0x63, 0xed, 0xf4, 0xa1, 0x07, 0x3c, 0xab, 0xc7, 0xd4 };
 
 // Control object
-CControlObject* gpobj;
+CControlObject *gpobj;
 
 // Forward declarations
-int
-init(std::string& strcfgfile, std::string& rootFolder);
 void
 copyleft(void);
 void
-help(char* szPrgname);
-bool
-createFolderStuct(std::string& rootFolder);
+help(char *szPrgname);
+
+// Create all missing directories in path (mkdir -p equivalent)
+static bool
+createDirectoryRecursive(const std::string &path)
+{
+  std::string sub;
+  size_t pos = 0;
+
+  if (path.empty()) {
+    return false;
+  }
+
+  while (pos != std::string::npos) {
+    pos = path.find('/', pos + 1);
+    sub = (pos == std::string::npos) ? path : path.substr(0, pos);
+    if (sub.empty() || sub == "/") {
+      continue;
+    }
+    struct stat st;
+    if (0 != stat(sub.c_str(), &st)) {
+#ifdef WIN32
+      if (0 != _mkdir(sub.c_str()) && EEXIST != errno) {
+#else
+      if (0 != mkdir(sub.c_str(), 0755) && EEXIST != errno) {
+#endif
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
 
 void
 _sighandlerStop(int sig)
 {
-    fprintf(stderr, "vscpd: signal received, forced to stop.\n");
-    SYSLOG(LOG_ERR, "vscpd: signal received, forced to stop.: %m");
-    gpobj->m_bQuit = true;
-    gbStopDaemon   = true;
-    gbRestart      = false;
+  fprintf(stderr, "mqttvscpd: signal received, forced to stop.\n");
+  gpobj->m_bQuit = true;
+  gbStopDaemon   = true;
 }
 
 void
 _sighandlerRestart(int sig)
 {
-    fprintf(stderr, "vscpd: signal received, restart. %m\n");
-    SYSLOG(LOG_ERR, "vscpd: signal received, restart.: %m");
-    gpobj->m_bQuit = true;
-    gbStopDaemon   = false;
-    gbRestart      = true;
+  fprintf(stderr, "mqttvscpd: signal received, restart. %s\n", strerror(errno));
+  gpobj->m_bQuit = true;
+  gbStopDaemon   = false;
 }
 
-void
-getDebugValues(const char* optarg)
+#ifndef WIN32
+static bool
+daemonize(pid_t *sid)
 {
-    std::string attribute = optarg;
-    std::deque<std::string> tokens;
-    vscp_split(tokens, attribute, ",");
-    size_t cnt = tokens.size();
-    for (size_t idx = 0; idx < MIN(8, cnt); idx++) {
-        if (tokens.size()) {
-            uint32_t val       = vscp_readStringValue(tokens.front());
-            m_gdebugArray[idx] = val;
-            tokens.pop_front();
-        }
+  pid_t pid;
+
+  if (gbDontRunAsDaemon) {
+    if (sid != NULL) {
+      *sid = 0;
     }
+    return true;
+  }
+
+  if (0 > (pid = fork())) {
+    return false;
+  }
+  else if (0 != pid) {
+    exit(0);
+  }
+
+  if (sid == NULL) {
+    return false;
+  }
+
+  *sid = setsid();
+  if (*sid < 0) {
+    return false;
+  }
+
+  umask(077);
+
+  close(STDIN_FILENO);
+  close(STDOUT_FILENO);
+  close(STDERR_FILENO);
+
+  int devNull = open("/dev/null", O_RDWR);
+  if (devNull >= 0) {
+    dup2(devNull, STDIN_FILENO);
+    dup2(devNull, STDOUT_FILENO);
+    dup2(devNull, STDERR_FILENO);
+    close(devNull);
+  }
+
+  return true;
 }
+
+static bool
+writePidFile(const char *path, pid_t sid)
+{
+  FILE *pFile = fopen(path, "w");
+  if (NULL == pFile) {
+    return false;
+  }
+
+  fprintf(pFile, "%u\n", static_cast<unsigned int>(sid));
+  fclose(pFile);
+  return true;
+}
+
+static void
+setupSignalHandlers()
+{
+  struct sigaction my_action;
+
+  // Ignore SIGPIPE
+  my_action.sa_handler = SIG_IGN;
+  my_action.sa_flags   = SA_RESTART;
+  sigaction(SIGPIPE, &my_action, NULL);
+
+  // Redirect SIGQUIT
+  my_action.sa_handler = _sighandlerStop;
+  my_action.sa_flags   = SA_RESTART;
+  sigaction(SIGQUIT, &my_action, NULL);
+
+  // Redirect SIGABRT
+  my_action.sa_handler = _sighandlerStop;
+  my_action.sa_flags   = SA_RESTART;
+  sigaction(SIGABRT, &my_action, NULL);
+
+  // Redirect SIGINT
+  my_action.sa_handler = _sighandlerStop;
+  my_action.sa_flags   = SA_RESTART;
+  sigaction(SIGINT, &my_action, NULL);
+
+  // Redirect SIGTERM
+  my_action.sa_handler = _sighandlerStop;
+  my_action.sa_flags   = SA_RESTART;
+  sigaction(SIGTERM, &my_action, NULL);
+
+  // Redirect SIGHUP
+  my_action.sa_handler = _sighandlerStop;
+  my_action.sa_flags   = SA_RESTART;
+  sigaction(SIGHUP, &my_action, NULL);
+}
+#endif // !WIN32
 
 /////////////////////////////////////////////////////////////////////////////
 // The one and only app. object
 //
 
 int
-main(int argc, char** argv)
+main(int argc, char **argv)
 {
-    int opt = 0;
-    std::string rootFolder; // Folder where VSCP files & folders will be located
-    std::string strcfgfile; // Points to XML configuration file
+  int opt = 0;
+  std::string rootFolder; // Folder where VSCP files & folders will be located
+  std::string strcfgfile; // Points to XML configuration file
+  pid_t sid = 0;
 
-    // Clear debug settings
-    for (int i = 0; i < 8; i++) {
-        m_gdebugArray[i] = 0;
-    }
+  char *value = getenv("VSCP_ENABLE_UDP_DEBUG");
+  if (value != NULL) {
+    printf("VSCP_ENABLE_UDP_DEBUG = %s\n", value);
+  }
 
-    fprintf(stderr, "Prepare to start vscpd...\n");
+  // Init pool
+  spdlog::init_thread_pool(8192, 1);
 
-    SYSLOG(LOG_INFO, "Starting the VSCP daemon...");
+  // Flush log every five seconds
+  spdlog::flush_every(std::chrono::seconds(5));
 
-    // Ignore return value from defunct processes d
-    signal(SIGCHLD, SIG_IGN);
+  auto console = spdlog::stdout_color_mt("console");
+  // Start out with level=info. Config may change this
+  console->set_level(spdlog::level::trace);
+  console->set_pattern("[vscpd: %c] [%^%l%$] %v");
+  spdlog::set_default_logger(console);
 
-    crcInit();
+  // Ignore return value from defunct processes id
+#ifndef WIN32
+  signal(SIGCHLD, SIG_IGN);
+#endif
+  crcInit();
 
-    rootFolder   = "/var/lib/vscp/";
-    strcfgfile   = "/etc/vscp/vscpd.conf";
-    gbStopDaemon = false;
+#ifdef WIN32
+  rootFolder = VSCPD_DEFAULT_ROOT_FOLDER;
+  strcfgfile = VSCPD_DEFAULT_CONFIG_FILE;
+#else
+  rootFolder = VSCPD_DEFAULT_ROOT_FOLDER;
+  strcfgfile = VSCPD_DEFAULT_CONFIG_FILE;
+#endif
+  
 
-    while ((opt = getopt(argc, argv, "d:c:r:k:hgs")) != -1) {
+  gbStopDaemon = false;
 
-        switch (opt) {
+  while ((opt = getopt(argc, argv, "d:c:r:k:hgsv")) != -1) {
+    switch (opt) {
+      case 's':
+        gbDontRunAsDaemon = true;
+        console->info("I will ***NOT*** run as a daemon! (use ctrl+c to terminate)");
+        break;
 
-            case 's':
-                fprintf(stderr,
-                        "I will ***NOT*** run as daemon! "
-                        "(ctrl+c to terminate)\n");
-                gbDontRunAsDaemon = true;
-                break;
+      case 'c':
+        strcfgfile = optarg;
+        break;
 
-            case 'c':
-                strcfgfile = optarg;
-                break;
+      case 'd': {
+        console->info("Debug flags=%s\n", optarg);
+        break;
+      }
 
-            case 'r':
-                rootFolder = optarg;
-                fprintf(stderr, "Will use rootfolder = %s", rootFolder.c_str());
-                SYSLOG(LOG_INFO,
-                       "Will use rootfolder = %s",
-                       rootFolder.c_str());
-                break;
+      case 'r':
+        rootFolder = optarg;
+        console->info("Will use rootfolder = %s", rootFolder.c_str());
+        break;
 
-            case 'k':
-                systemKey = optarg;
-                break;
+      case 'k':
+        // Set system key
+        vscp_hexStr2ByteArray(__vscp_key, 32, optarg);
+        break;
 
-            case 'd':
-                gnDebugLevel = atoi(optarg);
-                fprintf(stderr, "Debug flags=%s\n", optarg);
-                SYSLOG(LOG_INFO, "Debug flags=%s\n", optarg);
-                getDebugValues(optarg);
-                break;
+      case 'g':
+        copyleft();
+        exit(0);
+        break;
 
-            case 'g':
-                copyleft();
-                exit(0);
-                break;
+      case 'v':
+        fprintf(stderr, "%s\n", VSCPD_DISPLAY_VERSION);
+        exit(0);
+        break;
 
-            default:
-            case 'h':
-                help(argv[0]);
-                exit(-1);
-        }
-    }
-
-    fprintf(stderr,
-            "[vscpd] Configfile = %s\n",
-            (const char*)strcfgfile.c_str());
-
-    if (!init(strcfgfile, rootFolder)) {
-        SYSLOG(LOG_ERR, "[vscpd] Failed to configure. Terminating.\n");
-        fprintf(stderr, "vscpd: Failed to configure. Terminating.\n");
+      default:
+      case 'h':
+        help(argv[0]);
         exit(-1);
     }
+  }
+
+  console->info("Starting the VSCP MQTT daemon...");
+  console->info("Configfile = {}", strcfgfile);
 
 
-    fprintf(stderr, "vscpd: Bye, bye.\n");
-    exit(EXIT_SUCCESS);
-}
+#ifndef WIN32
+  if (!daemonize(&sid)) {
+    console->error("Failed to initialize daemon process.");
+    return -1;
+  }
 
-/////////////////////////////////////////////////////////////////////////////
-// initialisation
-
-int
-init(std::string& strcfgfile, std::string& rootFolder)
-{
-    pid_t pid, sid;
-
-    if (!gbDontRunAsDaemon) {
-
-        // Fork child
-        if (0 > (pid = fork())) {
-            // Failure
-            SYSLOG(LOG_ERR, "Failed to fork.\n");
-            return -1;
-        } else if (0 != pid) {
-            exit(0); // Parent goes by by.
-        }
-
-        sid = setsid(); // Become session leader
-        if (sid < 0) {
-            // Failure
-            SYSLOG(LOG_ERR, "Failed to become session leader.\n");
-            return -1;
-        }
-
-        umask(0); // Clear out file mode creation mask
-
-        // Close out the standard file descriptors
-        close(STDIN_FILENO);
-        close(STDOUT_FILENO);
-        close(STDERR_FILENO);
-
-        if (open("/", 0)) {
-            SYSLOG(LOG_ERR, "vscpd: open / not 0: %m");
-        }
-
-        dup2(0, 1);
-        dup2(0, 2);
-    }
-
-    signal(SIGHUP, _sighandlerStop);
-    signal(SIGUSR1, _sighandlerStop);
-    signal(SIGUSR2, _sighandlerRestart);
-
-    // Write pid to file
-    FILE* pFile;
-    pFile = fopen("/var/run/vscpd.pid", "w");
-    if (NULL == pFile) {
-        SYSLOG(LOG_ERR, "Writing pid file failed.\n");
-        fprintf(stderr, "Writing pid file failed.\n");
+  if (!gbDontRunAsDaemon) {
+    if (!writePidFile("/var/run/vscpd.pid", sid)) {
+      console->warn("Writing pid file failed (access rights?).");
     }
     else {
-        SYSLOG(LOG_ERR, "Writing pid file [/var/run/vscpd.pid] sid=%u\n", sid);
-        fprintf(pFile, "%u\n", sid);
-        fclose(pFile);
+      console->debug("Writing pid file [/var/run/vscpd.pid] sid=%u\n", static_cast<unsigned int>(sid));
+    }
+  }
+#endif // WIN32
+
+#ifndef WIN32
+  if (chdir((const char *) rootFolder.c_str())) {
+    console->warn("Failed to change dir to rootdir.");
+    if (-1 == chdir("/var/lib/vscp/mqttvscpd")) {
+      console->warn("Unable to chdir to home folder [/var/lib/vscp/mqttvscpd] errno=%d", errno);
     }
 
-    // Create folder structure
-    if (!createFolderStuct(rootFolder)) {
-        SYSLOG(LOG_ERR,
-               "vscpd: Folder structure is not in place (You may need to run "
-               "as root).");
-        fprintf(stderr,
-                "vscpd: Folder structure is not in place (You may need to run "
-                "as root).");
-        unlink("/var/run/vscpd.pid");
-        return -1;
+    unlink("/var/run/vscpd.pid");
+  }
+
+  setupSignalHandlers();
+#endif // !WIN32
+
+  // Create the control object
+  gpobj = new CControlObject();
+
+  if (!gpobj->init(strcfgfile, rootFolder)) {
+    console->critical("Can't initialize daemon. Exiting.\n");
+#ifndef WIN32
+    unlink("/var/run/vscpd.pid");
+#endif
+    spdlog::drop_all();
+    spdlog::shutdown();
+    exit(EXIT_FAILURE);
+  }
+
+  // Console log
+  auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+  if (gpobj->m_bEnableConsoleLog) {
+    console_sink->set_level(gpobj->m_consoleLogLevel);
+    console_sink->set_pattern(gpobj->m_consoleLogPattern);
+  }
+  else {
+    console_sink->set_level(spdlog::level::off);
+  }
+
+  try {
+    std::string logDir = gpobj->m_path_to_log_file;
+    size_t slashPos    = logDir.find_last_of('/');
+    if (std::string::npos != slashPos) {
+      logDir = logDir.substr(0, slashPos);
+      if (logDir.length() && !vscp_fileExists(logDir.c_str())) {
+        if (!createDirectoryRecursive(logDir)) {
+          console->error("Failed to create log directory {}. [{}]", logDir, strerror(errno));
+        }
+      }
     }
 
-    // Change working directory to root folder
-    if (chdir((const char*)rootFolder.c_str())) {
-        SYSLOG(LOG_ERR, "vscpd: Failed to change dir to rootdir");
-        fprintf(stderr, "vscpd: Failed to change dir to rootdir");
-        unlink("/var/run/vscpd.pid");
-        if (-1 == chdir("/var/lib/vscp/vscpd")) {
-            SYSLOG(
-              LOG_ERR,
-              "Unable to chdir to home folder [/var/lib/vscp/vscpd] errno=%d",
-              errno);
-        }
-
-        return -1;
+    auto rotating_file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(gpobj->m_path_to_log_file.c_str(),
+                                                                                     gpobj->m_max_log_size,
+                                                                                     gpobj->m_max_log_files);
+    if (gpobj->m_bEnableFileLog) {
+      rotating_file_sink->set_level(gpobj->m_fileLogLevel);
+      rotating_file_sink->set_pattern(gpobj->m_fileLogPattern);
+    }
+    else {
+      rotating_file_sink->set_level(spdlog::level::off);
     }
 
-    struct sigaction my_action;
+    std::vector<spdlog::sink_ptr> sinks{ console_sink, rotating_file_sink };
+    auto logger = std::make_shared<spdlog::async_logger>("logger",
+                                                         sinks.begin(),
+                                                         sinks.end(),
+                                                         spdlog::thread_pool(),
+                                                         spdlog::async_overflow_policy::block);
+    logger->set_level(spdlog::level::trace);
+    spdlog::register_logger(logger);
+    spdlog::set_default_logger(logger);
+  }
+  catch (...) {
+    console->critical("mqttvscpd: Unable to start the application due to spdlog setup failure. Exiting.");
+    spdlog::drop_all();
+    spdlog::shutdown();
+    exit(EXIT_FAILURE);
+  }
 
-    // Ignore SIGPIPE
-    my_action.sa_handler = SIG_IGN;
-    my_action.sa_flags   = SA_RESTART;
-    sigaction(SIGPIPE, &my_action, NULL);
+  console->debug("mqttvscpd: run.");
 
-    // Redirect SIGQUIT
-    my_action.sa_handler = _sighandlerStop;
-    my_action.sa_flags   = SA_RESTART;
-    sigaction(SIGQUIT, &my_action, NULL);
+  if (!gpobj->run()) {
+    console->critical("mqttvscpd: Unable to start the vscpd application. Exiting.");
+#ifndef WIN32
+    unlink("/var/run/vscpd.pid");
+#endif
+    spdlog::drop_all();
+    spdlog::shutdown();
+    exit(EXIT_FAILURE);
+  }
 
-    // Redirect SIGABRT
-    my_action.sa_handler = _sighandlerStop;
-    my_action.sa_flags   = SA_RESTART;
-    sigaction(SIGABRT, &my_action, NULL);
+  console->debug("mqttvscpd: cleanup.");
 
-    // Redirect SIGINT
-    my_action.sa_handler = _sighandlerStop;
-    my_action.sa_flags   = SA_RESTART;
-    sigaction(SIGINT, &my_action, NULL);
+  if (!gpobj->cleanup()) {
+    console->critical("mqttvscpd: Unable to clean up the vscpd application.");
+    spdlog::drop_all();
+    spdlog::shutdown();
+    exit(EXIT_FAILURE);
+  }
 
-    // Redirect SIGTERM
-    my_action.sa_handler = _sighandlerStop;
-    my_action.sa_flags   = SA_RESTART;
-    sigaction(SIGTERM, &my_action, NULL);
+  console->debug("mqttvscpd: Deleting the control object.");
+  delete gpobj;
 
-    // Redirect SIGHUP
-    my_action.sa_handler = _sighandlerStop;
-    my_action.sa_flags   = SA_RESTART;
-    sigaction(SIGHUP, &my_action, NULL);
+#ifndef WIN32
+  unlink("/var/run/vscp/vscpd.pid");
+#endif
+  gpobj = NULL;
 
-    do {
+  console->info("mqttvscpd: Bye, bye.");
 
-        gbRestart = false;
+  spdlog::drop_all();
+  spdlog::shutdown();
 
-        // Create the control object
-        gpobj = new CControlObject();
-
-        // Set system key
-        vscp_hexStr2ByteArray(gpobj->m_systemKey,
-                              32,
-                              (const char*)systemKey.c_str());
-
-        fprintf(stderr, "vscpd: init.\n");
-        if (!gpobj->init(strcfgfile, rootFolder)) {
-            fprintf(stderr, "Can't initialize daemon. Exiting.\n");
-            SYSLOG(LOG_ERR, "Can't initialize daemon. Exiting.");
-            unlink("/var/run/vscpd.pid");
-            return FALSE;
-        }
-
-        // Tansfer read debug parameters if set
-        gpobj->m_debugFlags = m_gdebugArray;
-
-
-        // *******************************
-        //    Main loop is entered here
-        // *******************************
-
-        fprintf(stderr, "vscpd: run.\n");
-        if (!gpobj->run()) {
-            fprintf(stderr,
-                    "Unable to start the vscpd application. Exiting.\n");
-            SYSLOG(LOG_ERR, "Unable to start the vscpd application. Exiting.");
-            unlink("/var/run/vscpd.pid");
-            return FALSE;
-        }
-
-        fprintf(stderr, "vscpd: cleanup.\n");
-
-        if (!gpobj->cleanup()) {
-            fprintf(stderr, "Unable to clean up the vscpd application.\n");
-            SYSLOG(LOG_ERR, "Unable to clean up the vscpd application.");
-            return FALSE;
-        }
-
-        fprintf(stderr, "vscpd: cleanup done.\n");
-
-        if (gbRestart) {
-            SYSLOG(LOG_ERR, "vscpd: Will try to restart.\n");
-            fprintf(stderr, "vscpd: Will try to restart.\n");
-        } else {
-            SYSLOG(LOG_ERR, "vscpd: Will end things.\n");
-            fprintf(stderr, "vscpd: Will end things.\n");
-        }
-
-        fprintf(stderr, "vscpd: Deleting the control object.\n");
-        delete gpobj;
-
-    } while (gbRestart);
-
-    // Remove the pid file
-    unlink("/var/run/vscp/vscpd.pid");
-
-    fprintf(stderr, "vscpd: ending...\n");
-
-    gpobj = NULL;
-
-    return TRUE;
+  exit(EXIT_SUCCESS);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -403,134 +477,65 @@ init(std::string& strcfgfile, std::string& rootFolder)
 void
 copyleft(void)
 {
-    fprintf(stderr, "\n\n");
-    fprintf(stderr, "vscpd - ");
-    fprintf(stderr, VSCPD_DISPLAY_VERSION);
-    fprintf(stderr, "\n");
-    fprintf(stderr, VSCPD_COPYRIGHT);
-    fprintf(stderr, "\n");
-    fprintf(stderr, "\n");
-    fprintf(
-      stderr,
-      "The MIT License (MIT)"
-      "\n"
-      "Copyright (C) 2000-2026 Ake Hedman and contributors, the VSCP Project\n"
-      "<info@vscp.org>\n"
-      "\n"
-      "Permission is hereby granted, free of charge, to any person obtaining a "
-      "copy\n"
-      "of this software and associated documentation files (the 'Software'), "
-      "to deal\n"
-      "in the Software without restriction, including without limitation the "
-      "rights\n"
-      "to use, copy, modify, merge, publish, distribute, sublicense, and/or "
-      "sell\n"
-      "copies of the Software, and to permit persons to whom the Software is\n"
-      "furnished to do so, subject to the following conditions:\n"
-      "\n"
-      "The above copyright notice and this permission notice shall be included "
-      "in\n"
-      "all copies or substantial portions of the Software.\n"
-      "\n"
-      "THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS "
-      "OR\n"
-      "IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF "
-      "MERCHANTABILITY,\n"
-      "FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL "
-      "THE\n"
-      "AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\n"
-      "LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING "
-      "FROM,\n"
-      "OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS "
-      "IN THE\n"
-      "SOFTWARE.\n");
-    fprintf(stderr, "\n");
+  fprintf(stderr, "\n\n");
+  fprintf(stderr, "vscpd - ");
+  fprintf(stderr, VSCPD_DISPLAY_VERSION);
+  fprintf(stderr, "\n");
+  fprintf(stderr, VSCPD_COPYRIGHT);
+  fprintf(stderr, "\n");
+  fprintf(stderr, "\n");
+  fprintf(stderr,
+          "The MIT License (MIT)"
+          "\n"
+          "Copyright (C) 2000-2026 Ake Hedman,  contributors,, contributors, the VSCP project\n"
+          "<info@vscp.org>\n"
+          "\n"
+          "Permission is hereby granted, free of charge, to any person obtaining a "
+          "copy\n"
+          "of this software and associated documentation files (the 'Software'), "
+          "to deal\n"
+          "in the Software without restriction, including without limitation the "
+          "rights\n"
+          "to use, copy, modify, merge, publish, distribute, sublicense, and/or "
+          "sell\n"
+          "copies of the Software, and to permit persons to whom the Software is\n"
+          "furnished to do so, subject to the following conditions:\n"
+          "\n"
+          "The above copyright notice and this permission notice shall be included "
+          "in\n"
+          "all copies or substantial portions of the Software.\n"
+          "\n"
+          "THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS "
+          "OR\n"
+          "IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF "
+          "MERCHANTABILITY,\n"
+          "FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL "
+          "THE\n"
+          "AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\n"
+          "LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING "
+          "FROM,\n"
+          "OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS "
+          "IN THE\n"
+          "SOFTWARE.\n");
+  fprintf(stderr, "\n");
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // help
 
 void
-help(char* szPrgname)
+help(char *szPrgname)
 {
-    fprintf(stderr,
-            "Usage: %s [-hg] [-r rootfolder] [-c config-file] [-k key] "
-            "-dd0,d1,d2...\n",
-            szPrgname);
-    fprintf(stderr, "\t-h\tThis help message.\n");
-    fprintf(stderr, "\t-s\tStandalone (don't run as daemon). \n");
-    fprintf(stderr, "\t-r\tSpecify VSCP root folder. \n");
-    fprintf(stderr, "\t-c\tSpecify a configuration file. \n");
-    fprintf(stderr, "\t-k\t32 byte encryption key string in hex format. \n");
-    fprintf(stderr,
-            "\t-d\tDebug flags as comma separated list (d0,d1,d2,d3,,,).");
-    fprintf(stderr, "that should be used (default: /etc/vscpd.conf).\n");
-    fprintf(stderr, "\t-g\tPrint MIT license info.\n");
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// createFolder
-//
-
-bool
-createFolder(const char* folder)
-{
-    if (0 == vscp_dirExists(folder)) {
-        if (-1 == mkdir(folder, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)) {
-            fprintf(stderr, "Failed to create folder %s\n", folder);
-            SYSLOG(LOG_ERR, "Failed to create folder %s\n", folder);
-            return false;
-        }
-    }
-
-    return true;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// createFolderStuct
-//
-
-bool
-createFolderStuct(std::string& rootFolder)
-{
-    std::string path;
-
-    if (!createFolder(rootFolder.c_str())) {
-        return false;
-    }
-
-    if (!createFolder("/etc/vscp/certs")) {
-        return false;
-    }
-
-    if (!createFolder("/etc/vscp/ca_certificats")) {
-        return false;
-    }
-
-    path = rootFolder + "/web";
-    if (!createFolder(path.c_str())) {
-        return false;
-    }
-
-    path = rootFolder + "/web/html";
-    if (!createFolder(path.c_str())) {
-        return false;
-    }
-
-    path = rootFolder + "/web/html/images";
-    if (!createFolder(path.c_str())) {
-        return false;
-    }
-
-    path = rootFolder + "/web/html/js";
-    if (!createFolder(path.c_str())) {
-        return false;
-    }
-
-    path = rootFolder + "/web/html/css";
-    if (!createFolder(path.c_str())) {
-        return false;
-    }
-
-    return true;
+  fprintf(stderr,
+          "Usage: %s [-hg] [-r rootfolder] [-c config-file] [-k key] "
+          "-dd0,d1,d2...\n",
+          szPrgname);
+  fprintf(stderr, "\t-h\tThis help message.\n");
+  fprintf(stderr, "\t-v\tPrint version. \n");
+  fprintf(stderr, "\t-s\tStandalone (don't run as daemon). \n");
+  fprintf(stderr, "\t-r\tSpecify VSCP root folder (default:%s). \n", VSCPD_DEFAULT_ROOT_FOLDER);
+  fprintf(stderr, "\t-c\tSpecify a configuration file (with path). \n");
+  fprintf(stderr, "\t-k\t32 byte encryption key string in hex format. \n");
+  fprintf(stderr, "that should be used (default: %s).\n", VSCPD_DEFAULT_CONFIG_FILE);
+  fprintf(stderr, "\t-g\tPrint MIT license.\n");
 }

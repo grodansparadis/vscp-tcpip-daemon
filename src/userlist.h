@@ -35,69 +35,69 @@
 #include <vscp.h>
 #include <vscphelper.h>
 
-// User rights bit array
-// "admin" has all rights.
-// "user" standard user rights
-// "driver" can send and receive events and log in to tcp/ip through local host
+// // User rights bit array
+// // "admin" has all rights.
+// // "user" standard user rights
+// // "driver" can send and receive events and log in to tcp/ip through local host
 
-// Rights nibble 7
-#define VSCP_USER_RIGHT_ALLOW_SHUTDOWN  0x80000000
-#define VSCP_USER_RIGHT_ALLOW_RESTART   0x40000000
-#define VSCP_USER_RIGHT_ALLOW_INTERFACE 0x20000000
-#define VSCP_USER_RIGHT_ALLOW_TEST      0x10000000
+// // Rights nibble 7
+// #define VSCP_USER_RIGHT_ALLOW_SHUTDOWN  0x80000000
+// #define VSCP_USER_RIGHT_ALLOW_RESTART   0x40000000
+// #define VSCP_USER_RIGHT_ALLOW_INTERFACE 0x20000000
+// #define VSCP_USER_RIGHT_ALLOW_TEST      0x10000000
 
-// Rights nibble 6
-#define VSCP_USER_RIGHT_ALLOW_SETGUID   0x08000000
-#define VSCP_USER_RIGHT_ALLOW_SETFILTER 0x04000000
+// // Rights nibble 6
+// #define VSCP_USER_RIGHT_ALLOW_SETGUID   0x08000000
+// #define VSCP_USER_RIGHT_ALLOW_SETFILTER 0x04000000
 
-// Rights nibble 5
+// // Rights nibble 5
 
-// Rights nibble 4
+// // Rights nibble 4
 
-// Rights nibble 3
-#define VSCP_USER_RIGHT_ALLOW_RCV_EVENT 0x00100000 // Allowed to receive events
+// // Rights nibble 3
+// #define VSCP_USER_RIGHT_ALLOW_RCV_EVENT 0x00100000 // Allowed to receive events
 
-// Rights nibble 2
-#define VSCP_USER_RIGHT_ALLOW_SEND_EVENT 0x00010000 // Allowed to send events
-#define VSCP_USER_RIGHT_ALLOW_SEND_L1CTRL_EVENT                                \
-    0x00020000 // Allowed to send Level I protocol events
-#define VSCP_USER_RIGHT_ALLOW_SEND_L2CTRL_EVENT                                \
-    0x00040000 // Allowed to send Level 2 protocol events
-#define VSCP_USER_RIGHT_ALLOW_SEND_HLO_EVENT                                   \
-    0x00040000 // Allowed to send HLO event(s)
+// // Rights nibble 2
+// #define VSCP_USER_RIGHT_ALLOW_SEND_EVENT 0x00010000 // Allowed to send events
+// #define VSCP_USER_RIGHT_ALLOW_SEND_L1CTRL_EVENT                                \
+//     0x00020000 // Allowed to send Level I protocol events
+// #define VSCP_USER_RIGHT_ALLOW_SEND_L2CTRL_EVENT                                \
+//     0x00040000 // Allowed to send Level 2 protocol events
+// #define VSCP_USER_RIGHT_ALLOW_SEND_HLO_EVENT                                   \
+//     0x00040000 // Allowed to send HLO event(s)
 
-// Rights nibble 1
+// // Rights nibble 1
 
-// Rights nibble 0 - Low nibble is priority. Higher
-// value allow for more restricted use of commands/functionality
-#define VSCP_USER_RIGHT_ALLOW_TCPIP     0x00000010
-#define VSCP_USER_RIGHT_ALLOW_WEBSOCKET 0x00000020
-#define VSCP_USER_RIGHT_ALLOW_WEB       0x00000040
+// // Rights nibble 0 - Low nibble is priority. Higher
+// // value allow for more restricted use of commands/functionality
+// #define VSCP_USER_RIGHT_ALLOW_TCPIP     0x00000010
+// #define VSCP_USER_RIGHT_ALLOW_WEBSOCKET 0x00000020
+// #define VSCP_USER_RIGHT_ALLOW_WEB       0x00000040
 
-// Default user privilege
-#define VSCP_ADMIN_DEFAULT_RIGHTS 0xFFFFFFFF
+// // Default user privilege
+// #define VSCP_ADMIN_DEFAULT_RIGHTS 0xFFFFFFFF
 
-#define VSCP_USER_DEFAULT_RIGHTS                                               \
-    VSCP_USER_RIGHT_ALLOW_TCPIP | VSCP_USER_RIGHT_ALLOW_WEBSOCKET |            \
-      VSCP_USER_RIGHT_ALLOW_WEB | VSCP_USER_RIGHT_ALLOW_SEND_EVENT |           \
-      VSCP_USER_RIGHT_ALLOW_RCV_EVENT |                                        \
-      VSCP_USER_RIGHT_ALLOW_SEND_L1CTRL_EVENT |                                \
-      VSCP_USER_RIGHT_ALLOW_SEND_L2CTRL_EVENT
+// #define VSCP_USER_DEFAULT_RIGHTS                                               \
+//     VSCP_USER_RIGHT_ALLOW_TCPIP | VSCP_USER_RIGHT_ALLOW_WEBSOCKET |            \
+//       VSCP_USER_RIGHT_ALLOW_WEB | VSCP_USER_RIGHT_ALLOW_SEND_EVENT |           \
+//       VSCP_USER_RIGHT_ALLOW_RCV_EVENT |                                        \
+//       VSCP_USER_RIGHT_ALLOW_SEND_L1CTRL_EVENT |                                \
+//       VSCP_USER_RIGHT_ALLOW_SEND_L2CTRL_EVENT
 
-#define VSCP_DRIVER_DEFAULT_RIGHTS                                             \
-    VSCP_USER_RIGHT_ALLOW_TCPIP | VSCP_USER_RIGHT_ALLOW_WEBSOCKET |            \
-      VSCP_USER_RIGHT_ALLOW_WEB | VSCP_USER_RIGHT_ALLOW_SEND_EVENT |           \
-      VSCP_USER_RIGHT_ALLOW_RCV_EVENT |                                        \
-      VSCP_USER_RIGHT_ALLOW_SEND_L1CTRL_EVENT |                                \
-      VSCP_USER_RIGHT_ALLOW_SEND_L2CTRL_EVENT |                                \
-      VSCP_USER_RIGHT_ALLOW_SEND_HLO_EVENT
+// #define VSCP_DRIVER_DEFAULT_RIGHTS                                             \
+//     VSCP_USER_RIGHT_ALLOW_TCPIP | VSCP_USER_RIGHT_ALLOW_WEBSOCKET |            \
+//       VSCP_USER_RIGHT_ALLOW_WEB | VSCP_USER_RIGHT_ALLOW_SEND_EVENT |           \
+//       VSCP_USER_RIGHT_ALLOW_RCV_EVENT |                                        \
+//       VSCP_USER_RIGHT_ALLOW_SEND_L1CTRL_EVENT |                                \
+//       VSCP_USER_RIGHT_ALLOW_SEND_L2CTRL_EVENT |                                \
+//       VSCP_USER_RIGHT_ALLOW_SEND_HLO_EVENT
 
-#define VSCP_ADD_USER_UNINITIALISED -1
+// #define VSCP_ADD_USER_UNINITIALISED -1
 
-#define USER_PRIVILEGE_MASK  0x0f
-#define USER_PRIVILEGE_BYTES 8
+// #define USER_PRIVILEGE_MASK  0x0f
+// #define USER_PRIVILEGE_BYTES 8
 
-#define USER_ID_ADMIN 0x00 // The one and only admin user
+// #define USER_ID_ADMIN 0x00 // The one and only admin user
 
 class CGroupItem
 {

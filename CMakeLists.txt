@@ -80,6 +80,8 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
+find_package(EXPAT REQUIRED)
+find_package(CURL REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(SQLite3 REQUIRED)
 # find_package(nlohmann_json 3.11.0 REQUIRED)
@@ -104,6 +106,13 @@ FetchContent_Declare(
   GIT_TAG 8fdc195103eda6047e2e59ff860eb5394c9434da
 )
 FetchContent_MakeAvailable(vscp)
+
+FetchContent_Declare(
+  vscp_firmware
+  GIT_REPOSITORY https://github.com/grodansparadis/vscp-firmware.git
+  GIT_TAG v1.7.0
+)
+FetchContent_MakeAvailable(vscp_firmware)
 
 FetchContent_Declare(
     mongoose
@@ -132,7 +141,7 @@ if(NOT TARGET SQLite3::SQLite3) # CMake < 4.3
 endif()
 
 # ---- Convenience alias for the submodule source root ----
-set(vscp_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third-party/vscp")
+#set(vscp_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third-party/vscp")
 
 # Use a platform-appropriate daemon entrypoint.
 # if(WIN32)
@@ -145,15 +154,26 @@ set(vscp_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third-party/vscp")
 # Build the daemon using vscp submodule for common functionality.
 set(VSCPD_SOURCES
     "${VSCPD_MAIN_SOURCE}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/vscpd.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/controlobject.cpp"
-    "${vscp_SOURCE_DIR}/src/vscp/common/tcpipsrv.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/tcpipsrv.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/interfacelist.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/userlist.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/devicethread.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/websocketsrv.cpp"
-    # Use vscphelper_compat from daemon.
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/vscphelper_compat.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/devicelist.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/devicelist.cpp"    
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/clientlist.cpp" 
+    "${vscp_SOURCE_DIR}/src/vscp/common/guid.cpp"
+    "${vscp_SOURCE_DIR}/src/vscp/common/vscphelper.cpp"
+    "${vscp_SOURCE_DIR}/src/vscp/common/vscpdatetime.cpp"
+    "${vscp_SOURCE_DIR}/src/vscp/common/vscp-guid-parser.c"
+    "${vscp_SOURCE_DIR}/src/common/vscphelper-common.cpp"
+    "${vscp_SOURCE_DIR}/src/common/crc.c"
+    "${vscp_SOURCE_DIR}/src/common/crc8.c"
+    "${vscp_SOURCE_DIR}/src/common/vscp-aes.c"
+    "${vscp_SOURCE_DIR}/src/common/vscpmd5.c"
+    "${vscp_SOURCE_DIR}/src/common/vscpbase64.c"
+    "${vscp_SOURCE_DIR}/src/common/randpassword.cpp"
+    "${vscp_SOURCE_DIR}/src/common/sockettcp.c"
 )
 
 # ---- Build the vscpd executable ----
@@ -165,11 +185,15 @@ target_include_directories(vscpd
     PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}"
         "${CMAKE_CURRENT_SOURCE_DIR}/src"
-        "${vscp_SOURCE_DIR}/src/common"
-        "${vscp_SOURCE_DIR}/src/vscp/common"
-        "${mongoose_SOURCE_DIR}"
-        "${spdlog_SOURCE_DIR}/include"
-        "${nlohmann_json_SOURCE_DIR}/include"
+        "${vscp_SOURCE_DIR}/src/common/"
+        "${vscp_SOURCE_DIR}/src/vscp/common/"
+        "${vscp_firmware_SOURCE_DIR}/common/"
+        "${EXPAT_INCLUDE_DIRS}"
+        "${MOSQUITTO_INCLUDE_DIRS}"
+        "${CURL_INCLUDE_DIRS}"
+        "${mongoose_SOURCE_DIR}/"
+        "${spdlog_SOURCE_DIR}/include/"
+        "${nlohmann_json_SOURCE_DIR}/include/"
 )
 
 if(WIN32)
@@ -184,6 +208,9 @@ if(WIN32)
             "${vscp_SOURCE_DIR}/src/vscp/common/win32helpers"
             "${vscp_SOURCE_DIR}/src/common"
             "${vscp_SOURCE_DIR}/src/vscp/common"
+            "${EXPAT_INCLUDE_DIRS}"
+            "${MOSQUITTO_INCLUDE_DIRS}"
+            "${CURL_INCLUDE_DIRS}"
             "${mongoose_SOURCE_DIR}"  
             "${spdlog_SOURCE_DIR}/include"
             "${nlohmann_json_SOURCE_DIR}/include"
@@ -202,6 +229,8 @@ target_link_libraries(vscpd
         SQLite3::SQLite3
         spdlog
         nlohmann_json
+        ${EXPAT_LIBRARIES}
+        ${CURL_LIBRARIES}
 )
 
 if(WIN32)
