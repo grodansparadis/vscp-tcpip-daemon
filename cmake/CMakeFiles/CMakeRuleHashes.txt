@@ -1,0 +1,4 @@
+# Hashes of file build rules.
+76c99cf5b082bc87411db1c53d03d0cc _deps/vscp-build/CMakeFiles/update_docs_metadata
+b12e9af72e3db704dcf05762b409ff1f man/CMakeFiles/man
+c3cbf04ac78b91b35b3ba49a4e33a797 man/vscpd.8

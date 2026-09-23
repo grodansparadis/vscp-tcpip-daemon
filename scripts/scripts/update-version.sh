@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+version_file=${1:-src/version.h}
+year=$(date -u +%y)
+month=$(date -u +%m)
+# First-parent commit count keeps the patch identical for CI artifacts and local cpack
+patch=$(git rev-list --count --first-parent HEAD)
+version="${year}.${month}.${patch}"
+
+perl -pi -e "s/(MQTTVSCPD_VERSION_MAJOR\s+)\d+/\${1}${year}/" "${version_file}"
+perl -pi -e "s/(MQTTVSCPD_VERSION_MINOR\s+)\d+/\${1}${month}/" "${version_file}"
+perl -pi -e "s/(MQTTVSCPD_VERSION_PATCH\s+)\d+/\${1}${patch}/" "${version_file}"
+perl -pi -e "s/(MQTTVSCPD_VERSION_STRING\s+).*/\${1}\"${version}\"/" "${version_file}"
+perl -pi -e "s/(MQTTVSCPD_DISPLAY_VERSION\s+).*/\${1}\"${version}\"/" "${version_file}"
+
+# Keep vcpkg manifest version in sync
+vcpkg_manifest="$(dirname "${version_file}")/../vcpkg.json"
+if [ -f "${vcpkg_manifest}" ]; then
+  perl -pi -e "s/(\"version-string\"\s*:\s*)\"[^\"]*\"/\${1}\"${version}\"/" "${vcpkg_manifest}"
+fi
+
+# Keep docs variables in sync
+docs_variables="$(dirname "${version_file}")/../docs/variables.xml"
+if [ -f "${docs_variables}" ]; then
+  timestamp=$(date -u +"%Y-%m-%d %H:%M")
+  perl -pi -e "s/(<creation-time>)[^<]*(<\/creation-time>)/\${1}${timestamp}\${2}/" "${docs_variables}"
+  perl -pi -e "s/(<document-version>)[^<]*(<\/document-version>)/\${1}${version}\${2}/" "${docs_variables}"
+fi
+
+# Expose the version to GitHub Actions steps
+if [ -n "${GITHUB_ENV:-}" ]; then
+  echo "VSCPD_VERSION=${version}" >> "${GITHUB_ENV}"
+fi

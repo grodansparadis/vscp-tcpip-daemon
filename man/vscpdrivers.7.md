@@ -1,5 +1,5 @@
 % VSCPDRIVERS(7) VSCP Drivers
-% Åke Hedman, Grodans Paradis AB
+% Åke Hedman, the VSCP project
 % January 20, 2020
 
 # NAME
@@ -12,7 +12,7 @@ See documentation for each driver.
 
 # DESCRIPTION
 
-There are many Level I drivers available in VSCP & Friends framework that can be used with both VSCP Works and the VSCP Daemon and added to that Level II and Level III drivers that can be used with the VSCP Daemon.
+There are many Level I drivers available in VSCP & Friends framework that can be used with both VSCP Works and the VSCP MQTT daemon and added to that Level II and Level III drivers that can be used with the VSCP MQTT Daemon.
 
 Level I drivers is documented [here](https://grodansparadis.gitbooks.io/the-vscp-daemon/level_i_drivers.html).
 
@@ -36,4 +36,4 @@ The [manual](https://grodansparadis.gitbooks.io/the-vscp-daemon) for vscpd conta
 The vscpd source code may be downloaded from <https://github.com/grodansparadis/vscp>. Source code for other system components of VSCP & Friends are here <https://github.com/grodansparadis>
 
 # COPYRIGHT
-Copyright © 2000-2020 Ake Hedman, Grodans Paradis AB - MIT license.
+Copyright (C) 2000-2026 Ake Hedman,  contributors,, the VSCP project - MIT license.

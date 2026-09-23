@@ -1,0 +1,266 @@
+[
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/c++ -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/third-party/vscp/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/third-party/vscp/src/common -std=gnu++17 -fPIE -o CMakeFiles/vscpd.dir/src/vscpd.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/src/vscpd.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/src/vscpd.cpp",
+  "output": "CMakeFiles/vscpd.dir/src/vscpd.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/c++ -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/third-party/vscp/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/third-party/vscp/src/common -std=gnu++17 -fPIE -o CMakeFiles/vscpd.dir/src/controlobject.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/src/controlobject.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/src/controlobject.cpp",
+  "output": "CMakeFiles/vscpd.dir/src/controlobject.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/c++ -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/third-party/vscp/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/third-party/vscp/src/common -std=gnu++17 -fPIE -o CMakeFiles/vscpd.dir/third-party/vscp/src/vscp/common/tcpipsrv.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/third-party/vscp/src/vscp/common/tcpipsrv.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/third-party/vscp/src/vscp/common/tcpipsrv.cpp",
+  "output": "CMakeFiles/vscpd.dir/third-party/vscp/src/vscp/common/tcpipsrv.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/c++ -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/third-party/vscp/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/third-party/vscp/src/common -std=gnu++17 -fPIE -o CMakeFiles/vscpd.dir/src/interfacelist.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/src/interfacelist.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/src/interfacelist.cpp",
+  "output": "CMakeFiles/vscpd.dir/src/interfacelist.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/c++ -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/third-party/vscp/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/third-party/vscp/src/common -std=gnu++17 -fPIE -o CMakeFiles/vscpd.dir/src/userlist.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/src/userlist.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/src/userlist.cpp",
+  "output": "CMakeFiles/vscpd.dir/src/userlist.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/c++ -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/third-party/vscp/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/third-party/vscp/src/common -std=gnu++17 -fPIE -o CMakeFiles/vscpd.dir/src/devicethread.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/src/devicethread.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/src/devicethread.cpp",
+  "output": "CMakeFiles/vscpd.dir/src/devicethread.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/c++ -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/third-party/vscp/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/third-party/vscp/src/common -std=gnu++17 -fPIE -o CMakeFiles/vscpd.dir/src/websocketsrv.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/src/websocketsrv.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/src/websocketsrv.cpp",
+  "output": "CMakeFiles/vscpd.dir/src/websocketsrv.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/c++ -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/third-party/vscp/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/third-party/vscp/src/common -std=gnu++17 -fPIE -o CMakeFiles/vscpd.dir/src/vscphelper_compat.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/src/vscphelper_compat.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/src/vscphelper_compat.cpp",
+  "output": "CMakeFiles/vscpd.dir/src/vscphelper_compat.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/c++ -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/third-party/vscp/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/third-party/vscp/src/common -std=gnu++17 -fPIE -o CMakeFiles/vscpd.dir/third-party/vscp/src/vscp/common/automation.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/third-party/vscp/src/vscp/common/automation.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/third-party/vscp/src/vscp/common/automation.cpp",
+  "output": "CMakeFiles/vscpd.dir/third-party/vscp/src/vscp/common/automation.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/c++ -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/third-party/vscp/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/third-party/vscp/src/common -std=gnu++17 -fPIE -o CMakeFiles/vscpd.dir/src/devicelist.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/src/devicelist.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/src/devicelist.cpp",
+  "output": "CMakeFiles/vscpd.dir/src/devicelist.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/cc -DOPENSSL_API_1_1 -Dvscp_sockettcp_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -std=gnu99 -fPIC -Wno-psabi -o CMakeFiles/vscp_sockettcp.dir/src/common/sockettcp.c.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/sockettcp.c",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/sockettcp.c",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_sockettcp.dir/src/common/sockettcp.c.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/cc -DOPENSSL_API_1_1 -Dvscp_sockettcp_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -std=gnu99 -fPIC -Wno-psabi -o CMakeFiles/vscp_sockettcp.dir/src/common/vscpmd5.c.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/vscpmd5.c",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/vscpmd5.c",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_sockettcp.dir/src/common/vscpmd5.c.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/cc -DOPENSSL_API_1_1 -Dvscp_util_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -std=gnu99 -fPIC -Wno-psabi -o CMakeFiles/vscp_util.dir/src/common/vscpbase64.c.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/vscpbase64.c",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/vscpbase64.c",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_util.dir/src/common/vscpbase64.c.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/cc -DOPENSSL_API_1_1 -Dvscp_util_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -std=gnu99 -fPIC -Wno-psabi -o CMakeFiles/vscp_util.dir/src/common/crc.c.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/crc.c",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/crc.c",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_util.dir/src/common/crc.c.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/cc -DOPENSSL_API_1_1 -Dvscp_util_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -std=gnu99 -fPIC -Wno-psabi -o CMakeFiles/vscp_util.dir/src/common/crc8.c.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/crc8.c",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/crc8.c",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_util.dir/src/common/crc8.c.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/cc -DOPENSSL_API_1_1 -Dvscp_util_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -std=gnu99 -fPIC -Wno-psabi -o CMakeFiles/vscp_util.dir/src/common/vscp-aes.c.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/vscp-aes.c",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/vscp-aes.c",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_util.dir/src/common/vscp-aes.c.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/c++ -DOPENSSL_API_1_1 -Dvscp_util_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -std=gnu++14 -fPIC -Wno-psabi -o CMakeFiles/vscp_util.dir/src/common/randpassword.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/randpassword.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/randpassword.cpp",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_util.dir/src/common/randpassword.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/c++ -DOPENSSL_API_1_1 -Dvscp_util_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -std=gnu++14 -fPIC -Wno-psabi -o CMakeFiles/vscp_util.dir/src/common/configfile.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/configfile.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/configfile.cpp",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_util.dir/src/common/configfile.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/c++ -DOPENSSL_API_1_1 -Dvscp_util_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -std=gnu++14 -fPIC -Wno-psabi -o CMakeFiles/vscp_util.dir/src/common/vscphelper-common.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/vscphelper-common.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/vscphelper-common.cpp",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_util.dir/src/common/vscphelper-common.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/c++ -DOPENSSL_API_1_1 -DVSCP_HAVE_MADDY -Dvscp_guid_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/nlohmann/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/spdlog/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/mustache -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/maddy/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -std=gnu++14 -fPIC -Wno-psabi -o CMakeFiles/vscp_guid.dir/src/vscp/common/guid.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/guid.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/guid.cpp",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_guid.dir/src/vscp/common/guid.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/cc -DOPENSSL_API_1_1 -DVSCP_HAVE_MADDY -Dvscp_guidparser_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/nlohmann/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/spdlog/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/mustache -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/maddy/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -std=gnu99 -fPIC -Wno-psabi -o CMakeFiles/vscp_guidparser.dir/src/vscp/common/vscp-guid-parser.c.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscp-guid-parser.c",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscp-guid-parser.c",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_guidparser.dir/src/vscp/common/vscp-guid-parser.c.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/c++ -DOPENSSL_API_1_1 -DVSCP_HAVE_MADDY -Dvscp_mdf_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/nlohmann/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/spdlog/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/mustache -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/maddy/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -std=gnu++14 -fPIC -Wno-psabi -o CMakeFiles/vscp_mdf.dir/src/vscp/common/mdf.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/mdf.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/mdf.cpp",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_mdf.dir/src/vscp/common/mdf.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/c++ -DOPENSSL_API_1_1 -DVSCP_HAVE_MADDY -DWITH_SYSTEMD -Dvscp_core_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/nlohmann/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/spdlog/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/mustache -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/maddy/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -std=gnu++14 -fPIC -Wno-psabi -o CMakeFiles/vscp_core.dir/src/vscp/common/vscphelper.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscphelper.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscphelper.cpp",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_core.dir/src/vscp/common/vscphelper.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/c++ -DOPENSSL_API_1_1 -DVSCP_HAVE_MADDY -DWITH_SYSTEMD -Dvscp_core_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/nlohmann/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/spdlog/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/mustache -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/maddy/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -std=gnu++14 -fPIC -Wno-psabi -o CMakeFiles/vscp_core.dir/src/vscp/common/vscpdatetime.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscpdatetime.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscpdatetime.cpp",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_core.dir/src/vscp/common/vscpdatetime.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/c++ -DOPENSSL_API_1_1 -DVSCP_HAVE_MADDY -DWITH_SYSTEMD -Dvscp_core_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/nlohmann/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/spdlog/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/mustache -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/maddy/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -std=gnu++14 -fPIC -Wno-psabi -o CMakeFiles/vscp_core.dir/src/vscp/common/vscpremotetcpif.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscpremotetcpif.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscpremotetcpif.cpp",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_core.dir/src/vscp/common/vscpremotetcpif.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/c++ -DOPENSSL_API_1_1 -DVSCP_HAVE_MADDY -DWITH_SYSTEMD -Dvscp_core_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/nlohmann/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/spdlog/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/mustache -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/maddy/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -std=gnu++14 -fPIC -Wno-psabi -o CMakeFiles/vscp_core.dir/src/vscp/common/vscpcanaldeviceif.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscpcanaldeviceif.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscpcanaldeviceif.cpp",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_core.dir/src/vscp/common/vscpcanaldeviceif.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/c++ -DOPENSSL_API_1_1 -DVSCP_HAVE_MADDY -DWITH_SYSTEMD -Dvscp_core_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/nlohmann/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/spdlog/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/mustache -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/maddy/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -std=gnu++14 -fPIC -Wno-psabi -o CMakeFiles/vscp_core.dir/src/vscp/common/canal-xmlconfig.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/canal-xmlconfig.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/canal-xmlconfig.cpp",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_core.dir/src/vscp/common/canal-xmlconfig.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/c++ -DOPENSSL_API_1_1 -DVSCP_HAVE_MADDY -DWITH_SYSTEMD -Dvscp_core_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/nlohmann/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/spdlog/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/mustache -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/maddy/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -std=gnu++14 -fPIC -Wno-psabi -o CMakeFiles/vscp_core.dir/src/vscp/common/register.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/register.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/register.cpp",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_core.dir/src/vscp/common/register.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/c++ -DOPENSSL_API_1_1 -DVSCP_HAVE_MADDY -DWITH_SYSTEMD -Dvscp_core_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/nlohmann/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/spdlog/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/mustache -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/maddy/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -std=gnu++14 -fPIC -Wno-psabi -o CMakeFiles/vscp_core.dir/src/vscp/common/userlist.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/userlist.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/userlist.cpp",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_core.dir/src/vscp/common/userlist.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/c++ -DOPENSSL_API_1_1 -DVSCP_HAVE_MADDY -DWITH_SYSTEMD -Dvscp_core_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/nlohmann/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/spdlog/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/mustache -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/maddy/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -std=gnu++14 -fPIC -Wno-psabi -o CMakeFiles/vscp_core.dir/src/vscp/common/clientlist.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/clientlist.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/clientlist.cpp",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_core.dir/src/vscp/common/clientlist.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/c++ -DOPENSSL_API_1_1 -DVSCP_HAVE_MADDY -DWITH_SYSTEMD -Dvscp_core_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/nlohmann/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/spdlog/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/mustache -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/maddy/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -std=gnu++14 -fPIC -Wno-psabi -o CMakeFiles/vscp_core.dir/src/vscp/common/interfacelist.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/interfacelist.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/interfacelist.cpp",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_core.dir/src/vscp/common/interfacelist.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/c++ -DOPENSSL_API_1_1 -DVSCP_HAVE_MADDY -DWITH_SYSTEMD -Dvscp_core_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/nlohmann/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/spdlog/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/mustache -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/maddy/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -std=gnu++14 -fPIC -Wno-psabi -o CMakeFiles/vscp_core.dir/src/vscp/common/hlo.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/hlo.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/hlo.cpp",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_core.dir/src/vscp/common/hlo.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/c++ -DOPENSSL_API_1_1 -DVSCP_HAVE_MADDY -DWITH_SYSTEMD -Dvscp_core_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/nlohmann/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/spdlog/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/mustache -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/maddy/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -std=gnu++14 -fPIC -Wno-psabi -o CMakeFiles/vscp_core.dir/src/vscp/common/vscpunit.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscpunit.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscpunit.cpp",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_core.dir/src/vscp/common/vscpunit.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/c++ -DOPENSSL_API_1_1 -DVSCP_HAVE_MADDY -DWITH_SYSTEMD -Dvscp_client_base_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/nlohmann/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/spdlog/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/mustache -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/maddy/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -std=gnu++14 -fPIC -Wno-psabi -o CMakeFiles/vscp_client_base.dir/src/vscp/common/vscp-client-base.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscp-client-base.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscp-client-base.cpp",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_client_base.dir/src/vscp/common/vscp-client-base.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/c++ -DOPENSSL_API_1_1 -DVSCP_HAVE_MADDY -DWITH_SYSTEMD -Dvscp_client_canal_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/nlohmann/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/spdlog/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/mustache -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/maddy/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -std=gnu++14 -fPIC -Wno-psabi -o CMakeFiles/vscp_client_canal.dir/src/vscp/common/vscp-client-canal.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscp-client-canal.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscp-client-canal.cpp",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_client_canal.dir/src/vscp/common/vscp-client-canal.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/c++ -DOPENSSL_API_1_1 -DVSCP_HAVE_MADDY -DWITH_SYSTEMD -Dvscp_client_tcp_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/nlohmann/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/spdlog/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/mustache -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/maddy/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -std=gnu++14 -fPIC -Wno-psabi -o CMakeFiles/vscp_client_tcp.dir/src/vscp/common/vscp-client-tcp.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscp-client-tcp.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscp-client-tcp.cpp",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_client_tcp.dir/src/vscp/common/vscp-client-tcp.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/c++ -DOPENSSL_API_1_1 -DVSCP_HAVE_MADDY -DWITH_SYSTEMD -Dvscp_client_udp_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/nlohmann/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/spdlog/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/mustache -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/maddy/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -std=gnu++14 -fPIC -Wno-psabi -o CMakeFiles/vscp_client_udp.dir/src/vscp/common/vscp-client-udp.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscp-client-udp.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscp-client-udp.cpp",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_client_udp.dir/src/vscp/common/vscp-client-udp.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/c++ -DOPENSSL_API_1_1 -DVSCP_HAVE_MADDY -DWITH_SYSTEMD -Dvscp_client_ws1_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/nlohmann/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/spdlog/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/mustache -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/maddy/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -std=gnu++14 -fPIC -Wno-psabi -o CMakeFiles/vscp_client_ws1.dir/src/vscp/common/vscp-client-ws1.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscp-client-ws1.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscp-client-ws1.cpp",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_client_ws1.dir/src/vscp/common/vscp-client-ws1.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/c++ -DOPENSSL_API_1_1 -DVSCP_HAVE_MADDY -DWITH_SYSTEMD -Dvscp_client_ws2_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/nlohmann/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/spdlog/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/mustache -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/maddy/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -std=gnu++14 -fPIC -Wno-psabi -o CMakeFiles/vscp_client_ws2.dir/src/vscp/common/vscp-client-ws2.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscp-client-ws2.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscp-client-ws2.cpp",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_client_ws2.dir/src/vscp/common/vscp-client-ws2.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/c++ -DOPENSSL_API_1_1 -DVSCP_HAVE_MADDY -DWITH_SYSTEMD -Dvscp_client_multicast_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/nlohmann/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/spdlog/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/mustache -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/maddy/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -std=gnu++14 -fPIC -Wno-psabi -o CMakeFiles/vscp_client_multicast.dir/src/vscp/common/vscp-client-multicast.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscp-client-multicast.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscp-client-multicast.cpp",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_client_multicast.dir/src/vscp/common/vscp-client-multicast.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/c++ -DOPENSSL_API_1_1 -DVSCP_HAVE_MADDY -DWITH_SYSTEMD -Dvscp_client_mqtt_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/nlohmann/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/spdlog/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/mustache -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/maddy/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -std=gnu++14 -fPIC -Wno-psabi -o CMakeFiles/vscp_client_mqtt.dir/src/vscp/common/vscp-client-mqtt.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscp-client-mqtt.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscp-client-mqtt.cpp",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_client_mqtt.dir/src/vscp/common/vscp-client-mqtt.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/c++ -DOPENSSL_API_1_1 -DVSCP_HAVE_MADDY -DWITH_SYSTEMD -Dvscp_client_socketcan_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/nlohmann/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/spdlog/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/mustache -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/maddy/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -std=gnu++14 -fPIC -Wno-psabi -o CMakeFiles/vscp_client_socketcan.dir/src/vscp/common/vscp-client-socketcan.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscp-client-socketcan.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscp-client-socketcan.cpp",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_client_socketcan.dir/src/vscp/common/vscp-client-socketcan.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/c++ -DOPENSSL_API_1_1 -DVSCP_HAVE_MADDY -DWITH_SYSTEMD -Dvscp_common_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/nlohmann/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/spdlog/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/mustache -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/maddy/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -std=gnu++14 -fPIC -Wno-psabi -o CMakeFiles/vscp_common.dir/src/vscp/common/vscp-common.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscp-common.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscp-common.cpp",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_common.dir/src/vscp/common/vscp-common.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-build",
+  "command": "/usr/bin/c++ -DOPENSSL_API_1_1 -DVSCP_HAVE_MADDY -DWITH_SYSTEMD -Dvscp_all_EXPORTS -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/nlohmann/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/spdlog/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/mustache -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/third-party/maddy/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -std=gnu++14 -fPIC -Wno-psabi -o CMakeFiles/vscp_all.dir/src/vscp/common/vscp-all.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscp-all.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscp-all.cpp",
+  "output": "_deps/vscp-build/CMakeFiles/vscp_all.dir/src/vscp/common/vscp-all.cpp.o"
+}
+]

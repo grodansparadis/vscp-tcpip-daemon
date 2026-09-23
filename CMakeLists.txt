@@ -18,15 +18,28 @@
 
 cmake_minimum_required(VERSION 3.16...3.31)
 
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/src/version.h" VSCPD_VERSION_MAJOR REGEX "^#define VSCPD_VERSION_MAJOR[ \\t]+([0-9]+)$")
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/src/version.h" VSCPD_VERSION_MINOR REGEX "^#define VSCPD_VERSION_MINOR[ \\t]+([0-9]+)$")
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/src/version.h" VSCPD_VERSION_PATCH REGEX "^#define VSCPD_VERSION_PATCH[ \\t]+([0-9]+)$")
+string(REGEX REPLACE "^#define VSCPD_VERSION_(MAJOR|MINOR|PATCH)[ \\t]+" "" VSCPD_VERSION_MAJOR "${VSCPD_VERSION_MAJOR}")
+string(REGEX REPLACE "^#define VSCPD_VERSION_(MAJOR|MINOR|PATCH)[ \\t]+" "" VSCPD_VERSION_MINOR "${VSCPD_VERSION_MINOR}")
+string(REGEX REPLACE "^#define VSCPD_VERSION_(MAJOR|MINOR|PATCH)[ \\t]+" "" VSCPD_VERSION_PATCH "${VSCPD_VERSION_PATCH}")
+
 project(vscp-tcpip-daemon
-    VERSION 15.0.3
+    VERSION ${VSCPD_VERSION_MAJOR}.${VSCPD_VERSION_MINOR}.${VSCPD_VERSION_PATCH}
     DESCRIPTION "VSCP TCP/IP Daemon"
     LANGUAGES CXX C)
+
+# ---- C standard ----
+set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_STANDARD_REQUIRED ON)
 
 # ---- C++ standard ----
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Generate position-independent code (-fPIC on Unix)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -41,33 +54,56 @@ option(VSCPD_BUILD_TESTS "Build unit tests" OFF)
 option(VSCPD_ENABLE_SYSTEMD "Link against libsystemd for sd_notify support" ON)
 
 # ---- Include module path from submodule (provides FindMosquitto, etc.) ----
-list(APPEND CMAKE_MODULE_PATH
-    "${CMAKE_CURRENT_SOURCE_DIR}/third-party/vscp/cmake/modules")
+# list(APPEND CMAKE_MODULE_PATH
+#     "${CMAKE_CURRENT_SOURCE_DIR}/third-party/vscp/cmake/modules")
 
 # ---- System libraries ----
 include(GNUInstallDirs)
 
+if(UNIX AND NOT APPLE)
+    set(CMAKE_INSTALL_PREFIX "/usr" CACHE PATH "Installation prefix" FORCE)
+    set(CMAKE_INSTALL_SYSCONFDIR "/etc" CACHE PATH "System configuration directory" FORCE)
+    set(CMAKE_INSTALL_LOCALSTATEDIR "/var" CACHE PATH "State directory" FORCE)
+endif()
+
+option(VSCPD_BUILD_MANPAGES "Build and install man pages" ON)
+set(VSCPD_PACKAGE_GENERATORS "" CACHE STRING "Semicolon-separated list of CPack generators to enable")
+
+if(DEFINED MQTTVSCPD_PACKAGE_GENERATORS AND NOT VSCPD_PACKAGE_GENERATORS)
+    set(VSCPD_PACKAGE_GENERATORS "${VSCPD_PACKAGE_GENERATORS}")
+endif()
+
+set(VSCP_BUILD_TESTS OFF CACHE BOOL "Build VSCP library tests" FORCE)
+set(VSCP_INSTALL OFF CACHE BOOL "Install VSCP helper libraries" FORCE)
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 find_package(OpenSSL REQUIRED)
-find_package(EXPAT REQUIRED)
-find_package(ZLIB REQUIRED)
+find_package(SQLite3 REQUIRED)
+# find_package(nlohmann_json 3.11.0 REQUIRED)
+# find_package(spdlog 1.15 REQUIRED)
+
+
+# if (NOT nlohmann_json_FOUND)
+#     message(FATAL_ERROR "nlohmann_json not found, install the nlohmann-json development package")
+# endif()
+
+
+# if (NOT spdlog_FOUND)
+#     message(FATAL_ERROR "spdlog not found, install the libspdlog development package")
+# endif()
+
 
 include(FetchContent)
 
 FetchContent_Declare(
-  spdlog
-  GIT_REPOSITORY https://github.com/gabime/spdlog.git
-  GIT_TAG v1.17.0
+  vscp
+  GIT_REPOSITORY https://github.com/grodansparadis/vscp.git
+  GIT_TAG 8fdc195103eda6047e2e59ff860eb5394c9434da
 )
-FetchContent_MakeAvailable(spdlog)
-
-FetchContent_Declare(
-    json 
-    GIT_REPOSITORY https://github.com/nlohmann/json.git
-    GIT_TAG v3.12.0
-)
-FetchContent_MakeAvailable(json)
+FetchContent_MakeAvailable(vscp)
 
 FetchContent_Declare(
     mongoose
@@ -76,39 +112,48 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(mongoose)
 
+FetchContent_Declare(
+    spdlog
+    GIT_REPOSITORY https://github.com/gabime/spdlog.git
+    GIT_TAG v1.17.0
+)
+FetchContent_MakeAvailable(spdlog)
 
-# FetchContent_Declare(
-#     mustache
-#     GIT_REPOSITORY https://github.com/kainjow/Mustache.git
-#     GIT_TAG v4.1
-# )
-# FetchContent_MakeAvailable(mustache)
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.12.0
+)
+FetchContent_MakeAvailable(nlohmann_json)
+
+
+if(NOT TARGET SQLite3::SQLite3) # CMake < 4.3
+  add_library(SQLite3::SQLite3 ALIAS SQLite::SQLite3)
+endif()
 
 # ---- Convenience alias for the submodule source root ----
-set(VSCP_SUB "${CMAKE_CURRENT_SOURCE_DIR}/third-party/vscp")
+set(vscp_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third-party/vscp")
 
 # Use a platform-appropriate daemon entrypoint.
-if(WIN32)
-    set(VSCPD_MAIN_SOURCE "${VSCP_SUB}/src/vscp/vscpd.cpp")
-else()
-    set(VSCPD_MAIN_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/src/linux/vscpd.cpp")
-endif()
+# if(WIN32)
+#     set(VSCPD_MAIN_SOURCE "${vscp_SOURCE_DIR}/src/vscp/vscpd.cpp")
+# else()
+#     set(VSCPD_MAIN_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/src/vscpd.cpp")
+# endif()
 
 # ---- Daemon source files ----
 # Build the daemon using vscp submodule for common functionality.
 set(VSCPD_SOURCES
     "${VSCPD_MAIN_SOURCE}"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/controlobject.cpp"
-    "${VSCP_SUB}/src/vscp/common/tcpipsrv.cpp"
+    "${vscp_SOURCE_DIR}/src/vscp/common/tcpipsrv.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/interfacelist.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/userlist.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/devicethread.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/websocketsrv.cpp"
     # Use vscphelper_compat from daemon.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/vscphelper_compat.cpp"
-    "${VSCP_SUB}/src/vscp/common/automation.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/devicelist.cpp"
-
 )
 
 # ---- Build the vscpd executable ----
@@ -120,14 +165,11 @@ target_include_directories(vscpd
     PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}"
         "${CMAKE_CURRENT_SOURCE_DIR}/src"
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/linux"
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/legacy_common"
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/legacy_common/third_party"
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/legacy_common/third_party/sqlite3-3.30.1"
-        "${VSCP_SUB}/src/vscp/common"
-        "${VSCP_SUB}/src/common"
-        "${VSCP_SUB}/third-party/mustache"
-        "${VSCP_SUB}/third-party/maddy/include"
+        "${vscp_SOURCE_DIR}/src/common"
+        "${vscp_SOURCE_DIR}/src/vscp/common"
+        "${mongoose_SOURCE_DIR}"
+        "${spdlog_SOURCE_DIR}/include"
+        "${nlohmann_json_SOURCE_DIR}/include"
 )
 
 if(WIN32)
@@ -139,35 +181,74 @@ if(WIN32)
     target_include_directories(vscpd
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/src/win32helpers"
-            "${VSCP_SUB}/src/vscp/common/win32helpers"
+            "${vscp_SOURCE_DIR}/src/vscp/common/win32helpers"
+            "${vscp_SOURCE_DIR}/src/common"
+            "${vscp_SOURCE_DIR}/src/vscp/common"
+            "${mongoose_SOURCE_DIR}"  
+            "${spdlog_SOURCE_DIR}/include"
+            "${nlohmann_json_SOURCE_DIR}/include"
     )
 endif()
 
 target_compile_definitions(vscpd PRIVATE
     USE_IPV6
     USE_WEBSOCKET
-    USE_LUA
-    USE_ZLIB
     USE_SERVER_STATS
 )
 
 target_link_libraries(vscpd
     PRIVATE
         Threads::Threads
-        spdlog::spdlog
+        SQLite3::SQLite3
+        spdlog
+        nlohmann_json
 )
 
-if(TARGET EXPAT::EXPAT)
-    target_link_libraries(vscpd PRIVATE EXPAT::EXPAT)
-else()
-    target_link_libraries(vscpd PRIVATE expat)
+if(WIN32)
+    find_package(Threads REQUIRED)
+    find_package(PThreads4W CONFIG QUIET)
+    if(NOT TARGET PThreads4W::PThreads4W_CXXEXC AND NOT TARGET PThreads4W::PThreads4W)
+        find_package(pthread CONFIG QUIET)
+    endif()
+
+    if(TARGET PThreads4W::PThreads4W_CXXEXC)
+        target_link_libraries(vscpd PRIVATE PThreads4W::PThreads4W_CXXEXC)
+    elseif(TARGET PThreads4W::PThreads4W)
+        target_link_libraries(vscpd PRIVATE PThreads4W::PThreads4W)
+    elseif(TARGET Threads::Threads)
+        target_link_libraries(vscpd PRIVATE Threads::Threads)
+    elseif(MSVC)
+        message(FATAL_ERROR "No usable pthreads target found for MSVC. Install the PThreads4W/pthread dependency (for example via vcpkg) before building.")
+    endif()
+
+    target_link_libraries(vscpd PRIVATE netapi32)
+
+    if(MSVC)
+        target_compile_options(vscpd PRIVATE /utf-8)
+    endif()
+
+    target_compile_definitions(vscpd
+        PRIVATE
+            _CRT_SECURE_NO_WARNINGS
+            _WINSOCK_DEPRECATED_NO_WARNINGS
+            WIN32_LEAN_AND_MEAN)
 endif()
 
-if(TARGET ZLIB::ZLIB)
-    target_link_libraries(vscpd PRIVATE ZLIB::ZLIB)
-else()
-    target_link_libraries(vscpd PRIVATE z)
+if(UNIX AND NOT APPLE)
+    find_path(SYSTEMD_INCLUDE_DIR systemd/sd-daemon.h)
+    find_library(SYSTEMD_LIBRARY NAMES systemd)
+    if(NOT SYSTEMD_INCLUDE_DIR OR NOT SYSTEMD_LIBRARY)
+        message(FATAL_ERROR "libsystemd headers and library are required to build mqttvscpd on Linux.")
+    endif()
+
+    target_include_directories(vscpd PRIVATE ${SYSTEMD_INCLUDE_DIR})
+    target_link_libraries(vscpd PRIVATE ${SYSTEMD_LIBRARY})
 endif()
+
+if(VSCPD_BUILD_MANPAGES AND UNIX)
+    add_subdirectory(man)
+endif()
+
 
 target_link_libraries(vscpd
     PRIVATE
@@ -185,7 +266,7 @@ endif()
 # through a variadic function.  Suppress the warning for that file only.
 if(APPLE)
     set_source_files_properties(
-        "${VSCP_SUB}/src/vscp/common/tcpipsrv.cpp"
+        "${vscp_SOURCE_DIR}/src/vscp/common/tcpipsrv.cpp"
         PROPERTIES COMPILE_OPTIONS "-Wno-non-pod-varargs"
     )
 endif()
@@ -286,10 +367,10 @@ set(CPACK_PACKAGE_DESCRIPTION
     "The VSCP TCP/IP Daemon (vscpd) is the main control centre for the VSCP
 (Very Simple Control Protocol) framework. It provides a TCP/IP interface
 for connected clients and drivers.")
-set(CPACK_PACKAGE_VERSION          "${PROJECT_VERSION}")
-set(CPACK_PACKAGE_VERSION_MAJOR    "${PROJECT_VERSION_MAJOR}")
-set(CPACK_PACKAGE_VERSION_MINOR    "${PROJECT_VERSION_MINOR}")
-set(CPACK_PACKAGE_VERSION_PATCH    "${PROJECT_VERSION_PATCH}")
+set(CPACK_PACKAGE_VERSION          "${VSCPD_VERSION_MAJOR}")
+set(CPACK_PACKAGE_VERSION_MAJOR    "${VSCPD_VERSION_MAJOR}")
+set(CPACK_PACKAGE_VERSION_MINOR    "${VSCPD_VERSION_MINOR}")
+set(CPACK_PACKAGE_VERSION_PATCH    "${VSCPD_VERSION_PATCH}")
 set(CPACK_PACKAGE_HOMEPAGE_URL     "https://www.vscp.org")
 set(CPACK_RESOURCE_FILE_LICENSE    "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 set(CPACK_RESOURCE_FILE_README     "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
@@ -307,7 +388,7 @@ set(CPACK_SOURCE_IGNORE_FILES
 set(CPACK_DEBIAN_PACKAGE_SECTION      "net")
 set(CPACK_DEBIAN_PACKAGE_PRIORITY     "optional")
 set(CPACK_DEBIAN_PACKAGE_DEPENDS
-    "libssl3 | libssl1.1, libexpat1, libmosquitto1, zlib1g")
+    "libssl3 | libssl1.1")
 set(CPACK_DEBIAN_PACKAGE_SUGGESTS     "mosquitto")
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER   "${CPACK_PACKAGE_CONTACT}")
 set(CPACK_DEBIAN_FILE_NAME            DEB-DEFAULT)
@@ -316,12 +397,12 @@ set(CPACK_DEB_COMPONENT_INSTALL       OFF)
 # ---- RPM (Linux) ----
 set(CPACK_RPM_PACKAGE_GROUP           "Applications/System")
 set(CPACK_RPM_PACKAGE_LICENSE         "MIT")
-set(CPACK_RPM_PACKAGE_REQUIRES        "openssl-libs, expat, mosquitto, zlib")
+set(CPACK_RPM_PACKAGE_REQUIRES        "openssl-libs")
 set(CPACK_RPM_PACKAGE_URL             "${CPACK_PACKAGE_HOMEPAGE_URL}")
 set(CPACK_RPM_FILE_NAME               RPM-DEFAULT)
 
 # ---- NSIS (Windows installer) ----
-set(CPACK_NSIS_DISPLAY_NAME           "VSCP TCP/IP Daemon ${PROJECT_VERSION}")
+set(CPACK_NSIS_DISPLAY_NAME           "VSCP TCP/IP Daemon ${VSCPD_VERSION_MAJOR}.${VSCPD_VERSION_MINOR}.${VSCPD_VERSION_PATCH}")
 set(CPACK_NSIS_PACKAGE_NAME           "VSCP TCP/IP Daemon")
 set(CPACK_NSIS_HELP_LINK              "https://docs.vscp.org/vscpd/")
 set(CPACK_NSIS_URL_INFO_ABOUT         "${CPACK_PACKAGE_HOMEPAGE_URL}")
