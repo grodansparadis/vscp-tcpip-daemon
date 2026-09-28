@@ -107,12 +107,12 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(vscp)
 
-FetchContent_Declare(
-  vscp_firmware
-  GIT_REPOSITORY https://github.com/grodansparadis/vscp-firmware.git
-  GIT_TAG v1.7.0
-)
-FetchContent_MakeAvailable(vscp_firmware)
+# FetchContent_Declare(
+#   vscp_firmware
+#   GIT_REPOSITORY https://github.com/grodansparadis/vscp-firmware.git
+#   GIT_TAG v1.7.0
+# )
+# FetchContent_MakeAvailable(vscp_firmware)
 
 FetchContent_Declare(
     mongoose
@@ -174,11 +174,12 @@ set(VSCPD_SOURCES
     "${vscp_SOURCE_DIR}/src/common/vscpbase64.c"
     "${vscp_SOURCE_DIR}/src/common/randpassword.cpp"
     "${vscp_SOURCE_DIR}/src/common/sockettcp.c"
+    "${mongoose_SOURCE_DIR}/mongoose.c"
 )
 
 # ---- Build the vscpd executable ----
 add_executable(vscpd ${VSCPD_SOURCES})
-set_target_properties(vscpd PROPERTIES OUTPUT_NAME "tcpip-vscpd")
+set_target_properties(vscpd PROPERTIES OUTPUT_NAME "vscpd")
 
 # The daemon headers and third-party imports live under src/daemon.
 target_include_directories(vscpd
@@ -187,13 +188,13 @@ target_include_directories(vscpd
         "${CMAKE_CURRENT_SOURCE_DIR}/src"
         "${vscp_SOURCE_DIR}/src/common/"
         "${vscp_SOURCE_DIR}/src/vscp/common/"
-        "${vscp_firmware_SOURCE_DIR}/common/"
         "${EXPAT_INCLUDE_DIRS}"
         "${MOSQUITTO_INCLUDE_DIRS}"
         "${CURL_INCLUDE_DIRS}"
         "${mongoose_SOURCE_DIR}/"
         "${spdlog_SOURCE_DIR}/include/"
         "${nlohmann_json_SOURCE_DIR}/include/"
+        "${mongoose_SOURCE_DIR}/"
 )
 
 if(WIN32)
@@ -340,9 +341,9 @@ else()
         DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}/vscp"
     )
     install(PROGRAMS
-        "${CMAKE_CURRENT_SOURCE_DIR}/install/unix/tcpip-vscpd.init"
+        "${CMAKE_CURRENT_SOURCE_DIR}/install/unix/vscpd.init"
         DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}/init.d"
-        RENAME tcpip-vscpd
+        RENAME vscpd
     )
 endif()
 

@@ -40,9 +40,9 @@
 #include <map>
 #include <set>
 
-#include <sqlite3.h>
 #include <mustache.hpp>
 #include <nlohmann/json.hpp> // Needs C++11  -std=c++11
+#include <sqlite3.h>
 
 #include "spdlog/sinks/rotating_file_sink.h"
 #include "spdlog/spdlog.h"
@@ -343,12 +343,6 @@ class CControlObject {
     // Set to true of the clientWorkerThread should terminate
     bool m_bQuit_clientMsgWorkerThread;
 
-    /*!
-     * Debug flags
-     * See vscp_debug.h for possible flags.
-     * Set to point to m_gdebugArray in startup
-     */
-    uint32_t* m_debugFlags;
 
     //**************************************************************************
     //                                 Security
@@ -399,8 +393,6 @@ class CControlObject {
     //                      TCP/IP server
     /////////////////////////////////////////////////////////
 
-    // Server will be started if set to true (by configuration (db/xml)
-    bool m_enableTcpip;
 
     // Enable encryption on tcp/ip interface if enabled.
     // 0 = Disabled
@@ -410,7 +402,7 @@ class CControlObject {
     uint8_t m_encryptionTcpip;
 
     // Interface used for TCP/IP connection  (only one)
-    std::string m_strTcpInterfaceAddress;
+    std::string m_interfaceAddress;
 
     // Data object for the tcp/ip Listen thread
     tcpipListenThreadObj* m_ptcpipSrvObject;
@@ -429,112 +421,6 @@ class CControlObject {
     std::string m_tcpip_ssl_cipher_list;
     uint8_t m_tcpip_ssl_protocol_version;
     bool m_tcpip_ssl_short_trust;
-
-    //*****************************************************
-    //               webserver interface
-    //*****************************************************
-
-    // Context for web server
-    struct mg_context* m_web_ctx;
-
-    // Enable webserver
-    bool m_web_bEnable;
-
-    // Enable web admin interface (general section in conf)
-    bool m_enableWebAdminIf;
-
-    // See
-    // https://www.vscp.org/docs/vscpd/doku.php?id=configuring_the_vscp_daemon#webserver
-    std::string m_web_document_root;
-    std::string m_web_listening_ports;
-    std::string m_web_index_files;
-    std::string m_web_authentication_domain;
-    bool m_enable_auth_domain_check;
-    std::string m_web_ssl_certificate;
-    std::string m_web_ssl_certificate_chain;
-    bool m_web_ssl_verify_peer;
-    std::string m_web_ssl_ca_path;
-    std::string m_web_ssl_ca_file;
-    uint16_t m_web_ssl_verify_depth;
-    bool m_web_ssl_default_verify_paths;
-    std::string m_web_ssl_cipher_list;
-    uint8_t m_web_ssl_protocol_version;
-    bool m_web_ssl_short_trust;
-    std::string m_web_cgi_interpreter;
-    std::string m_web_cgi_patterns;
-    std::string m_web_cgi_environment;
-    std::string m_web_protect_uri;
-    std::string m_web_trottle;
-    bool m_web_enable_directory_listing;
-    bool m_web_enable_keep_alive;
-    long m_web_keep_alive_timeout_ms;
-    std::string m_web_access_control_list;
-    std::string m_web_extra_mime_types;
-    int m_web_num_threads;
-    std::string m_web_url_rewrite_patterns;
-    std::string m_web_hide_file_patterns;
-    long m_web_request_timeout_ms;
-    long m_web_linger_timeout_ms; // Set negative to not set
-    bool m_web_decode_url;
-    std::string m_web_global_auth_file;
-    std::string m_web_per_directory_auth_file;
-    std::string m_web_ssi_patterns;
-    std::string m_web_access_control_allow_origin;
-    std::string m_web_access_control_allow_methods;
-    std::string m_web_access_control_allow_headers;
-    std::string m_web_error_pages;
-    long m_web_tcp_nodelay;
-    std::string m_web_static_file_cache_control;
-    long m_web_static_file_max_age;
-    long m_web_strict_transport_security_max_age;
-    bool m_web_allow_sendfile_call;
-    std::string m_web_additional_header;
-    long m_web_max_request_size;
-    bool m_web_allow_index_script_resource;
-    std::string m_web_duktape_script_patterns;
-    std::string m_web_lua_preload_file;
-    std::string m_web_lua_script_patterns;
-    std::string m_web_lua_server_page_patterns;
-    std::string m_web_lua_websocket_patterns;
-    std::string m_web_lua_background_script;
-    std::string m_web_lua_background_script_params;
-
-    // Protects the web session object
-    pthread_mutex_t m_mutex_websrvSession;
-
-    // Linked list of all active sessions. (websrv.h)
-    std::list<struct websrv_session*> m_web_sessions;
-
-    //**************************************************************************
-    //                              REST
-    //**************************************************************************
-
-    // Protects the REST session object
-    pthread_mutex_t m_mutex_restSession;
-
-    // Session structure for REST API
-    std::list<struct restsrv_session*> m_rest_sessions;
-
-    // Enable REST API
-    bool m_bEnableRestApi;
-
-    //**************************************************************************
-    //                              WEBSOCKETS
-    //**************************************************************************
-
-    bool m_bWebsocketsEnable; // Enable web socket functionality
-    std::string m_websocket_document_root;
-    long m_websocket_timeout_ms;
-    bool bEnable_websocket_ping_pong;
-    std::string lua_websocket_pattern;
-
-    // * * Websockets * *
-
-    // Protects the websocket session object
-    pthread_mutex_t m_mutex_websocketSession;
-
-    // List of active websocket sessions
-    // std::list<websock_session*> m_websocketSessions;
 
     //**************************************************************************
     //                                DATABASE

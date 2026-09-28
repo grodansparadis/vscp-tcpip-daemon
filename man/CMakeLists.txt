@@ -17,9 +17,9 @@ else()
   set(PANDOCCOMMAND_FOUND 1)
 endif()
 
-# if (NOT ${PANDOCCOMMAND_FOUND})
-#     message("* * * PanDoc was not found * * *")
-# endif()
+if (NOT ${PANDOCCOMMAND_FOUND})
+    message("* * * PanDoc was not found * * *")
+endif()
 
 # man pages
 if (${PANDOCCOMMAND_FOUND})

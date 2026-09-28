@@ -70,14 +70,17 @@
 
 #include "version.h"
 
-#include <mongoose.h>
+extern "C" {
+#include "mongoose.h"
+}
+
 #include <nlohmann/json.hpp>
 
-#include "spdlog/spdlog.h"
-#include "spdlog/sinks/stdout_color_sinks.h"
 #include "spdlog/sinks/basic_file_sink.h"
 #include "spdlog/sinks/rotating_file_sink.h"
+#include "spdlog/sinks/stdout_color_sinks.h"
 #include "spdlog/sinks/udp_sink.h"
+#include "spdlog/spdlog.h"
 #ifdef __linux__
 #include "spdlog/sinks/syslog_sink.h"
 #include <syslog.h> // for LOG_PID, LOG_USER, etc.
@@ -90,13 +93,13 @@
 #include <crc.h>
 #include <devicelist.h>
 #include <devicethread.h>
+#include <guid.h>
 #include <randpassword.h>
 #include <vscp.h>
 #include <vscpd_caps.h>
 #include <vscpdb.h>
 #include <vscphelper.h>
 #include <vscpmd5.h>
-#include <guid.h>
 
 #define UNUSED(x) (void)(x)
 void
@@ -117,10 +120,56 @@ createFolderStuct(std::string& rootFolder); // from vscpd.cpp
 
 void*
 clientMsgWorkerThread(void* userdata); // this
-void*
-tcpipListenThread(void* pData); // tcpipsev.cpp
-void*
-UDPThread(void* pData); // udpsrv.cpp
+// void*
+// tcpipListenThread(void* pData); // tcpipsev.cpp
+
+static void
+tcpip_event_handler(struct mg_connection* conn, int ev, void* ev_data);
+
+///////////////////////////////////////////////////////////////////////////////
+// log_to_spdlog
+//
+
+static void log_to_spdlog(char ch, void *param) {
+  (void) param;
+  static thread_local std::string line;
+
+  if (ch != '\n') {
+    line.push_back(ch);
+    return;
+  }
+
+  if (!line.empty() && line.back() == '\r') line.pop_back();
+
+  // Default Mongoose format: "<time> <level> <file>:<line>:<func> <message>"
+  // Level is a single digit: 1=error 2=info 3=debug 4=verbose
+  spdlog::level::level_enum lvl = spdlog::level::info;
+  std::string msg = line;
+
+  size_t p1 = line.find(' ');
+  if (p1 != std::string::npos && p1 + 1 < line.size()) {
+    switch (line[p1 + 1]) {
+      case '1': lvl = spdlog::level::err;   break;
+      case '2': lvl = spdlog::level::info;  break;
+      case '3': lvl = spdlog::level::debug; break;
+      case '4': lvl = spdlog::level::trace; break;
+    }
+    // Skip "<time> <level> <file:line:func> " to keep just the message
+    size_t p2 = line.find(' ', p1 + 1);           // after level
+    size_t p3 = (p2 == std::string::npos) ? p2 : line.find(' ', p2 + 1);  // after file:line:func
+    if (p3 != std::string::npos) msg = line.substr(p3 + 1);
+  }
+
+  spdlog::log(lvl, "[mg] {}", msg);
+  line.clear();
+}
+
+void init_mongoose_logging() {
+  mg_log_set_fn(log_to_spdlog, nullptr);
+  mg_log_set(MG_LL_DEBUG);   // Mongoose's own filter, spdlog filters again after
+}
+
+// ----------------------------------------------------------------------------
 
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
@@ -130,54 +179,39 @@ CControlObject::CControlObject()
 {
     // Open syslog
 
-    spdlog::debug( "Starting the vscpd daemon");
+    spdlog::debug("Starting the vscpd daemon");
 
     m_bQuit = false; // true  for app termination
     m_bQuit_clientMsgWorkerThread =
       false; // true for clientWorkerThread termination
 
     if (-1 == sem_init(&m_semClientOutputQueue, 0, 0)) {
-        spdlog::error( "Unable to init m_semClientOutputQueue");
+        spdlog::error("Unable to init m_semClientOutputQueue");
         return;
     }
 
     if (-1 == sem_init(&m_semSentToAllClients, 0, 0)) {
-        spdlog::error( "Unable to init m_semSentToAllClients");
+        spdlog::error("Unable to init m_semSentToAllClients");
         return;
     }
 
     if (0 != pthread_mutex_init(&m_mutex_ClientOutputQueue, NULL)) {
-        spdlog::error( "Unable to init m_mutex_ClientOutputQueue");
-        return;
-    }
-
-    if (0 != pthread_mutex_init(&m_mutex_websrvSession, NULL)) {
-        spdlog::error( "Unable to init m_mutex_websrvSession");
-        return;
-    }
-
-    if (0 != pthread_mutex_init(&m_mutex_restSession, NULL)) {
-        spdlog::error( "Unable to init m_mutex_restSession");
-        return;
-    }
-
-    if (0 != pthread_mutex_init(&m_mutex_websocketSession, NULL)) {
-        spdlog::error( "Unable to init m_mutex_websocketSession");
+        spdlog::error("Unable to init m_mutex_ClientOutputQueue");
         return;
     }
 
     if (0 != pthread_mutex_init(&m_mutex_DeviceList, NULL)) {
-        spdlog::error( "Unable to init m_mutex_DeviceList");
+        spdlog::error("Unable to init m_mutex_DeviceList");
         return;
     }
 
     if (0 != pthread_mutex_init(&m_mutex_clientList, NULL)) {
-        spdlog::error( "Unable to init m_mutex_clientList");
+        spdlog::error("Unable to init m_mutex_clientList");
         return;
     }
 
     if (0 != pthread_mutex_init(&m_mutex_UserList, NULL)) {
-        spdlog::error( "Unable to init m_mutex_UserList");
+        spdlog::error("Unable to init m_mutex_UserList");
         return;
     }
 
@@ -195,22 +229,15 @@ CControlObject::CControlObject()
                           "A4A86F7D7E119BA3F0CD06881E371B989B"
                           "33B6D606A863B633EF529D64544F8E");
 
-    //m_automation.setControlObject(this);
+    // m_automation.setControlObject(this);
     m_maxItemsInClientReceiveQueue = MAX_ITEMS_CLIENT_RECEIVE_QUEUE;
 
     // Nill the GUID
     m_guid.clear();
 
-    // web admin interface
-    m_enableWebAdminIf = true;
-
-    // Local domain
-    m_web_authentication_domain = "mydomain.com";
-
     // Default TCP/IP interface settings
-    m_enableTcpip            = true;
-    m_strTcpInterfaceAddress = "9598";
-    m_encryptionTcpip        = 0;
+    m_interfaceAddress = "tcp://localhost:9598";
+    m_encryptionTcpip  = 0;
     m_tcpip_ssl_certificate.clear();
     m_tcpip_ssl_certificate_chain.clear();
     m_tcpip_ssl_verify_peer = 0; // no=0, optional=1, yes=2
@@ -222,73 +249,28 @@ CControlObject::CControlObject()
     m_tcpip_ssl_protocol_version = 0;
     m_tcpip_ssl_short_trust      = false;
 
-    // Web server SSL settings
-    m_web_ssl_certificate          = "/etc/vscp/certs/server.pem";
-    m_web_ssl_certificate_chain    = "";
-    m_web_ssl_verify_peer          = false;
-    m_web_ssl_ca_path              = "";
-    m_web_ssl_ca_file              = "";
-    m_web_ssl_verify_depth         = 9;
-    m_web_ssl_default_verify_paths = true;
-    m_web_ssl_cipher_list      = "DES-CBC3-SHA:AES128-SHA:AES128-GCM-SHA256";
-    m_web_ssl_protocol_version = 3;
-    m_web_ssl_short_trust      = false;
+    // Logging defaults
+    m_bEnableFileLog   = false;
+    m_fileLogLevel     = spdlog::level::info;
+    m_fileLogPattern   = "[mqttvscpd] [%^%l%$] %v";
+    m_path_to_log_file = "/var/log/vscp/vscpd.log"; // Directory is created
+                                                    // automatically if missing
+    m_max_log_size  = 5242880;
+    m_max_log_files = 7;
 
-    // Webserver interface
-    m_web_bEnable         = true;
-    m_web_listening_ports = "[::]:9999r,[::]:8843s,8884";
+    m_bEnableConsoleLog = true;
+    m_consoleLogLevel   = spdlog::level::info;
+    m_consoleLogPattern = "[mqttvscpd] [%^%l%$] %v";
 
-    m_web_index_files = "index.xhtml,index.html,index.htm,"
-                        "index.lp,index.lsp,index.lua,index.cgi,"
-                        "index.shtml,index.php";
+    m_bEnableSysLog = false;
+    m_sysLogLevel   = spdlog::level::info;
+    m_sysLogIdent   = "mqttvscpd";
 
-    m_web_document_root = m_rootFolder + "www/html";
-
-    // Directory listings on by default
-    m_web_enable_directory_listing          = true;
-    m_web_enable_keep_alive                 = false;
-    m_web_keep_alive_timeout_ms             = 0;
-    m_web_access_control_list               = "";
-    m_web_extra_mime_types                  = "";
-    m_web_num_threads                       = 50;
-    m_web_url_rewrite_patterns              = "";
-    m_web_hide_file_patterns                = "";
-    m_web_global_auth_file                  = "";
-    m_web_per_directory_auth_file           = "";
-    m_web_ssi_patterns                      = "";
-    m_web_url_rewrite_patterns              = "";
-    m_web_request_timeout_ms                = 10000;
-    m_web_linger_timeout_ms                 = -1; // Do not set
-    m_web_decode_url                        = true;
-    m_web_ssi_patterns                      = "";
-    m_web_access_control_allow_origin       = "*";
-    m_web_access_control_allow_methods      = "*";
-    m_web_access_control_allow_headers      = "*";
-    m_web_error_pages                       = "";
-    m_web_tcp_nodelay                       = 0;
-    m_web_static_file_cache_control         = "";
-    m_web_static_file_max_age               = 3600;
-    m_web_strict_transport_security_max_age = -1;
-    m_web_allow_sendfile_call               = true;
-    m_web_additional_header                 = "";
-    m_web_max_request_size                  = 16384;
-    m_web_allow_index_script_resource       = false;
-    m_web_duktape_script_patterns           = "**.ssjs$";
-    m_web_lua_preload_file                  = "";
-    m_web_lua_script_patterns               = "**.lua$";
-    m_web_lua_server_page_patterns          = "**.lp$|**.lsp$";
-    m_web_lua_websocket_patterns            = "**.lua$";
-    m_web_lua_background_script             = "";
-    m_web_lua_background_script_params      = "";
-
-    m_bWebsocketsEnable       = true;
-    m_websocket_document_root = "";
-    m_websocket_timeout_ms = atoi(VSCPDB_CONFIG_DEFAULT_WEBSOCKET_TIMEOUT_MS);
-    bEnable_websocket_ping_pong = false;
-    lua_websocket_pattern =
-      std::string(VSCPDB_CONFIG_DEFAULT_WEB_LUA_WEBSOCKET_PATTERN);
-
-    m_bEnableRestApi = true;
+    m_bEnableUdpLog = false;
+    m_udpLogHost    = "127.0.0.1";
+    m_udpLogPort    = 9999;
+    m_udpLogLevel   = spdlog::level::info;
+    m_udpLogPattern = "[%Y-%m-%d %H:%M:%S.%e] [%l] %v";
 
     // Init. web server subsystem - All features enabled
     // ssl mt locks will we initiated here for openssl 1.0
@@ -297,7 +279,7 @@ CControlObject::CControlObject()
     // }
 
     struct mg_mgr mgr; // Event manager
-    //mg_mgr_init(&mgr); // Init manager
+    // mg_mgr_init(&mgr); // Init manager
 
     // mg_http_listen(&mgr,
     //                "http://0.0.0.0:8000",
@@ -322,7 +304,7 @@ CControlObject::CControlObject()
 CControlObject::~CControlObject()
 {
 
-    spdlog::debug( "Cleaning up");
+    spdlog::debug("Cleaning up");
 
     // Remove objects in Client send queue
     std::list<vscpEvent*>::iterator iterVSCP;
@@ -343,49 +325,34 @@ CControlObject::~CControlObject()
     // mg_exit_library();
 
     if (0 != sem_destroy(&m_semClientOutputQueue)) {
-        spdlog::error( "Unable to destroy m_semClientOutputQueue");
+        spdlog::error("Unable to destroy m_semClientOutputQueue");
     }
 
     if (0 != sem_destroy(&m_semSentToAllClients)) {
-        spdlog::error( "Unable to destroy m_semSentToAllClients");
+        spdlog::error("Unable to destroy m_semSentToAllClients");
     }
 
     if (0 != pthread_mutex_destroy(&m_mutex_ClientOutputQueue)) {
-        spdlog::error( "Unable to destroy m_mutex_ClientOutputQueue");
-        return;
-    }
-
-    if (0 != pthread_mutex_destroy(&m_mutex_websrvSession)) {
-        spdlog::error( "Unable to destroy m_mutex_websrvSession");
-        return;
-    }
-
-    if (0 != pthread_mutex_destroy(&m_mutex_restSession)) {
-        spdlog::error( "Unable to destroy m_mutex_restSession");
-        return;
-    }
-
-    if (0 != pthread_mutex_destroy(&m_mutex_websocketSession)) {
-        spdlog::error( "Unable to destroy m_mutex_websocketSession");
+        spdlog::error("Unable to destroy m_mutex_ClientOutputQueue");
         return;
     }
 
     if (0 != pthread_mutex_destroy(&m_mutex_DeviceList)) {
-        spdlog::error( "Unable to destroy m_mutex_DeviceList");
+        spdlog::error("Unable to destroy m_mutex_DeviceList");
         return;
     }
 
     if (0 != pthread_mutex_destroy(&m_mutex_clientList)) {
-        spdlog::error( "Unable to destroy m_mutex_clientList");
+        spdlog::error("Unable to destroy m_mutex_clientList");
         return;
     }
 
     if (0 != pthread_mutex_destroy(&m_mutex_UserList)) {
-        spdlog::error( "Unable to destroy m_mutex_UserList");
+        spdlog::error("Unable to destroy m_mutex_UserList");
         return;
     }
 
-    spdlog::debug( "Terminating the vscpd daemon");
+    spdlog::debug("Terminating the vscpd daemon");
 
     // Close syslog
 }
@@ -404,14 +371,10 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
 
     // Root folder must exist
     if (!vscp_fileExists(m_rootFolder.c_str())) {
-        spdlog::error(
-               "The specified rootfolder does not exist (%s).",
-               (const char*)m_rootFolder.c_str());
+        spdlog::error("The specified rootfolder does not exist (%s).",
+                      (const char*)m_rootFolder.c_str());
         return false;
     }
-
-    std::string strRootwww = m_rootFolder + "www/html";
-    m_web_document_root    = strRootwww;
 
     // Change locale to get the correct decimal point "."
     setlocale(LC_NUMERIC, "C");
@@ -419,9 +382,8 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
     // A configuration file must be available
     if (!vscp_fileExists(strcfgfile.c_str())) {
         printf("No configuration file. Can't initialize!.");
-        spdlog::error(
-               "No configuration file. Can't initialize!. Path=%s",
-               strcfgfile.c_str());
+        spdlog::error("No configuration file. Can't initialize!. Path=%s",
+                      strcfgfile.c_str());
         return false;
     }
 
@@ -431,39 +393,42 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
 
     // Read JSON configuration
 
-    spdlog::debug( "Reading configuration file");
+    spdlog::debug("Reading configuration file");
 
     // Read JSON configuration
     try {
         if (!readConfiguration(strcfgfile)) {
             spdlog::error(
-                   "Unable to open/parse configuration file. Can't initialize! "
-                   "Path =%s",
-                   strcfgfile.c_str());
+              "Unable to open/parse configuration file. Can't initialize! "
+              "Path =%s",
+              strcfgfile.c_str());
             return FALSE;
         }
     }
     catch (...) {
-        spdlog::error( "Exception when reading configuration file");
+        spdlog::error("Exception when reading configuration file");
         return FALSE;
     }
+
+    // Use spdlog also for mongoose
+    init_mongoose_logging();
 
 #ifndef WIN32
     if (m_runAsUser.length()) {
         struct passwd* pw;
         if (NULL == (pw = getpwnam(m_runAsUser.c_str()))) {
-            spdlog::error( "Unknown user.");
+            spdlog::error("Unknown user.");
         }
         else if (setgid(pw->pw_gid) != 0) {
-            spdlog::error( "setgid() failed. [%s]", strerror(errno));
+            spdlog::error("setgid() failed. [%s]", strerror(errno));
         }
         else if (setuid(pw->pw_uid) != 0) {
-            spdlog::error( "setuid() failed. [%s]", strerror(errno));
+            spdlog::error("setuid() failed. [%s]", strerror(errno));
         }
     }
 #endif
 
-    spdlog::debug( "Using configuration file: %s", strcfgfile.c_str());
+    spdlog::debug("Using configuration file: %s", strcfgfile.c_str());
 
     //==========================================================================
     //                           Add admin user
@@ -471,7 +436,7 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
 
     m_userList.addSuperUser(m_admin_user,
                             m_admin_password,
-                            m_web_authentication_domain,
+                            "TODO",
                             m_admin_allowfrom); // Remotes allows to connect
 
     //==========================================================================
@@ -494,13 +459,13 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
     m_driverPassword = buf;
 
     std::string drvhash;
-    //vscp_makePasswordHash(drvhash, std::string(buf));
+    // vscp_makePasswordHash(drvhash, std::string(buf));
 
     m_userList.addUser(m_driverUsername,
                        drvhash,                     // salt;hash
                        "System added driver user.", // full name
                        "System added driver user.", // note
-                       m_web_authentication_domain,
+                       "TODO",
                        NULL,
                        "driver",
                        "+127.0.0.0/24", // Only local
@@ -529,14 +494,14 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
     str += VSCPD_DISPLAY_VERSION;
     str += " - ";
     str += VSCPD_COPYRIGHT;
-    spdlog::info( "{}", str.c_str());
+    spdlog::info("{}", str.c_str());
 
     // Start daemon internal client worker thread
     try {
         startClientMsgWorkerThread();
     }
     catch (...) {
-        spdlog::error( "Exception when starting message worker thread");
+        spdlog::error("Exception when starting message worker thread");
         return FALSE;
     }
 
@@ -545,10 +510,10 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
     // Must be started before the tcp/ip server as
     // ssl initializarion is done here
     try {
-        //start_webserver();
+        // start_webserver();
     }
     catch (...) {
-        spdlog::error( "Exception when starting web server");
+        spdlog::error("Exception when starting web server");
         return FALSE;
     }
 
@@ -557,7 +522,7 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
         startTcpipSrvThread();
     }
     catch (...) {
-        spdlog::error( "Exception when starting tcp/ip server");
+        spdlog::error("Exception when starting tcp/ip server");
         return FALSE;
     }
 
@@ -566,11 +531,24 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
         startDeviceWorkerThreads();
     }
     catch (...) {
-        spdlog::error( "Exception when loading drivers");
+        spdlog::error("Exception when loading drivers");
         return FALSE;
     }
 
     return true;
+}
+
+static void
+timer_fn(void* arg)
+{
+    struct mg_mgr* mgr       = (struct mg_mgr*)arg;
+    CControlObject* pCtrlObj = (CControlObject*)mgr->userdata;
+
+    // if (c_res.c == NULL) {
+    //     c_res.i = 0;
+    //     c_res.c = mg_connect(mgr, s_conn, cfn, &c_res);
+    //     MG_INFO(("CLIENT %s", c_res.c ? "connecting" : "failed"));
+    // }
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -587,7 +565,7 @@ CControlObject::run(void)
     // We need to create a clientItem and add this object to the list
     CClientItem* pClientItem = new CClientItem;
     if (NULL == pClientItem) {
-        spdlog::error( "Unable to allocate Client item, Ending.");
+        spdlog::error("Unable to allocate Client item, Ending.");
         return false;
     }
 
@@ -602,18 +580,42 @@ CControlObject::run(void)
     if (!addClient(pClientItem, CLIENT_ID_INTERNAL)) {
         // Failed to add client
         delete pClientItem;
-        spdlog::error( "ControlObject: Failed to add internal client.");
+        spdlog::error("ControlObject: Failed to add internal client.");
         pthread_mutex_unlock(&m_clientList.m_mutexItemList);
         delete pClientItem;
         return false;
     }
     pthread_mutex_unlock(&m_clientList.m_mutexItemList);
 
-    spdlog::debug( "Mainloop starting");
+    spdlog::debug("Mainloop starting");
 
 #ifdef WITH_SYSTEMD
     sd_notify(0, "READY=1");
 #endif
+
+    //-------------------------------------------------------------------------
+    //                            Initiate Mongoose
+    //-------------------------------------------------------------------------
+    struct mg_mgr mgr; // Event manager
+    struct mg_connection* conn;
+
+    mg_log_set(MG_LL_INFO); // Set log level
+    mg_mgr_init(&mgr);      // Initialize event manager
+    mgr.userdata = this;
+
+    mg_timer_add(&mgr,
+                 15000,
+                 MG_TIMER_REPEAT | MG_TIMER_RUN_NOW,
+                 timer_fn,
+                 &mgr);
+    conn = mg_listen(&mgr,
+                     m_interfaceAddress.c_str(),
+                     tcpip_event_handler,
+                     this); // Create server connection
+    if (conn == NULL) {
+        MG_INFO(("SERVER cant' open a connection"));
+        return 0;
+    }
 
     //-------------------------------------------------------------------------
     //                            MAIN - LOOP
@@ -634,18 +636,21 @@ CControlObject::run(void)
             clock_gettime(CLOCK_REALTIME, &old_now);
 
             if (!automation(pClientItem)) {
-                spdlog::error( "Failed to send automation events!");
+                spdlog::error("Failed to send automation events!");
             }
         }
 
         // Wait for event
-        if ((-1 == vscp_sem_wait(&m_semSentToAllClients, 10)) &&
-            errno == ETIMEDOUT) {
-            continue;
-        }
+        // if ((-1 == vscp_sem_wait(&m_semSentToAllClients, 10)) &&
+        //     errno == ETIMEDOUT) {
+        //     continue;
+        // }
+
+        mg_mgr_poll(&mgr, 100); // Infinite event loop, blocks for upto 100ms
+                                // unless there is network activity
 
         // Send events to websocket clients
-        //websock_post_incomingEvents();
+        // websock_post_incomingEvents();
 
         //----------------------------------------------------------------------
         //                         Event received here
@@ -677,7 +682,7 @@ CControlObject::run(void)
 
     // Clean up is called in main file
 
-    spdlog::debug( "Mainloop ending");
+    spdlog::debug("Mainloop ending");
 
     return true;
 }
@@ -708,7 +713,7 @@ CControlObject::automation(CClientItem* pClientItem)
     ex.data[2] = 0; // subzone
 
     if (!sendEvent(pClientItem, &ex)) {
-        spdlog::error( "Failed to send Class1 heartbeat");
+        spdlog::error("Failed to send Class1 heartbeat");
     }
 
     // Send VSCP_CLASS2_INFORMATION,
@@ -730,7 +735,7 @@ CControlObject::automation(CClientItem* pClientItem)
            std::min((int)strlen(m_strServerName.c_str()), 64));
 
     if (!sendEvent(pClientItem, &ex)) {
-        spdlog::error( "Failed to send Class2 heartbeat");
+        spdlog::error("Failed to send Class2 heartbeat");
     }
 
     // Send VSCP_CLASS1_PROTOCOL,
@@ -757,7 +762,7 @@ CControlObject::automation(CClientItem* pClientItem)
     ex.data[4] = (uint8_t)((time32) & 0xff); // Time since epoch LSB
 
     if (!sendEvent(pClientItem, &ex)) {
-        spdlog::error( "Failed to send segment controller heartbeat");
+        spdlog::error("Failed to send segment controller heartbeat");
     }
 
     // Send VSCP_CLASS2_PROTOCOL,
@@ -798,7 +803,7 @@ CControlObject::automation(CClientItem* pClientItem)
     ex.sizeData = 104;
 
     if (!sendEvent(pClientItem, &ex)) {
-        spdlog::error( "Failed to send high end server capabilities.");
+        spdlog::error("Failed to send high end server capabilities.");
     }
 
     return true;
@@ -811,57 +816,53 @@ bool
 CControlObject::cleanup(void)
 {
 
-    spdlog::debug(
-           "ControlObject: cleanup - Giving worker threads time to stop "
-           "operations...");
+    spdlog::debug("ControlObject: cleanup - Giving worker threads time to stop "
+                  "operations...");
 
-    spdlog::debug(
-           "ControlObject: cleanup - Stopping device worker thread...");
+    spdlog::debug("ControlObject: cleanup - Stopping device worker thread...");
 
     try {
         stopDeviceWorkerThreads();
     }
     catch (...) {
         spdlog::error(
-               "REST: Exception occurred when stoping device worker threads");
+          "REST: Exception occurred when stoping device worker threads");
     }
 
     spdlog::debug(
-           "ControlObject: cleanup - Stopping VSCP Server worker thread...");
+      "ControlObject: cleanup - Stopping VSCP Server worker thread...");
 
     // stopDaemonWorkerThread(); *****
 
-    spdlog::debug(
-           "ControlObject: cleanup - Stopping client worker thread...");
+    spdlog::debug("ControlObject: cleanup - Stopping client worker thread...");
 
     try {
         stopClientMsgWorkerThread();
     }
     catch (...) {
-        spdlog::error( "Exception occurred when stoping client worker thread");
+        spdlog::error("Exception occurred when stoping client worker thread");
     }
 
     spdlog::debug(
-           "ControlObject: cleanup - Stopping Web Server worker thread...");
+      "ControlObject: cleanup - Stopping Web Server worker thread...");
 
     try {
-        //stop_webserver();
+        // stop_webserver();
     }
     catch (...) {
-        spdlog::error( "REST: Exception occurred when stoping web server");
+        spdlog::error("REST: Exception occurred when stoping web server");
     }
 
-    spdlog::debug(
-           "ControlObject: cleanup - Stopping TCP/IP worker thread...");
+    spdlog::debug("ControlObject: cleanup - Stopping TCP/IP worker thread...");
 
     try {
         stopTcpipSrvThread();
     }
     catch (...) {
-        spdlog::error( "REST: Exception occurred when stoping tcp/ip server");
+        spdlog::error("REST: Exception occurred when stoping tcp/ip server");
     }
 
-    spdlog::debug( "Controlobject: ControlObject: Cleanup done.");
+    spdlog::debug("Controlobject: ControlObject: Cleanup done.");
 
     return true;
 }
@@ -874,14 +875,14 @@ bool
 CControlObject::startClientMsgWorkerThread(void)
 {
 
-    spdlog::debug( "Controlobject: Starting client worker thread...");
+    spdlog::debug("Controlobject: Starting client worker thread...");
 
     if (pthread_create(&m_clientMsgWorkerThread,
                        NULL,
                        clientMsgWorkerThread,
                        this)) {
 
-        spdlog::error( "Controlobject: Unable to start client thread.");
+        spdlog::error("Controlobject: Unable to start client thread.");
         return false;
     }
 
@@ -909,37 +910,28 @@ CControlObject::stopClientMsgWorkerThread(void)
 bool
 CControlObject::startTcpipSrvThread(void)
 {
-    if (!m_enableTcpip) {
+    // spdlog::debug("Controlobject: Starting TCP/IP interface...");
 
-            spdlog::debug( "Controlobject: TCP/IP interface disabled.");
-        
-        return true;
-    }
+    // // Create the tcp/ip server data object
+    // m_ptcpipSrvObject = (tcpipListenThreadObj*)new
+    // tcpipListenThreadObj(this); if (NULL == m_ptcpipSrvObject) {
+    //     spdlog::error("Controlobject: Failed to allocate storage for
+    //     tcp/ip.");
+    // }
 
+    // // Set the port to listen for connections on
+    // m_ptcpipSrvObject->setListeningPort(m_interfaceAddress);
 
-        spdlog::debug( "Controlobject: Starting TCP/IP interface...");
-    
-
-    // Create the tcp/ip server data object
-    m_ptcpipSrvObject = (tcpipListenThreadObj*)new tcpipListenThreadObj(this);
-    if (NULL == m_ptcpipSrvObject) {
-        spdlog::error(
-               "Controlobject: Failed to allocate storage for tcp/ip.");
-    }
-
-    // Set the port to listen for connections on
-    m_ptcpipSrvObject->setListeningPort(m_strTcpInterfaceAddress);
-
-    if (pthread_create(&m_tcpipListenThread,
-                       NULL,
-                       tcpipListenThread,
-                       m_ptcpipSrvObject)) {
-        delete m_ptcpipSrvObject;
-        m_ptcpipSrvObject = NULL;
-        spdlog::error(
-               "Controlobject: Unable to start the tcp/ip listen thread.");
-        return false;
-    }
+    // if (pthread_create(&m_tcpipListenThread,
+    //                    NULL,
+    //                    tcpipListenThread,
+    //                    m_ptcpipSrvObject)) {
+    //     delete m_ptcpipSrvObject;
+    //     m_ptcpipSrvObject = NULL;
+    //     spdlog::error(
+    //       "Controlobject: Unable to start the tcp/ip listen thread.");
+    //     return false;
+    // }
 
     return true;
 }
@@ -952,19 +944,15 @@ bool
 CControlObject::stopTcpipSrvThread(void)
 {
     // Tell the thread it's time to quit
-    m_ptcpipSrvObject->m_nStopTcpIpSrv = VSCP_TCPIP_SRV_STOP;
+    // m_ptcpipSrvObject->m_nStopTcpIpSrv = VSCP_TCPIP_SRV_STOP;
 
+    // spdlog::debug("Controlobject: Terminating TCP thread.");
 
-        spdlog::debug( "Controlobject: Terminating TCP thread.");
-    
+    // pthread_join(m_tcpipListenThread, NULL);
+    // delete m_ptcpipSrvObject;
+    // m_ptcpipSrvObject = NULL;
 
-    pthread_join(m_tcpipListenThread, NULL);
-    delete m_ptcpipSrvObject;
-    m_ptcpipSrvObject = NULL;
-
-
-        spdlog::debug( "Controlobject: Terminated TCP thread.");
-
+    // spdlog::debug("Controlobject: Terminated TCP thread.");
 
     return true;
 }
@@ -978,7 +966,7 @@ CControlObject::startDeviceWorkerThreads(void)
 {
     CDeviceItem* pDeviceItem;
 
-    spdlog::debug( "[Controlobject][Driver] - Starting drivers...");
+    spdlog::debug("[Controlobject][Driver] - Starting drivers...");
 
     std::deque<CDeviceItem*>::iterator it;
     for (it = m_deviceList.m_devItemList.begin();
@@ -988,17 +976,15 @@ CControlObject::startDeviceWorkerThreads(void)
         pDeviceItem = *it;
         if (NULL != pDeviceItem) {
 
-            spdlog::debug(
-                   "Controlobject: [Driver] - Preparing: %s ",
-                   pDeviceItem->m_strName.c_str());
+            spdlog::debug("Controlobject: [Driver] - Preparing: %s ",
+                          pDeviceItem->m_strName.c_str());
 
             // Just start if enabled
             if (!pDeviceItem->m_bEnable)
                 continue;
 
-            spdlog::debug(
-                   "Controlobject: [Driver] - Starting: %s ",
-                   pDeviceItem->m_strName.c_str());
+            spdlog::debug("Controlobject: [Driver] - Starting: %s ",
+                          pDeviceItem->m_strName.c_str());
 
             // Start  the driver logic
             pDeviceItem->startDriver(this);
@@ -1018,7 +1004,7 @@ CControlObject::stopDeviceWorkerThreads(void)
 {
     CDeviceItem* pDeviceItem;
 
-    spdlog::debug( "[Controlobject][Driver] - Stopping drivers...");
+    spdlog::debug("[Controlobject][Driver] - Stopping drivers...");
 
     std::deque<CDeviceItem*>::iterator iter;
     for (iter = m_deviceList.m_devItemList.begin();
@@ -1028,9 +1014,8 @@ CControlObject::stopDeviceWorkerThreads(void)
         pDeviceItem = *iter;
         if (NULL != pDeviceItem) {
 
-            spdlog::debug(
-                   "Controlobject: [Driver] - Stopping: %s ",
-                   pDeviceItem->m_strName.c_str());
+            spdlog::debug("Controlobject: [Driver] - Stopping: %s ",
+                          pDeviceItem->m_strName.c_str());
 
             pDeviceItem->stopDriver();
         }
@@ -1095,9 +1080,7 @@ CControlObject::getVscpCapabilities(uint8_t* pCapability)
     // }
 
     // VSCP TCP/IP interface
-    if (m_enableTcpip) {
-        caps |= VSCP_SERVER_CAPABILITY_TCPIP;
-    }
+    caps |= VSCP_SERVER_CAPABILITY_TCPIP;
 
     // VSCP UDP interface
     // if (m_udpSrvObj.m_bEnable) {
@@ -1112,21 +1095,6 @@ CControlObject::getVscpCapabilities(uint8_t* pCapability)
     // VSCP raw Ethernet interface
     if (1) {
         caps |= VSCP_SERVER_CAPABILITY_RAWETH;
-    }
-
-    // VSCP web server
-    if (m_web_bEnable) {
-        caps |= VSCP_SERVER_CAPABILITY_WEB;
-    }
-
-    // VSCP websocket interface
-    if (m_web_bEnable) {
-        caps |= VSCP_SERVER_CAPABILITY_WEBSOCKET;
-    }
-
-    // VSCP websocket interface
-    if (m_web_bEnable) {
-        caps |= VSCP_SERVER_CAPABILITY_REST;
     }
 
     // IPv6 support
@@ -1145,9 +1113,7 @@ CControlObject::getVscpCapabilities(uint8_t* pCapability)
     }
 
     // +2 tcp/ip connections support
-    if (m_enableTcpip) {
-        caps |= VSCP_SERVER_CAPABILITY_TWO_CONNECTIONS;
-    }
+    caps |= VSCP_SERVER_CAPABILITY_TWO_CONNECTIONS;
 
     // AES256
     caps |= VSCP_SERVER_CAPABILITY_AES256;
@@ -1175,18 +1141,18 @@ CControlObject::sendEventToClient(CClientItem* pClientItem, vscpEvent* pEvent)
 {
     // Must be valid pointers
     if (NULL == pClientItem) {
-        spdlog::error( "sendEventToClient - Pointer to clientitem is null");
+        spdlog::error("sendEventToClient - Pointer to clientitem is null");
         return false;
     }
     if (NULL == pEvent) {
-        spdlog::error( "sendEventToClient - Pointer to event is null");
+        spdlog::error("sendEventToClient - Pointer to event is null");
         return false;
     }
 
     // Check if filtered out - if so do nothing here
     if (!vscp_doLevel2Filter(pEvent, &pClientItem->m_filter)) {
 
-        spdlog::debug( "sendEventToClient - Filtered out");
+        spdlog::debug("sendEventToClient - Filtered out");
 
         return false;
     }
@@ -1196,7 +1162,7 @@ CControlObject::sendEventToClient(CClientItem* pClientItem, vscpEvent* pEvent)
     if (pClientItem->m_clientInputQueue.size() >
         m_maxItemsInClientReceiveQueue) {
 
-        spdlog::debug( "sendEventToClient - overrun");
+        spdlog::debug("sendEventToClient - overrun");
 
         // Overrun
         pClientItem->m_statistics.cntOverruns++;
@@ -1234,7 +1200,7 @@ CControlObject::sendEventAllClients(vscpEvent* pEvent, uint32_t excludeID)
     std::deque<CClientItem*>::iterator it;
 
     if (NULL == pEvent) {
-        spdlog::error( "sendEventAllClients - null event");
+        spdlog::error("sendEventAllClients - null event");
         return false;
     }
 
@@ -1246,12 +1212,11 @@ CControlObject::sendEventAllClients(vscpEvent* pEvent, uint32_t excludeID)
 
         if ((NULL != pClientItem) && (excludeID != pClientItem->m_clientID)) {
 
-            spdlog::debug(
-                   "Send event to client [%s]",
-                   pClientItem->m_strDeviceName.c_str());
+            spdlog::debug("Send event to client [%s]",
+                          pClientItem->m_strDeviceName.c_str());
 
             if (!sendEventToClient(pClientItem, pEvent)) {
-                spdlog::error( "sendEventAllClients - Failed to send event");
+                spdlog::error("sendEventAllClients - Failed to send event");
             }
         }
     }
@@ -1274,11 +1239,11 @@ CControlObject::sendEvent(CClientItem* pClientItem, vscpEvent* peventToSend)
 
     // Check pointers
     if (NULL == pClientItem) {
-        spdlog::error( "sendEvent - null clientItem");
+        spdlog::error("sendEvent - null clientItem");
         return false;
     }
     if (NULL == peventToSend) {
-        spdlog::error( "sendEvent - null event");
+        spdlog::error("sendEvent - null event");
         return false;
     }
 
@@ -1299,7 +1264,7 @@ CControlObject::sendEvent(CClientItem* pClientItem, vscpEvent* peventToSend)
 
     vscpEvent* pEvent = new vscpEvent; // Create new VSCP Event
     if (NULL == pEvent) {
-        spdlog::error( "sendEvent - Allocation of event failed");
+        spdlog::error("sendEvent - Allocation of event failed");
         return false;
     }
 
@@ -1308,7 +1273,7 @@ CControlObject::sendEvent(CClientItem* pClientItem, vscpEvent* peventToSend)
     // Copy event
     if (!vscp_copyEvent(pEvent, peventToSend)) {
         vscp_deleteEvent_v2(&pEvent);
-        spdlog::error( "sendEvent - Event copy failed");
+        spdlog::error("sendEvent - Event copy failed");
         return false;
     }
 
@@ -1334,26 +1299,25 @@ CControlObject::sendEvent(CClientItem* pClientItem, vscpEvent* peventToSend)
         destguid.setAt(14, 0); // Interface GUID's have LSB bytes nilled
         destguid.setAt(15, 0);
 
-        spdlog::debug(
-               "Level I event over Level II "
-               "dest = %02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:"
-               "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:",
-               destguid.getAt(0),
-               destguid.getAt(1),
-               destguid.getAt(2),
-               destguid.getAt(3),
-               destguid.getAt(4),
-               destguid.getAt(5),
-               destguid.getAt(6),
-               destguid.getAt(7),
-               destguid.getAt(8),
-               destguid.getAt(9),
-               destguid.getAt(10),
-               destguid.getAt(11),
-               destguid.getAt(12),
-               destguid.getAt(13),
-               destguid.getAt(14),
-               destguid.getAt(15));
+        spdlog::debug("Level I event over Level II "
+                      "dest = %02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:"
+                      "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:",
+                      destguid.getAt(0),
+                      destguid.getAt(1),
+                      destguid.getAt(2),
+                      destguid.getAt(3),
+                      destguid.getAt(4),
+                      destguid.getAt(5),
+                      destguid.getAt(6),
+                      destguid.getAt(7),
+                      destguid.getAt(8),
+                      destguid.getAt(9),
+                      destguid.getAt(10),
+                      destguid.getAt(11),
+                      destguid.getAt(12),
+                      destguid.getAt(13),
+                      destguid.getAt(14),
+                      destguid.getAt(15));
 
         // Find client
         pthread_mutex_lock(&m_clientList.m_mutexItemList);
@@ -1366,36 +1330,35 @@ CControlObject::sendEvent(CClientItem* pClientItem, vscpEvent* peventToSend)
             CClientItem* pItem = *it;
 
             spdlog::debug(
-                   "Test if = "
-                   "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:"
-                   "%02X:%02X:%02X:%02X:%02X:  - %s",
-                   pItem->m_guid.getAt(0),
-                   pItem->m_guid.getAt(1),
-                   pItem->m_guid.getAt(2),
-                   pItem->m_guid.getAt(3),
-                   pItem->m_guid.getAt(4),
-                   pItem->m_guid.getAt(5),
-                   pItem->m_guid.getAt(6),
-                   pItem->m_guid.getAt(7),
-                   pItem->m_guid.getAt(8),
-                   pItem->m_guid.getAt(9),
-                   pItem->m_guid.getAt(10),
-                   pItem->m_guid.getAt(11),
-                   pItem->m_guid.getAt(12),
-                   pItem->m_guid.getAt(13),
-                   pItem->m_guid.getAt(14),
-                   pItem->m_guid.getAt(15),
-                   pItem->m_strDeviceName.c_str());
-            spdlog::debug(
-                   "Match = %s",
-                   (pItem->m_guid == destguid) ? "true" : "false");
+              "Test if = "
+              "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:"
+              "%02X:%02X:%02X:%02X:%02X:  - %s",
+              pItem->m_guid.getAt(0),
+              pItem->m_guid.getAt(1),
+              pItem->m_guid.getAt(2),
+              pItem->m_guid.getAt(3),
+              pItem->m_guid.getAt(4),
+              pItem->m_guid.getAt(5),
+              pItem->m_guid.getAt(6),
+              pItem->m_guid.getAt(7),
+              pItem->m_guid.getAt(8),
+              pItem->m_guid.getAt(9),
+              pItem->m_guid.getAt(10),
+              pItem->m_guid.getAt(11),
+              pItem->m_guid.getAt(12),
+              pItem->m_guid.getAt(13),
+              pItem->m_guid.getAt(14),
+              pItem->m_guid.getAt(15),
+              pItem->m_strDeviceName.c_str());
+            spdlog::debug("Match = %s",
+                          (pItem->m_guid == destguid) ? "true" : "false");
 
             if (pItem->m_guid == destguid) {
                 // Found
                 // pDestClientItem = pItem;
                 bSent = true;
                 if (!sendEventToClient(pItem, pEvent)) {
-                    spdlog::debug( "sendEventToClient: Failed!");
+                    spdlog::debug("sendEventToClient: Failed!");
                 }
                 break;
             }
@@ -1422,7 +1385,7 @@ CControlObject::sendEvent(CClientItem* pClientItem, vscpEvent* peventToSend)
         }
         else {
 
-            spdlog::debug( "sendEvent - overrun");
+            spdlog::debug("sendEvent - overrun");
 
             pClientItem->m_statistics.cntOverruns++;
             vscp_deleteEvent_v2(&pEvent);
@@ -1444,12 +1407,12 @@ CControlObject::sendEvent(CClientItem* pClientItem, vscpEventEx* pex)
     vscpEvent ev;
 
     if (!vscp_convertEventExToEvent(&ev, pex)) {
-        spdlog::error( "sendEvent: Failed in vscp_convertEventExToEvent");
+        spdlog::error("sendEvent: Failed in vscp_convertEventExToEvent");
         return false;
     }
 
     if (!(rv = sendEvent(pClientItem, &ev))) {
-        spdlog::error( "sendEvent: Failed to send event");
+        spdlog::error("sendEvent: Failed to send event");
     }
 
     vscp_deleteEvent(&ev);
@@ -1629,14 +1592,13 @@ CControlObject::getMacAddress(cguid& guid)
 
         // ptr = (unsigned char *)&s.ifr_ifru.ifru_hwaddr.sa_data[0];
 
-        spdlog::debug(
-               "Ethernet MAC address: %02X:%02X:%02X:%02X:%02X:%02X",
-               (uint8_t)s.ifr_addr.sa_data[0],
-               (uint8_t)s.ifr_addr.sa_data[1],
-               (uint8_t)s.ifr_addr.sa_data[2],
-               (uint8_t)s.ifr_addr.sa_data[3],
-               (uint8_t)s.ifr_addr.sa_data[4],
-               (uint8_t)s.ifr_addr.sa_data[5]);
+        spdlog::debug("Ethernet MAC address: %02X:%02X:%02X:%02X:%02X:%02X",
+                      (uint8_t)s.ifr_addr.sa_data[0],
+                      (uint8_t)s.ifr_addr.sa_data[1],
+                      (uint8_t)s.ifr_addr.sa_data[2],
+                      (uint8_t)s.ifr_addr.sa_data[3],
+                      (uint8_t)s.ifr_addr.sa_data[4],
+                      (uint8_t)s.ifr_addr.sa_data[5]);
 
         guid.setAt(0, 0xff);
         guid.setAt(1, 0xff);
@@ -1656,7 +1618,7 @@ CControlObject::getMacAddress(cguid& guid)
         guid.setAt(15, 0);
     }
     else {
-        spdlog::error( "Failed to get hardware address (must be root?).");
+        spdlog::error("Failed to get hardware address (must be root?).");
         rv = false;
     }
 
@@ -1765,32 +1727,28 @@ bool
 CControlObject::readConfiguration(const std::string& strcfgfile)
 {
 
-    spdlog::debug(
-           "Reading full JSON configuration from {}",
-           strcfgfile.c_str());
+    spdlog::debug("Reading full JSON configuration from {}",
+                  strcfgfile.c_str());
 
     json j;
     try {
         std::ifstream in(strcfgfile, std::ifstream::in);
         if (!in.is_open()) {
-            spdlog::error(
-                   "Failed to open configuration file {}",
-                   strcfgfile.c_str());
+            spdlog::error("Failed to open configuration file {}",
+                          strcfgfile.c_str());
             return false;
         }
         in >> j;
     }
     catch (const std::exception& ex) {
-        spdlog::error(
-               "Failed to parse JSON configuration file {}: {}",
-               strcfgfile.c_str(),
-               ex.what());
+        spdlog::error("Failed to parse JSON configuration file {}: {}",
+                      strcfgfile.c_str(),
+                      ex.what());
         return false;
     }
     catch (...) {
-        spdlog::error(
-               "Failed to parse JSON configuration file {}",
-               strcfgfile.c_str());
+        spdlog::error("Failed to parse JSON configuration file {}",
+                      strcfgfile.c_str());
         return false;
     }
 
@@ -1831,16 +1789,561 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
         return false;
     };
 
+    // Logging
+    if (!(j.contains("logging") && j["logging"].is_object())) {
+        spdlog::debug(
+          "ReadConfig: logging object. Defaults will be used for all values.");
+    }
+    else {
+
+        // Logging: file-enable-log
+        if (j["logging"].contains("file-enable-log")) {
+            try {
+                m_bEnableFileLog = j["logging"]["file-enable-log"].get<bool>();
+            }
+            catch (const std::exception& ex) {
+                spdlog::error(
+                  "ReadConfig: Failed to read 'file-enable-log' Error='{}'",
+                  ex.what());
+            }
+            catch (...) {
+                spdlog::error("ReadConfig: Failed to read 'file-enable-log' "
+                              "due to unknown error.");
+            }
+            spdlog::debug("ReadConfig: LOGGING 'file-enable-log' set to {}",
+                          m_bEnableFileLog ? "true" : "false");
+        }
+        else {
+            spdlog::debug("ReadConfig: Failed to read LOGGING "
+                          "'file-enable-log' Defaults will be used.");
+        }
+
+        // Logging: file-log-level
+        if (j["logging"].contains("file-log-level")) {
+            std::string str;
+            try {
+                str = j["logging"]["file-log-level"].get<std::string>();
+            }
+            catch (const std::exception& ex) {
+                spdlog::error(
+                  "ReadConfig: Failed to read 'file-log-level' Error='{}'",
+                  ex.what());
+            }
+            catch (...) {
+                spdlog::error("ReadConfig: Failed to read 'file-log-level' due "
+                              "to unknown error.");
+            }
+            vscp_makeLower(str);
+            if (std::string::npos != str.find("off")) {
+                m_fileLogLevel = spdlog::level::off;
+                spdlog::debug(
+                  "ReadConfig: LOGGING 'file-log-level' set to 'off'.");
+            }
+            else if (std::string::npos != str.find("critical")) {
+                m_fileLogLevel = spdlog::level::critical;
+                spdlog::debug(
+                  "ReadConfig: LOGGING 'file-log-level' set to 'critical'.");
+            }
+            else if (std::string::npos != str.find("err")) {
+                m_fileLogLevel = spdlog::level::err;
+                spdlog::debug(
+                  "ReadConfig: LOGGING 'file-log-level' set to 'err'.");
+            }
+            else if (std::string::npos != str.find("warn")) {
+                m_fileLogLevel = spdlog::level::warn;
+                spdlog::debug(
+                  "ReadConfig: LOGGING 'file-log-level' set to 'warn'.");
+            }
+            else if (std::string::npos != str.find("info")) {
+                m_fileLogLevel = spdlog::level::info;
+                spdlog::debug(
+                  "ReadConfig: LOGGING 'file-log-level' set to 'info'.");
+            }
+            else if (std::string::npos != str.find("debug")) {
+                m_fileLogLevel = spdlog::level::debug;
+                spdlog::debug(
+                  "ReadConfig: LOGGING 'file-log-level' set to 'debug'.");
+            }
+            else if (std::string::npos != str.find("trace")) {
+                m_fileLogLevel = spdlog::level::trace;
+                spdlog::debug(
+                  "ReadConfig: LOGGING 'file-log-level' set to 'trace'.");
+            }
+            else {
+                spdlog::debug("ReadConfig: LOGGING 'file-log-level' has "
+                              "invalid value [{}]. Default value used.",
+                              str);
+            }
+        }
+        else {
+            spdlog::debug("ReadConfig: Failed to read LOGGING 'file-log-level' "
+                          "Defaults will be used.");
+        }
+
+        // Logging: file-pattern
+        if (j["logging"].contains("file-pattern")) {
+            try {
+                m_fileLogPattern =
+                  j["logging"]["file-pattern"].get<std::string>();
+            }
+            catch (const std::exception& ex) {
+                spdlog::error(
+                  "ReadConfig: Failed to read 'file-pattern' Error='{}'",
+                  ex.what());
+            }
+            catch (...) {
+                spdlog::error("ReadConfig: Failed to read 'file-pattern' due "
+                              "to unknown error.");
+            }
+            spdlog::debug("ReadConfig: LOGGING 'file-pattern' set to {}.",
+                          m_fileLogPattern);
+        }
+        else {
+            spdlog::debug("ReadConfig: Failed to read LOGGING 'file-pattern' "
+                          "Defaults will be used.");
+        }
+
+        // Logging: file-path
+        if (j["logging"].contains("file-path")) {
+            try {
+                m_path_to_log_file =
+                  j["logging"]["file-path"].get<std::string>();
+            }
+            catch (const std::exception& ex) {
+                spdlog::error(
+                  "ReadConfig: Failed to read 'file-path' Error='{}'",
+                  ex.what());
+            }
+            catch (...) {
+                spdlog::error("ReadConfig: Failed to read 'file-path' due to "
+                              "unknown error.");
+            }
+            spdlog::debug("ReadConfig: LOGGING 'file-path' set to '{}'.",
+                          m_path_to_log_file);
+        }
+        else {
+            spdlog::debug("ReadConfig: Failed to read LOGGING 'file-path' "
+                          "Defaults will be used.");
+        }
+
+        // Logging: file-max-size
+        if (j["logging"].contains("file-max-size")) {
+            try {
+                m_max_log_size = j["logging"]["file-max-size"].get<uint32_t>();
+            }
+            catch (const std::exception& ex) {
+                spdlog::error(
+                  "ReadConfig: Failed to read 'file-max-size' Error='{}'",
+                  ex.what());
+            }
+            catch (...) {
+                spdlog::error("ReadConfig: Failed to read 'file-max-size' due "
+                              "to unknown error.");
+            }
+            spdlog::debug("ReadConfig: LOGGING 'file-max-size' set to '{}'.",
+                          m_max_log_size);
+        }
+        else {
+            spdlog::debug("ReadConfig: Failed to read LOGGING 'file-max-size' "
+                          "Defaults will be used.");
+        }
+
+        // Logging: file-max-files
+        if (j["logging"].contains("file-max-files")) {
+            try {
+                m_max_log_files =
+                  j["logging"]["file-max-files"].get<uint16_t>();
+            }
+            catch (const std::exception& ex) {
+                spdlog::error(
+                  "ReadConfig: Failed to read 'file-max-files' Error='{}'",
+                  ex.what());
+            }
+            catch (...) {
+                spdlog::error("ReadConfig: Failed to read 'file-max-files' due "
+                              "to unknown error.");
+            }
+            spdlog::debug("ReadConfig: LOGGING 'file-max-files' set to '{}'.",
+                          m_max_log_files);
+        }
+        else {
+            spdlog::debug("ReadConfig: Failed to read LOGGING 'file-max-files' "
+                          "Defaults will be used.");
+        }
+
+        // Console
+
+        // Logging: console-enable-log
+        if (j["logging"].contains("console-enable-log")) {
+            try {
+                m_bEnableConsoleLog =
+                  j["logging"]["console-enable-log"].get<bool>();
+            }
+            catch (const std::exception& ex) {
+                spdlog::error(
+                  "ReadConfig: Failed to read 'console-enable-log' Error='{}'",
+                  ex.what());
+            }
+            catch (...) {
+                spdlog::error("ReadConfig: Failed to read 'console-enable-log' "
+                              "due to unknown error.");
+            }
+            spdlog::debug("ReadConfig: LOGGING 'console-enable-log' set to {}",
+                          m_bEnableConsoleLog ? "true" : "false");
+        }
+        else {
+            spdlog::debug("ReadConfig: Failed to read LOGGING "
+                          "'console-enable-log' Defaults will be used.");
+        }
+
+        // Logging: console-log-level
+        if (j["logging"].contains("console-log-level")) {
+            std::string str;
+            try {
+                str = j["logging"]["console-log-level"].get<std::string>();
+            }
+            catch (const std::exception& ex) {
+                spdlog::error("ReadConfig: Failed to read "
+                              "'console-enable-level' Error='{}'",
+                              ex.what());
+            }
+            catch (...) {
+                spdlog::error("ReadConfig: Failed to read "
+                              "'console-enable-level' due to unknown error.");
+            }
+            vscp_makeLower(str);
+            if (std::string::npos != str.find("off")) {
+                m_consoleLogLevel = spdlog::level::off;
+                spdlog::debug(
+                  "ReadConfig: LOGGING 'console-log-level' set to 'off'.");
+            }
+            else if (std::string::npos != str.find("critical")) {
+                m_consoleLogLevel = spdlog::level::critical;
+                spdlog::debug(
+                  "ReadConfig: LOGGING 'console-log-level' set to 'critical'.");
+            }
+            else if (std::string::npos != str.find("err")) {
+                m_consoleLogLevel = spdlog::level::err;
+                spdlog::debug(
+                  "ReadConfig: LOGGING 'console-log-level' set to 'err'.");
+            }
+            else if (std::string::npos != str.find("warn")) {
+                m_consoleLogLevel = spdlog::level::warn;
+                spdlog::debug(
+                  "ReadConfig: LOGGING 'console-log-level' set to 'warn'.");
+            }
+            else if (std::string::npos != str.find("info")) {
+                m_consoleLogLevel = spdlog::level::info;
+                spdlog::debug(
+                  "ReadConfig: LOGGING 'console-log-level' set to 'info'.");
+            }
+            else if (std::string::npos != str.find("debug")) {
+                m_consoleLogLevel = spdlog::level::debug;
+                spdlog::debug(
+                  "ReadConfig: LOGGING 'console-log-level' set to 'debug'.");
+            }
+            else if (std::string::npos != str.find("trace")) {
+                m_consoleLogLevel = spdlog::level::trace;
+                spdlog::debug(
+                  "ReadConfig: LOGGING 'console-log-level' set to 'trace'.");
+            }
+            else {
+                spdlog::debug("ReadConfig: LOGGING 'console-log-level' has "
+                              "invalid value [{}]. Default value used.",
+                              str);
+            }
+        }
+        else {
+            spdlog::debug("ReadConfig: Failed to read LOGGING 'file-log-level' "
+                          "Defaults will be used.");
+        }
+
+        // Logging: console-pattern
+        if (j["logging"].contains("console-pattern")) {
+            try {
+                m_consoleLogPattern =
+                  j["logging"]["console-pattern"].get<std::string>();
+            }
+            catch (const std::exception& ex) {
+                spdlog::error(
+                  "ReadConfig: Failed to read 'console-pattern' Error='{}'",
+                  ex.what());
+            }
+            catch (...) {
+                spdlog::error("ReadConfig: Failed to read 'console-pattern' "
+                              "due to unknown error.");
+            }
+            spdlog::debug("ReadConfig: LOGGING 'console-pattern' set to {}.",
+                          m_consoleLogPattern);
+        }
+        else {
+            spdlog::debug("ReadConfig: Failed to read LOGGING "
+                          "'console-pattern' Defaults will be used.");
+        }
+
+        // syslog
+
+        // Logging: syslog-enable-log
+        if (j["logging"].contains("syslog-enable-log")) {
+            try {
+                m_bEnableSysLog = j["logging"]["syslog-enable-log"].get<bool>();
+            }
+            catch (const std::exception& ex) {
+                spdlog::error(
+                  "ReadConfig: Failed to read 'syslog-enable-log' Error='{}'",
+                  ex.what());
+            }
+            catch (...) {
+                spdlog::error("ReadConfig: Failed to read 'syslog-enable-log' "
+                              "due to unknown error.");
+            }
+            spdlog::debug("ReadConfig: LOGGING 'syslog-enable-log' set to {}",
+                          m_bEnableSysLog ? "true" : "false");
+        }
+        else {
+            spdlog::debug("ReadConfig: Failed to read LOGGING "
+                          "'syslog-enable-log' Defaults will be used.");
+        }
+
+        // Logging: syslog-log-level
+        if (j["logging"].contains("syslog-log-level")) {
+            std::string str;
+            try {
+                str = j["logging"]["syslog-log-level"].get<std::string>();
+            }
+            catch (const std::exception& ex) {
+                spdlog::error(
+                  "ReadConfig: Failed to read 'syslog-log-level' Error='{}'",
+                  ex.what());
+            }
+            catch (...) {
+                spdlog::error("ReadConfig: Failed to read 'syslog-log-level' "
+                              "due to unknown error.");
+            }
+            vscp_makeLower(str);
+            if (std::string::npos != str.find("off")) {
+                m_sysLogLevel = spdlog::level::off;
+                spdlog::debug(
+                  "ReadConfig: LOGGING 'syslog-log-level' set to 'off'.");
+            }
+            else if (std::string::npos != str.find("critical")) {
+                m_sysLogLevel = spdlog::level::critical;
+                spdlog::debug(
+                  "ReadConfig: LOGGING 'syslog-log-level' set to 'critical'.");
+            }
+            else if (std::string::npos != str.find("err")) {
+                m_sysLogLevel = spdlog::level::err;
+                spdlog::debug(
+                  "ReadConfig: LOGGING 'syslog-log-level' set to 'err'.");
+            }
+            else if (std::string::npos != str.find("warn")) {
+                m_sysLogLevel = spdlog::level::warn;
+                spdlog::debug(
+                  "ReadConfig: LOGGING 'syslog-log-level' set to 'warn'.");
+            }
+            else if (std::string::npos != str.find("info")) {
+                m_sysLogLevel = spdlog::level::info;
+                spdlog::debug(
+                  "ReadConfig: LOGGING 'syslog-log-level' set to 'info'.");
+            }
+            else if (std::string::npos != str.find("debug")) {
+                m_sysLogLevel = spdlog::level::debug;
+                spdlog::debug(
+                  "ReadConfig: LOGGING 'syslog-log-level' set to 'debug'.");
+            }
+            else if (std::string::npos != str.find("trace")) {
+                m_sysLogLevel = spdlog::level::trace;
+                spdlog::debug(
+                  "ReadConfig: LOGGING 'syslog-log-level' set to 'trace'.");
+            }
+            else {
+                spdlog::debug("ReadConfig: LOGGING 'syslog-log-level' has "
+                              "invalid value [{}]. Default value used.",
+                              str);
+            }
+        }
+        else {
+            spdlog::debug("ReadConfig: Failed to read LOGGING "
+                          "'syslog-log-level' Defaults will be used.");
+        }
+
+        // Logging: syslog-ident
+        if (j["logging"].contains("syslog-ident")) {
+            try {
+                m_sysLogIdent = j["logging"]["syslog-ident"].get<std::string>();
+            }
+            catch (const std::exception& ex) {
+                spdlog::error(
+                  "ReadConfig: Failed to read 'syslog-ident' Error='{}'",
+                  ex.what());
+            }
+            catch (...) {
+                spdlog::error("ReadConfig: Failed to read 'syslog-ident' due "
+                              "to unknown error.");
+            }
+            spdlog::debug("ReadConfig: LOGGING 'syslog-ident' set to {}.",
+                          m_sysLogIdent);
+        }
+        else {
+            spdlog::debug("ReadConfig: Failed to read LOGGING 'syslog-ident' "
+                          "Defaults will be used.");
+        }
+
+        // UDP logging
+        if (j["logging"].contains("udp-enable-log")) {
+            try {
+                m_bEnableUdpLog = j["logging"]["udp-enable-log"].get<bool>();
+            }
+            catch (const std::exception& ex) {
+                spdlog::error(
+                  "ReadConfig: Failed to read 'udp-enable-log' Error='{}'",
+                  ex.what());
+            }
+            catch (...) {
+                spdlog::error("ReadConfig: Failed to read 'udp-enable-log' due "
+                              "to unknown error.");
+            }
+            spdlog::debug("ReadConfig: LOGGING 'udp-enable-log' set to {}",
+                          m_bEnableUdpLog ? "true" : "false");
+        }
+        else {
+            spdlog::debug("ReadConfig: Failed to read LOGGING 'udp-enable-log' "
+                          "Defaults will be used.");
+        }
+
+        // UDP logging level
+        if (j["logging"].contains("udp-log-level")) {
+            std::string str;
+            try {
+                str = j["logging"]["udp-log-level"].get<std::string>();
+            }
+            catch (const std::exception& ex) {
+                spdlog::error(
+                  "ReadConfig: Failed to read 'udp-log-level' Error='{}'",
+                  ex.what());
+            }
+            catch (...) {
+                spdlog::error("ReadConfig: Failed to read 'udp-log-level' due "
+                              "to unknown error.");
+            }
+            vscp_makeLower(str);
+            if (std::string::npos != str.find("off")) {
+                m_udpLogLevel = spdlog::level::off;
+                spdlog::debug(
+                  "ReadConfig: LOGGING 'udp-log-level' set to 'off'.");
+            }
+            else if (std::string::npos != str.find("critical")) {
+                m_udpLogLevel = spdlog::level::critical;
+                spdlog::debug(
+                  "ReadConfig: LOGGING 'udp-log-level' set to 'critical'.");
+            }
+            else if (std::string::npos != str.find("err")) {
+                m_udpLogLevel = spdlog::level::err;
+                spdlog::debug(
+                  "ReadConfig: LOGGING 'udp-log-level' set to 'err'.");
+            }
+            else if (std::string::npos != str.find("warn")) {
+                m_udpLogLevel = spdlog::level::warn;
+                spdlog::debug(
+                  "ReadConfig: LOGGING 'udp-log-level' set to 'warn'.");
+            }
+            else if (std::string::npos != str.find("info")) {
+                m_udpLogLevel = spdlog::level::info;
+                spdlog::debug(
+                  "ReadConfig: LOGGING 'udp-log-level' set to 'info'.");
+            }
+            else if (std::string::npos != str.find("debug")) {
+                m_udpLogLevel = spdlog::level::debug;
+                spdlog::debug(
+                  "ReadConfig: LOGGING 'udp-log-level' set to 'debug'.");
+            }
+            else if (std::string::npos != str.find("trace")) {
+                m_udpLogLevel = spdlog::level::trace;
+                spdlog::debug(
+                  "ReadConfig: LOGGING 'udp-log-level' set to 'trace'.");
+            }
+            else {
+                spdlog::debug("ReadConfig: LOGGING 'udp-log-level' has invalid "
+                              "value [{}]. Default value used.",
+                              str);
+            }
+        } // UDP logging level
+
+        // Logging: udp-pattern
+        if (j["logging"].contains("udp-pattern")) {
+            try {
+                m_udpLogPattern =
+                  j["logging"]["udp-pattern"].get<std::string>();
+            }
+            catch (const std::exception& ex) {
+                spdlog::error(
+                  "ReadConfig: Failed to read 'udp-pattern' Error='{}'",
+                  ex.what());
+            }
+            catch (...) {
+                spdlog::error("ReadConfig: Failed to read 'udp-pattern' due to "
+                              "unknown error.");
+            }
+            spdlog::debug("ReadConfig: LOGGING 'udp-pattern' set to {}.",
+                          m_udpLogPattern);
+        }
+        else {
+            spdlog::debug("ReadConfig: Failed to read LOGGING 'udp-pattern'. "
+                          "Defaults will be used.");
+        }
+
+        // Logging: udp-host
+        if (j["logging"].contains("udp-host")) {
+            try {
+                m_udpLogHost = j["logging"]["udp-host"].get<std::string>();
+            }
+            catch (const std::exception& ex) {
+                spdlog::error(
+                  "ReadConfig: Failed to read 'udp-host' Error='{}'",
+                  ex.what());
+            }
+            catch (...) {
+                spdlog::error("ReadConfig: Failed to read 'udp-host' due to "
+                              "unknown error.");
+            }
+            spdlog::debug("ReadConfig: LOGGING 'udp-host' set to {}.",
+                          m_udpLogHost);
+        }
+        else {
+            spdlog::debug("ReadConfig: Failed to read LOGGING 'udp-host' "
+                          "Defaults will be used.");
+        }
+
+        // Logging: udp-port
+        if (j["logging"].contains("udp-port")) {
+            try {
+                m_udpLogPort = j["logging"]["udp-port"].get<uint16_t>();
+            }
+            catch (const std::exception& ex) {
+                spdlog::error(
+                  "ReadConfig: Failed to read 'udp-port' Error='{}'",
+                  ex.what());
+            }
+            catch (...) {
+                spdlog::error(
+                  "Failed to read 'udp-port' due to unknown error.");
+            }
+            spdlog::debug("ReadConfig: LOGGING 'udp-port' set to {}.",
+                          m_udpLogPort);
+        }
+        else {
+            spdlog::debug("ReadConfig: Failed to read LOGGING 'udp-port' "
+                          "Defaults will be used.");
+        }
+
+    } // logging
+
     // Top-level/general fields.
     get_string(j, "runasuser", m_runAsUser);
     get_string(j, "servername", m_strServerName);
 
     if (j.contains("guid") && j["guid"].is_string()) {
         m_guid.getFromString(j["guid"].get<std::string>());
-    }
-
-    if (j.contains("debug") && j["debug"].is_number_integer()) {
-        m_debugFlags[0] = j["debug"].get<uint32_t>();
     }
 
     // Optional legacy/general object support.
@@ -1856,10 +2359,6 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
             m_maxItemsInClientReceiveQueue =
               g["clientbuffersize"].get<uint32_t>();
         }
-        bool b = false;
-        if (get_bool(g, "webadminif", b)) {
-            m_enableWebAdminIf = b;
-        }
     }
 
     // Security.
@@ -1869,7 +2368,8 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
         get_string(sec, "password", m_admin_password);
         get_string(sec, "allowfrom", m_admin_allowfrom);
         get_string(sec, "vscptoken", m_vscptoken);
-        get_string(sec, "authentication_domain", m_web_authentication_domain);
+        // get_string(sec, "authentication_domain",
+        // m_web_authentication_domain);
         if (sec.contains("vscpkey") && sec["vscpkey"].is_string()) {
             vscp_hexStr2ByteArray(m_systemKey,
                                   32,
@@ -1883,9 +2383,7 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
         bool b        = false;
         uint32_t n    = 0;
 
-        if (get_bool(t, "enable", b))
-            m_enableTcpip = b;
-        get_string(t, "interface", m_strTcpInterfaceAddress);
+        get_string(t, "interface", m_interfaceAddress);
         get_string(t, "ssl_certificate", m_tcpip_ssl_certificate);
         get_string(t, "ssl_certificate_chain", m_tcpip_ssl_certificate_chain);
         if (get_uint(t, "ssl_verify_peer", n))
@@ -1903,133 +2401,6 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
         }
         if (get_bool(t, "ssl_short_trust", b))
             m_tcpip_ssl_short_trust = b;
-    }
-
-    // Web server section.
-    if (j.contains("webserver") && j["webserver"].is_object()) {
-        const json& w = j["webserver"];
-        bool b        = false;
-        uint32_t n    = 0;
-
-        if (get_bool(w, "enable", b))
-            m_web_bEnable = b;
-        get_string(w, "document_root", m_web_document_root);
-        get_string(w, "listening_ports", m_web_listening_ports);
-        get_string(w, "index_files", m_web_index_files);
-        get_string(w, "authentication_domain", m_web_authentication_domain);
-        if (get_bool(w, "enable_auth_domain_check", b)) {
-            m_enable_auth_domain_check = b;
-        }
-
-        get_string(w, "ssl_certificat", m_web_ssl_certificate);
-        get_string(w, "ssl_certificat_chain", m_web_ssl_certificate_chain);
-        if (get_bool(w, "ssl_verify_peer", b))
-            m_web_ssl_verify_peer = b;
-        get_string(w, "ssl_ca_path", m_web_ssl_ca_path);
-        get_string(w, "ssl_ca_file", m_web_ssl_ca_file);
-        if (get_uint(w, "ssl_verify_depth", n))
-            m_web_ssl_verify_depth = n;
-        if (get_bool(w, "ssl_default_verify_paths", b)) {
-            m_web_ssl_default_verify_paths = b;
-        }
-        get_string(w, "ssl_cipher_list", m_web_ssl_cipher_list);
-        if (get_uint(w, "ssl_protcol_version", n)) {
-            m_web_ssl_protocol_version = n;
-        }
-        if (get_bool(w, "ssl_short_trust", b))
-            m_web_ssl_short_trust = b;
-
-        get_string(w, "cgi_interpreter", m_web_cgi_interpreter);
-        get_string(w, "cgi_pattern", m_web_cgi_patterns);
-        get_string(w, "cgi_environment", m_web_cgi_environment);
-        get_string(w, "protect_uri", m_web_protect_uri);
-        get_string(w, "trottle", m_web_trottle);
-        if (get_bool(w, "enable_directory_listing", b)) {
-            m_web_enable_directory_listing = b;
-        }
-        if (get_bool(w, "enable_keep_alive", b))
-            m_web_enable_keep_alive = b;
-        if (get_uint(w, "keep_alive_timeout_ms", n))
-            m_web_keep_alive_timeout_ms = n;
-        get_string(w, "access_control_list", m_web_access_control_list);
-        get_string(w, "extra_mime_types", m_web_extra_mime_types);
-        if (get_uint(w, "num_threads", n))
-            m_web_num_threads = n;
-        get_string(w, "hide_file_pattern", m_web_hide_file_patterns);
-        get_string(w, "hide_file_patterns", m_web_hide_file_patterns);
-        get_string(w, "url_rewrite_patterns", m_web_url_rewrite_patterns);
-        if (get_uint(w, "request_timeout_ms", n))
-            m_web_request_timeout_ms = n;
-        if (get_uint(w, "linger_timeout_ms", n))
-            m_web_linger_timeout_ms = n;
-        if (get_bool(w, "decode_url", b))
-            m_web_decode_url = b;
-        get_string(w, "global_auth_file", m_web_global_auth_file);
-        get_string(w,
-                   "web_per_directory_auth_file",
-                   m_web_per_directory_auth_file);
-        get_string(w,
-                   "access_control_allow_origin",
-                   m_web_access_control_allow_origin);
-        get_string(w,
-                   "access_control_allow_methods",
-                   m_web_access_control_allow_methods);
-        get_string(w,
-                   "access_control_allow_headers",
-                   m_web_access_control_allow_headers);
-        get_string(w, "error_pages", m_web_error_pages);
-        if (get_uint(w, "tcp_nodelay", n))
-            m_web_tcp_nodelay = n;
-        get_string(w,
-                   "static_file_cache_control",
-                   m_web_static_file_cache_control);
-        if (get_uint(w, "static_file_max_age", n))
-            m_web_static_file_max_age = n;
-        if (get_uint(w, "strict_transport_security_max_age", n)) {
-            m_web_strict_transport_security_max_age = n;
-        }
-        if (get_bool(w, "sendfile_call", b))
-            m_web_allow_sendfile_call = b;
-        get_string(w, "additional_headers", m_web_additional_header);
-        if (get_uint(w, "max_request_size", n))
-            m_web_max_request_size = n;
-        if (get_bool(w, "web_allow_index_script_resource", b)) {
-            m_web_allow_index_script_resource = b;
-        }
-        get_string(w, "duktape_script_patterns", m_web_duktape_script_patterns);
-        get_string(w, "lua_preload_file", m_web_lua_preload_file);
-        get_string(w, "lua_script_patterns", m_web_lua_script_patterns);
-        get_string(w,
-                   "lua_server_page_patterns",
-                   m_web_lua_server_page_patterns);
-        get_string(w, "lua_websockets_patterns", m_web_lua_websocket_patterns);
-        get_string(w, "lua_background_script", m_web_lua_background_script);
-        get_string(w,
-                   "lua_background_script_params",
-                   m_web_lua_background_script_params);
-    }
-
-    // REST and websocket sections.
-    if (j.contains("restapi") && j["restapi"].is_object()) {
-        bool b = false;
-        if (get_bool(j["restapi"], "enable", b)) {
-            m_bEnableRestApi = b;
-        }
-    }
-
-    if (j.contains("websockets") && j["websockets"].is_object()) {
-        const json& ws = j["websockets"];
-        bool b         = false;
-        uint32_t n     = 0;
-        if (get_bool(ws, "enable", b))
-            m_bWebsocketsEnable = b;
-        get_string(ws, "document_root", m_websocket_document_root);
-        if (get_uint(ws, "timeout_ms", n))
-            m_websocket_timeout_ms = n;
-        if (get_bool(ws, "enable_websocket_ping_pong", b)) {
-            bEnable_websocket_ping_pong = b;
-        }
-        get_string(ws, "web-lua_websocket_pattern", lua_websocket_pattern);
     }
 
     // Users.
@@ -2072,16 +2443,16 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
                             vscp_readMaskFromString(&vfilter, mask);
             }
 
-            m_userList.addUser(name,
-                               password,
-                               fullname,
-                               note,
-                               m_web_authentication_domain,
-                               hasFilter ? &vfilter : NULL,
-                               privilege,
-                               allowfrom,
-                               allowevent,
-                               0);
+            // m_userList.addUser(name,
+            //                    password,
+            //                    fullname,
+            //                    note,
+            //                    m_web_authentication_domain,
+            //                    hasFilter ? &vfilter : NULL,
+            //                    privilege,
+            //                    allowfrom,
+            //                    allowevent,
+            //                    0);
         }
     }
 
@@ -2113,10 +2484,10 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
                                           true,
                                           drv["translation"].get<uint32_t>())) {
                     spdlog::error(
-                           "Level I driver not added name=%s. Path does not "
-                           "exist. - [%s]",
-                           strName.c_str(),
-                           drv["path"].get<std::string>().c_str());
+                      "Level I driver not added name=%s. Path does not "
+                      "exist. - [%s]",
+                      strName.c_str(),
+                      drv["path"].get<std::string>().c_str());
                 }
             }
         }
@@ -2143,10 +2514,10 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
                                           VSCP_DRIVER_LEVEL2,
                                           true)) {
                     spdlog::error(
-                           "Level II driver not added name=%s. Path does not "
-                           "exist. - [%s]",
-                           strName.c_str(),
-                           drv["path-driver"].get<std::string>().c_str());
+                      "Level II driver not added name=%s. Path does not "
+                      "exist. - [%s]",
+                      strName.c_str(),
+                      drv["path-driver"].get<std::string>().c_str());
                 }
             }
         }
@@ -2214,4 +2585,73 @@ clientMsgWorkerThread(void* userdata)
     } // while
 
     return NULL;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// tcpip_event_handler
+//
+// Handle TCP/IP events for the server
+//
+
+static void
+tcpip_event_handler(struct mg_connection* conn, int ev, void* ev_data)
+{
+    //int *i = &((struct c_res_s *) conn->fn_data)->i;
+
+
+
+    CControlObject* pobj = (CControlObject*)conn->fn_data;
+    if (NULL == pobj) {
+        spdlog::error("Internal error: Eventhandler have invalid control object pointer");
+        return;
+    }
+
+    if (ev == MG_EV_OPEN && conn->is_listening == 1) {
+        MG_INFO(("SERVER is listening"));
+        spdlog::debug("SERVER is listening");
+    }
+    else if (ev == MG_EV_ACCEPT) {
+        //MG_INFO(("SERVER accepted a connection"));
+        spdlog::debug("SERVER accepted a connection");
+        // if (mg_url_is_ssl(pobj->m_interfaceAddress.c_str())) {
+        //     struct mg_tls_opts opts = { .ca =
+        //     mg_unpacked("/certs/ss_ca.pem"),
+        //                                 .cert =
+        //                                   mg_unpacked("/certs/ss_server.pem"),
+        //                                 .key =
+        //                                   mg_unpacked("/certs/ss_server.pem")
+        //                                   };
+        //     mg_tls_init(conn, &opts);
+        // }
+        mg_send(conn, "Welcome\r\n", 10);
+    }
+    else if (ev == MG_EV_CONNECT) {
+        //MG_INFO(("CLIENT connected"));
+        spdlog::debug("CLIENT connected");
+        mg_send(conn, "Hi\r\n", 10);
+        // if (mg_url_is_ssl(s_conn)) {
+        //     struct mg_tls_opts opts = { .ca = mg_unpacked("/certs/ss_ca.pem"),
+        //                                 .cert =
+        //                                   mg_unpacked("/certs/ss_client.pem"),
+        //                                 .key =
+        //                                   mg_unpacked("/certs/ss_client.pem") };
+        //     mg_tls_init(c, &opts);
+            // }
+        //*i = 1; // do something
+    }
+    else if (ev == MG_EV_READ) {
+        struct mg_iobuf* r = &conn->recv;
+        //MG_INFO(("SERVER got data: %.*s", r->len, r->buf));
+        spdlog::debug("-->SERVER got data: <{}>", std::string((const char*)r->buf, r->len));
+        //mg_send(conn, r->buf, r->len); // echo it back
+        r->len = 0; // Tell Mongoose we've consumed the data
+    }
+    else if (ev == MG_EV_CLOSE) {
+        //MG_INFO(("SERVER disconnected"));
+        spdlog::debug("SERVER disconnected");    
+    }
+    else if (ev == MG_EV_ERROR) {
+        //MG_INFO(("SERVER error: %s", (char*)ev_data));
+        spdlog::error("SERVER error: {}", (char*)ev_data);
+    }
 }
