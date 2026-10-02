@@ -99,18 +99,18 @@ deviceThread(void* pData)
                   pClientItem->m_strDeviceName.c_str());
 
     // Add the client to the Client List
-    pthread_mutex_lock(&pObj->m_clientList.m_mutexItemList);
+    pthread_mutex_lock(&pObj->m_clientList.m_mutexClientItemList);
     if (!pObj->addClient(pClientItem, pDevItem->m_interface_guid)) {
         // Failed to add client
         delete pDevItem->m_pClientItem;
         pDevItem->m_pClientItem = NULL;
 
-        pthread_mutex_unlock(&pObj->m_clientList.m_mutexItemList);
+        pthread_mutex_unlock(&pObj->m_clientList.m_mutexClientItemList);
         spdlog::error(
           "Devicethread: Failed to add client. Terminating thread.");
         return NULL;
     }
-    pthread_mutex_unlock(&pObj->m_clientList.m_mutexItemList);
+    pthread_mutex_unlock(&pObj->m_clientList.m_mutexClientItemList);
 
     // Client now have GUID set to server GUID + channel id
     // If device has a non NULL GUID replace the client GUID preserving
@@ -702,9 +702,9 @@ deviceThread(void* pData)
     }
 
     // Remove messages in the client queues
-    pthread_mutex_lock(&pObj->m_clientList.m_mutexItemList);
+    pthread_mutex_lock(&pObj->m_clientList.m_mutexClientItemList);
     pObj->removeClient(pClientItem);
-    pthread_mutex_unlock(&pObj->m_clientList.m_mutexItemList);
+    pthread_mutex_unlock(&pObj->m_clientList.m_mutexClientItemList);
 
     return NULL;
 }

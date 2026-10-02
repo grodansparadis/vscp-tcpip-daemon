@@ -25,6 +25,21 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+/*!
+  @file interfacelist.h
+  @brief Interface for the CInterfaceList class.
+
+  This file contains the definition of the CInterfaceList class, which
+  manages the list of network interfaces in the VSCP daemon.
+  The class provides methods to add and retrieve interface items.
+
+  @author Ake Hedman and contributors, the VSCP project
+  @date 2000-2026
+  @version 1.0
+  @copyright Copyright (C) 2000-2026 Ake Hedman and contributors, the VSCP project
+  @license MIT License
+  */
+
 #if !defined(INTERFACELIST__INCLUDED_)
 #define INTERFACELIST__INCLUDED_
 

@@ -41,7 +41,6 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
-#include <syslog.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -53,6 +52,7 @@
 #define DWORD unsigned long
 #endif
 
+#include "mongoose.h"
 #include "spdlog/spdlog.h"
 
 #include <vscp.h>
@@ -63,334 +63,104 @@
 #include "tcpipsrv.h"
 #include "version.h"
 
-#define TCPIPSRV_INACTIVITY_TIMOUT (3600 * 12)
-
-
-
-// ****************************************************************************
-//                               Listen thread
-// ****************************************************************************
-
-///////////////////////////////////////////////////////////////////////////////
-// tcpipListenThreadObj
-//
-// This thread listens for connection on a TCP socket and starts a new thread
-// to handle client requests
-//
-
-tcpipListenThreadObj::tcpipListenThreadObj(CControlObject* pobj)
-{
-    // Set the control object pointer
-    setControlObjectPointer(pobj);
-
-    m_strListeningPort = "9598";
-
-    // Init. the server comtext structure
-    memset(&m_srvctx, 0, sizeof(struct server_context));
-
-    m_nStopTcpIpSrv = VSCP_TCPIP_SRV_RUN;
-    m_idCounter     = 0;
-
-    pthread_mutex_init(&m_mutexTcpClientList, NULL);
-}
-
-tcpipListenThreadObj::~tcpipListenThreadObj()
-{
-    pthread_mutex_destroy(&m_mutexTcpClientList);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// tcpipListenThread
-//
+#if defined(__linux__)
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+#include <string.h>
+#elif defined(__APPLE__)
+#include <string.h>
+#else
+// Fallback implementation for Windows or other platforms lacking memmem
+#include <string.h>
 
 void*
-tcpipListenThread(void* pData)
+memmem(const void* haystack,
+       size_t haystacklen,
+       const void* needle,
+       size_t needlelen)
 {
-    size_t i;
-    struct stcp_connection* conn;
-    struct socket* psocket;
-    struct stcp_secure_options opts;
-    struct pollfd* pfd;
-    memset(&opts, 0, sizeof(opts));
-#ifdef WITH_WRAP
-    struct request_info wrap_req;
-    char address[1024];
-#endif
-
-    tcpipListenThreadObj* pListenObj = (tcpipListenThreadObj*)pData;
-    if (NULL == pListenObj) {
-        SYSLOG(
-          LOG_ERR,
-          "TCP/IP client is missing client object data. Terinating thread.");
+    if (needlelen == 0)
+        return (void*)haystack;
+    if (haystacklen < needlelen)
         return NULL;
-    }
 
-    // Fix pointer to main object
-    CControlObject* pObj = pListenObj->getControlObject();
+    const char* h = (const char*)haystack;
+    const char* n = (const char*)needle;
 
-    // ------------------------------------------------------------------------
-
-    // * * * Init. secure options * * *
-
-    // Certificate
-    if (pObj->m_tcpip_ssl_certificate.length()) {
-        opts.pem = strdup((const char*)pObj->m_tcpip_ssl_certificate.c_str());
-    }
-
-    // Certificate chain
-    if (pObj->m_tcpip_ssl_certificate_chain.length()) {
-        opts.chain =
-          strdup((const char*)pObj->m_tcpip_ssl_certificate_chain.c_str());
-    }
-
-    opts.verify_peer = pObj->m_tcpip_ssl_verify_peer;
-
-    // CA path
-    if (pObj->m_tcpip_ssl_ca_path.length()) {
-        opts.ca_path = strdup((const char*)pObj->m_tcpip_ssl_ca_path.c_str());
-    }
-
-    // CA file
-    if (pObj->m_tcpip_ssl_ca_file.length()) {
-        opts.chain = strdup((const char*)pObj->m_tcpip_ssl_ca_file.c_str());
-    }
-
-    opts.verify_depth        = pObj->m_tcpip_ssl_verify_depth;
-    opts.default_verify_path = pObj->m_tcpip_ssl_default_verify_paths ? 1 : 0;
-    opts.protocol_version    = pObj->m_tcpip_ssl_protocol_version;
-
-    // chiper list
-    if (pObj->m_tcpip_ssl_cipher_list.length()) {
-        opts.chipher_list =
-          strdup((const char*)pObj->m_tcpip_ssl_cipher_list.c_str());
-    }
-
-    opts.short_trust = pObj->m_tcpip_ssl_short_trust ? 1 : 0;
-
-    // Init. SSL subsystem
-    if (pObj->m_tcpip_ssl_certificate.length()) {
-        if (0 == stcp_init_ssl(pListenObj->m_srvctx.ssl_ctx, &opts)) {
-            spdlog::error("[TCP/IP srv thread] Failed to init. ssl.\n");
-            return NULL;
+    // Simple O(N*M) search loop
+    for (size_t i = 0; i <= haystacklen - needlelen; i++) {
+        if (h[i] == n[0] && memcmp(&h[i], n, needlelen) == 0) {
+            return (void*)&h[i];
         }
     }
-
-    // --------------------------------------------------------------------------------------
-
-    // Bind to selected interface
-    if (0 == stcp_listening(&pListenObj->m_srvctx,
-                            pListenObj->m_strListeningPort.c_str())) {
-        spdlog::error("[TCP/IP srv thread] Failed to init listening socket.");
-        return NULL;
-    }
-
-    SYSLOG(LOG_DEBUG, "[TCP/IP srv listen thread] Started.");
-
-    while (!pListenObj->m_nStopTcpIpSrv) {
-
-        pfd = pListenObj->m_srvctx.listening_socket_fds;
-        memset(pfd, 0, sizeof(*pfd));
-        for (i = 0; i < pListenObj->m_srvctx.num_listening_sockets; i++) {
-            pfd[i].fd      = pListenObj->m_srvctx.listening_sockets[i].sock;
-            pfd[i].events  = POLLIN;
-            pfd[i].revents = 0;
-        }
-
-        int pollres;
-        if ((pollres = stcp_poll(pfd,
-                                 pListenObj->m_srvctx.num_listening_sockets,
-                                 500,
-                                 &(pListenObj->m_nStopTcpIpSrv))) > 0) {
-
-            for (i = 0; i < pListenObj->m_srvctx.num_listening_sockets; i++) {
-
-                // NOTE(lsm): on QNX, poll() returns POLLRDNORM after the
-                // successful poll, and POLLIN is defined as
-                // (POLLRDNORM | POLLRDBAND)
-                // Therefore, we're checking pfd[i].revents & POLLIN, not
-                // pfd[i].revents == POLLIN.
-                if (pfd[i].revents & POLLIN) {
-
-                    conn = stcp_new_connection(); // Init connection
-                    if (NULL == conn) {
-                        spdlog::error(
-                          "[TCP/IP srv] -- Memory problem when creating "
-                          "conn object.");
-                        continue;
-                    }
-
-                    memset(conn, 0, sizeof(struct stcp_connection));
-                    conn->client.id = pListenObj->m_idCounter++;
-
-                    if (stcp_accept(&pListenObj->m_srvctx,
-                                    &pListenObj->m_srvctx.listening_sockets[i],
-                                    &(conn->client))) {
-
-                        stcp_init_client_connection(conn, &opts);
-                        SYSLOG(LOG_DEBUG, "[TCP/IP srv] -- Connection accept.");
-
-#ifdef WITH_WRAP
-                        /* Use tcpd / libwrap to determine whether a connection
-                         * is allowed. */
-                        request_init(&wrap_req,
-                                     RQ_FILE,
-                                     conn->client.sock,
-                                     RQ_DAEMON,
-                                     "vscpd",
-                                     0);
-                        fromhost(&wrap_req);
-                        if (!hosts_access(&wrap_req)) {
-                            // Access is denied
-                            if (!stcp_socket_get_address(conn, address, 1024)) {
-                                spdlog::error("Client connection from %s "
-                                              "denied access by tcpd.",
-                                              address);
-                            }
-                            stcp_close_connection(conn);
-                            conn = NULL;
-                            continue;
-                        }
-#endif
-
-                        // Create the thread object
-                        tcpipClientObj* pClientObj =
-                          new tcpipClientObj(pListenObj);
-                        if (NULL == pClientObj) {
-                            spdlog::error("[TCP/IP srv] -- Memory problem when "
-                                          "creating client thread.");
-                            stcp_close_connection(conn);
-                            conn = NULL;
-                            continue;
-                        }
-
-                        pClientObj->m_conn    = conn;
-                        pClientObj->m_pParent = pListenObj;
-
-                        SYSLOG(
-                          LOG_DEBUG,
-                          "Controlobject: Starting client tcp/ip thread...");
-
-                        int err;
-                        if ((err =
-                               pthread_create(&pClientObj->m_tcpipClientThread,
-                                              NULL,
-                                              tcpipClientThread,
-                                              pClientObj))) {
-                            spdlog::error(
-                              "[TCP/IP srv] -- Failed to run client "
-                              "tcp/ip client thread. error={}",
-                              err);
-                            delete pClientObj;
-                            stcp_close_connection(conn);
-                            conn = NULL;
-                            continue;
-                        }
-
-                        // Make it detached
-                        pthread_detach(pClientObj->m_tcpipClientThread);
-
-                        // Add conn to list of active connections
-                        pthread_mutex_lock(&pListenObj->m_mutexTcpClientList);
-                        pListenObj->m_tcpip_clientList.push_back(pClientObj);
-                        pthread_mutex_unlock(&pListenObj->m_mutexTcpClientList);
-                    }
-                    else {
-                        delete psocket;
-                        psocket = NULL;
-                    }
-                }
-
-            } // for
-
-        } // poll
-
-        pollres = 0;
-
-    } // While
-
-    SYSLOG(LOG_DEBUG, "[TCP/IP srv listen thread] Preparing Exit.");
-
-    // Wait for clients to terminate
-    int loopCnt = 0;
-    while (true) {
-
-        pthread_mutex_lock(&pListenObj->m_mutexTcpClientList);
-        if (!pListenObj->m_tcpip_clientList.size())
-            break;
-        pthread_mutex_unlock(&pListenObj->m_mutexTcpClientList);
-
-        loopCnt++;
-        sleep(1); // Give them some time
-    }
-
-    stcp_close_all_listening_sockets(&pListenObj->m_srvctx);
-
-    // * * * Deallocate allocated security options * * *
-
-    if (NULL != opts.pem) {
-        free((void*)opts.pem);
-        opts.pem = NULL;
-    }
-
-    if (NULL != opts.chain) {
-        free((void*)opts.chain);
-        opts.chain = NULL;
-    }
-
-    if (NULL != opts.ca_path) {
-        free((void*)opts.ca_path);
-        opts.ca_path = NULL;
-    }
-
-    if (NULL != opts.ca_file) {
-        free((void*)opts.ca_file);
-        opts.ca_file = NULL;
-    }
-
-    if (NULL != opts.chipher_list) {
-        free((void*)opts.chipher_list);
-        opts.chipher_list = NULL;
-    }
-
-    if (pObj->m_tcpip_ssl_certificate.length()) {
-        stcp_uninit_ssl();
-    }
-
-    SYSLOG(LOG_DEBUG, "[TCP/IP srv listen thread] Exit.");
-
     return NULL;
 }
+#endif
 
-// ****************************************************************************
-//                              Client thread
-// ****************************************************************************
+#define TCPIPSRV_INACTIVITY_TIMOUT (3600 * 12)
+
+// trim from start
+static inline std::string&
+ltrim(std::string& s)
+{
+    s.erase(s.begin(),
+            std::find_if(s.begin(),
+                         s.end(),
+                         std::not1(std::ptr_fun<int, int>(std::isspace))));
+    return s;
+}
+
+// trim from end
+static inline std::string&
+rtrim(std::string& s)
+{
+    s.erase(std::find_if(s.rbegin(),
+                         s.rend(),
+                         std::not1(std::ptr_fun<int, int>(std::isspace)))
+              .base(),
+            s.end());
+    return s;
+}
+
+static void
+timer_fn(void* arg)
+{
+    struct mg_mgr* mgr       = (struct mg_mgr*)arg;
+    CControlObject* pCtrlObj = (CControlObject*)mgr->userdata;
+
+    // if (c_res.c == NULL) {
+    //     c_res.i = 0;
+    //     c_res.c = mg_connect(mgr, s_conn, cfn, &c_res);
+    //     MG_INFO(("CLIENT %s", c_res.c ? "connecting" : "failed"));
+    // }
+}
 
 ///////////////////////////////////////////////////////////////////////////////
-// tcpipClientObj
+// CTcpipSrv
 //
 // This thread listens for connection on a TCP socket and starts a new thread
 // to handle client requests
 //
 
-tcpipClientObj::tcpipClientObj(tcpipListenThreadObj* pParent)
+CTcpipSrv::CTcpipSrv(CControlObject* obj)
 {
-    m_pClientItem = NULL;
     m_strResponse.clear();  // For clearness
-    m_rv           = 0;     // No error code
     m_bReceiveLoop = false; // Not in receive loop
-    m_conn         = NULL;  // No connection yet
-    m_pObj         = NULL;
-    pParent        = pParent;
-
-    if (NULL != pParent) {
-        m_pObj = pParent->getControlObject();
-    }
+    m_pCtrlObj     = obj;   // Set the control object pointer
+    m_bRun         = true;  // Not quitting yet
 }
 
-tcpipClientObj::~tcpipClientObj()
+CTcpipSrv::~CTcpipSrv()
 {
+    spdlog::debug(
+      "CTcpipSrv: Joining client thread and clearing command array");
+
     pthread_join(m_tcpipClientThread, NULL);
     m_commandArray.clear(); // TODO remove strings
+
+    // Remove all clients
+    // m_pCtrlObj->removeAllClients();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -398,19 +168,38 @@ tcpipClientObj::~tcpipClientObj()
 //
 
 bool
-tcpipClientObj::write(std::string& str, bool bAddCRLF)
+CTcpipSrv::write(struct mg_connection* conn, std::string& str, bool bAddCRLF)
 {
-    // Must be connected
-    if (STCP_CONN_STATE_CONNECTED != m_conn->conn_state)
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
         return false;
+    }
+
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return false;
+    }
+
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
+    // Must be connected
+    if (!pClientItem->isConnected()) {
+        spdlog::error("Client is not connected, cannot write data.");
+        return false;
+    }
 
     if (bAddCRLF) {
         str += std::string("\r\n");
     }
 
-    m_rv = stcp_write(m_conn, (const char*)str.c_str(), str.length());
-    if (m_rv != str.length())
+    // Write out data
+    m_rv = mg_send(conn, (const char*)str.c_str(), str.length());
+    if (m_rv != str.length()) {
         return false;
+    }
 
     return true;
 }
@@ -420,15 +209,33 @@ tcpipClientObj::write(std::string& str, bool bAddCRLF)
 //
 
 bool
-tcpipClientObj::write(const char* buf, size_t len)
+CTcpipSrv::write(struct mg_connection* conn, const char* buf, size_t len)
 {
-    // Must be connected
-    if (STCP_CONN_STATE_CONNECTED != m_conn->conn_state)
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
         return false;
+    }
 
-    m_rv = stcp_write(m_conn, (const char*)buf, len);
-    if (m_rv != len)
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
         return false;
+    }
+
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
+    // Must be connected
+    if (!pClientItem->isConnected()) {
+        spdlog::error("Client is not connected, cannot write data.");
+        return false;
+    }
+
+    m_rv = mg_send(conn, (const char*)buf, len);
+    if (m_rv != len) {
+        return false;
+    }
 
     return true;
 }
@@ -438,13 +245,30 @@ tcpipClientObj::write(const char* buf, size_t len)
 //
 
 bool
-tcpipClientObj::read(std::string& str)
+CTcpipSrv::read(struct mg_connection* conn, std::string& str)
 {
     size_t pos;
 
-    // Must be connected
-    if (STCP_CONN_STATE_CONNECTED != m_conn->conn_state)
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
         return false;
+    }
+
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return false;
+    }
+
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
+    // Must be connected
+    if (!pClientItem->isConnected()) {
+        spdlog::error("Client is not connected, cannot read data.");
+        return false;
+    }
 
     if (m_strResponse.npos != (pos = m_strResponse.find('\n'))) {
 
@@ -460,37 +284,45 @@ tcpipClientObj::read(std::string& str)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// CommandHandler
+// commandHandler
 //
 
 int
-tcpipClientObj::CommandHandler(std::string& strCommand)
+CTcpipSrv::commandHandler(struct mg_connection* conn, std::string& strCommand)
 {
+    // Must have a valid connection
+    if (NULL == conn) {
+        spdlog::error("Connection pointer is NULL, cannot handle command.");
+        return -1;
+    }
+
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return -1;
+    }
+
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
     // Must be connected
-    if (STCP_CONN_STATE_CONNECTED != m_conn->conn_state) {
-        return VSCP_TCPIP_RV_ERROR;
+    if (!pClientItem->isConnected()) {
+        spdlog::error("Client is not connected, cannot handle command.");
+        return -1;
     }
 
-    if (NULL == m_pObj) {
-        spdlog::error(
-          "[TCP/IP srv] ERROR: Control object pointer is NULL in command "
-          "handler.");
+    if (NULL == m_pCtrlObj) {
+        spdlog::error("[TCP/IP srv] ERROR: Control object pointer is NULL in "
+                      "command handler.");
         return VSCP_TCPIP_RV_CLOSE; // Close connection
     }
 
-    if (NULL == m_pClientItem) {
-        SYSLOG(
-          LOG_ERR,
-          "[TCP/IP srv] ERROR: ClientItem pointer is NULL in command handler.");
-        return VSCP_TCPIP_RV_CLOSE; // Close connection
-    }
-
-    m_pClientItem->m_currentCommand = strCommand;
-    vscp_trim(m_pClientItem->m_currentCommand);
+    pClientItem->setCurrentCommand(strCommand);
+    vscp_trim(pClientItem->getCurrentCommand());
 
     // If nothing to handle just return
-    if (0 == m_pClientItem->m_currentCommand.length()) {
-        write(MSG_OK, strlen(MSG_OK));
+    if (0 == pClientItem->getCurrentCommand().length()) {
+        write(conn, MSG_OK, strlen(MSG_OK));
         return VSCP_TCPIP_RV_OK;
     }
 
@@ -498,8 +330,8 @@ tcpipClientObj::CommandHandler(std::string& strCommand)
     //                            No Operation
     //*********************************************************************
 
-    if (m_pClientItem->CommandStartsWith(("noop"))) {
-        write(MSG_OK, strlen(MSG_OK));
+    if (pClientItem->CommandStartsWith(("noop"))) {
+        write(conn, MSG_OK, strlen(MSG_OK));
         return VSCP_TCPIP_RV_OK;
     }
 
@@ -507,12 +339,12 @@ tcpipClientObj::CommandHandler(std::string& strCommand)
     //                             Rcvloop
     //*********************************************************************
 
-    else if (m_pClientItem->CommandStartsWith(("rcvloop")) ||
-             m_pClientItem->CommandStartsWith(("receiveloop"))) {
-        if (checkPrivilege(VSCP_USER_RIGHT_ALLOW_RCV_EVENT)) {
+    else if (pClientItem->CommandStartsWith(("rcvloop")) ||
+             pClientItem->CommandStartsWith(("receiveloop"))) {
+        if (isUserAllowedToSendEvent(VSCP_USER_RIGHT_ALLOW_RCV_EVENT)) {
             try {
-                m_pClientItem->m_timeRcvLoop = time(NULL);
-                handleClientRcvLoop();
+                pClientItem->m_timeRcvLoop = time(NULL);
+                handleClientRcvLoop(conn);
             }
             catch (...) {
                 spdlog::error("TCPIP: Exception occurred handleClientRcvLoop");
@@ -524,18 +356,18 @@ tcpipClientObj::CommandHandler(std::string& strCommand)
     //                             Quitloop
     //*********************************************************************
 
-    else if (m_pClientItem->CommandStartsWith(("quitloop"))) {
+    else if (pClientItem->CommandStartsWith(("quitloop"))) {
         m_bReceiveLoop = false;
-        write(MSG_QUIT_LOOP, strlen(MSG_QUIT_LOOP));
+        write(conn, MSG_QUIT_LOOP, strlen(MSG_QUIT_LOOP));
     }
 
     //*********************************************************************
     //                             Username
     //*********************************************************************
 
-    else if (m_pClientItem->CommandStartsWith(("user"))) {
+    else if (pClientItem->CommandStartsWith(("user"))) {
         try {
-            handleClientUser();
+            handleClientUser(conn);
         }
         catch (...) {
             spdlog::error("TCPIP: Exception occurred handleClientUser");
@@ -546,10 +378,10 @@ tcpipClientObj::CommandHandler(std::string& strCommand)
     //                            Password
     //*********************************************************************
 
-    else if (m_pClientItem->CommandStartsWith(("pass"))) {
+    else if (pClientItem->CommandStartsWith(("pass"))) {
 
         try {
-            if (!handleClientPassword()) {
+            if (!handleClientPassword(conn)) {
                 spdlog::error(
                   "[TCP/IP srv] Command: Password. Not authorized.");
                 return VSCP_TCPIP_RV_CLOSE; // Close connection
@@ -559,19 +391,19 @@ tcpipClientObj::CommandHandler(std::string& strCommand)
             spdlog::error("TCPIP: Exception occurred handleClientPassword");
         }
 
-        SYSLOG(LOG_DEBUG, "[TCP/IP srv] Command: Password. PASS");
+        spdlog::debug("[TCP/IP srv] Command: Password. PASS");
     }
 
     //*********************************************************************
     //                              Challenge
     //*********************************************************************
 
-    else if (m_pClientItem->CommandStartsWith(("challenge"))) {
+    else if (pClientItem->CommandStartsWith(("challenge"))) {
         try {
-            handleChallenge();
+            handleChallenge(conn);
         }
         catch (...) {
-            spdlog::error("TCPIP: Exception occurred handleChallange");
+            spdlog::error("TCPIP: Exception occurred handleChallenge");
         }
     }
 
@@ -579,20 +411,20 @@ tcpipClientObj::CommandHandler(std::string& strCommand)
     //                                 QUIT
     // *********************************************************************
 
-    else if (m_pClientItem->CommandStartsWith("quit") ||
-             m_pClientItem->CommandStartsWith("exit")) {
-        SYSLOG(LOG_INFO, "[TCP/IP srv] Command: Close.");
-        write(MSG_GOODBY, strlen(MSG_GOODBY));
+    else if (pClientItem->CommandStartsWith("quit") ||
+             pClientItem->CommandStartsWith("exit")) {
+        spdlog::info("[TCP/IP srv] Command: Close.");
+        write(conn, MSG_GOODBY, strlen(MSG_GOODBY));
         return VSCP_TCPIP_RV_CLOSE; // Close connection
     }
 
     //*********************************************************************
     //                              Shutdown
     //*********************************************************************
-    else if (m_pClientItem->CommandStartsWith(("shutdown"))) {
-        if (checkPrivilege(VSCP_USER_RIGHT_ALLOW_SHUTDOWN)) {
+    else if (pClientItem->CommandStartsWith(("shutdown"))) {
+        if (isUserAllowedToSendEvent(VSCP_USER_RIGHT_ALLOW_SHUTDOWN)) {
             try {
-                handleClientShutdown();
+                handleClientShutdown(conn);
             }
             catch (...) {
                 spdlog::error("TCPIP: Exception occurred handleClientShutdown");
@@ -604,10 +436,10 @@ tcpipClientObj::CommandHandler(std::string& strCommand)
     //                             Send event
     //*********************************************************************
 
-    else if (m_pClientItem->CommandStartsWith(("send"))) {
-        if (checkPrivilege(VSCP_USER_RIGHT_ALLOW_SEND_EVENT)) {
+    else if (pClientItem->CommandStartsWith(("send"))) {
+        if (isUserAllowedToSendEvent(VSCP_USER_RIGHT_ALLOW_SEND_EVENT)) {
             try {
-                handleClientSend();
+                handleClientSend(conn);
             }
             catch (...) {
                 spdlog::error("TCPIP: Exception occurred handleClientSend");
@@ -619,11 +451,11 @@ tcpipClientObj::CommandHandler(std::string& strCommand)
     //                            Read event
     //*********************************************************************
 
-    else if (m_pClientItem->CommandStartsWith(("retr")) ||
-             m_pClientItem->CommandStartsWith(("retrieve"))) {
-        if (checkPrivilege(VSCP_USER_RIGHT_ALLOW_RCV_EVENT)) {
+    else if (pClientItem->CommandStartsWith(("retr")) ||
+             pClientItem->CommandStartsWith(("retrieve"))) {
+        if (isUserAllowedToSendEvent(VSCP_USER_RIGHT_ALLOW_RCV_EVENT)) {
             try {
-                handleClientReceive();
+                handleClientReceive(conn);
             }
             catch (...) {
                 spdlog::error("TCPIP: Exception occurred handleClientReceive");
@@ -635,11 +467,11 @@ tcpipClientObj::CommandHandler(std::string& strCommand)
     //                            Data Available
     //*********************************************************************
 
-    else if (m_pClientItem->CommandStartsWith(("cdta")) ||
-             m_pClientItem->CommandStartsWith(("chkdata")) ||
-             m_pClientItem->CommandStartsWith(("checkdata"))) {
+    else if (pClientItem->CommandStartsWith(("cdta")) ||
+             pClientItem->CommandStartsWith(("chkdata")) ||
+             pClientItem->CommandStartsWith(("checkdata"))) {
         try {
-            handleClientDataAvailable();
+            handleClientDataAvailable(conn);
         }
         catch (...) {
             spdlog::error(
@@ -651,11 +483,11 @@ tcpipClientObj::CommandHandler(std::string& strCommand)
     //                          Clear input queue
     //*********************************************************************
 
-    else if (m_pClientItem->CommandStartsWith(("clra")) ||
-             m_pClientItem->CommandStartsWith(("clearall")) ||
-             m_pClientItem->CommandStartsWith(("clrall"))) {
+    else if (pClientItem->CommandStartsWith(("clra")) ||
+             pClientItem->CommandStartsWith(("clearall")) ||
+             pClientItem->CommandStartsWith(("clrall"))) {
         try {
-            handleClientClearInputQueue();
+            handleClientClearInputQueue(conn);
         }
         catch (...) {
             spdlog::error(
@@ -667,9 +499,9 @@ tcpipClientObj::CommandHandler(std::string& strCommand)
     //                           Get Statistics
     //*********************************************************************
 
-    else if (m_pClientItem->CommandStartsWith(("stat"))) {
+    else if (pClientItem->CommandStartsWith(("stat"))) {
         try {
-            handleClientGetStatistics();
+            handleClientGetStatistics(conn);
         }
         catch (...) {
             spdlog::error(
@@ -681,9 +513,9 @@ tcpipClientObj::CommandHandler(std::string& strCommand)
     //                            Get Status
     //*********************************************************************
 
-    else if (m_pClientItem->CommandStartsWith(("info"))) {
+    else if (pClientItem->CommandStartsWith(("info"))) {
         try {
-            handleClientGetStatus();
+            handleClientGetStatus(conn);
         }
         catch (...) {
             spdlog::error("TCPIP: Exception occurred handleClientGetStatus");
@@ -694,10 +526,10 @@ tcpipClientObj::CommandHandler(std::string& strCommand)
     //                           Get Channel ID
     //*********************************************************************
 
-    else if (m_pClientItem->CommandStartsWith(("chid")) ||
-             m_pClientItem->CommandStartsWith(("getchid"))) {
+    else if (pClientItem->CommandStartsWith(("chid")) ||
+             pClientItem->CommandStartsWith(("getchid"))) {
         try {
-            handleClientGetChannelID();
+            handleClientGetChannelID(conn);
         }
         catch (...) {
             spdlog::error("TCPIP: Exception occurred handleClientGetChannelID");
@@ -708,11 +540,11 @@ tcpipClientObj::CommandHandler(std::string& strCommand)
     //                          Set Channel GUID
     //*********************************************************************
 
-    else if (m_pClientItem->CommandStartsWith(("sgid")) ||
-             m_pClientItem->CommandStartsWith(("setguid"))) {
-        if (checkPrivilege(VSCP_USER_RIGHT_ALLOW_SETGUID)) {
+    else if (pClientItem->CommandStartsWith(("sgid")) ||
+             pClientItem->CommandStartsWith(("setguid"))) {
+        if (isUserAllowedToSendEvent(VSCP_USER_RIGHT_ALLOW_SETGUID)) {
             try {
-                handleClientSetChannelGUID();
+                handleClientSetChannelGUID(conn);
             }
             catch (...) {
                 spdlog::error(
@@ -725,10 +557,10 @@ tcpipClientObj::CommandHandler(std::string& strCommand)
     //                          Get Channel GUID
     //*********************************************************************
 
-    else if (m_pClientItem->CommandStartsWith(("ggid")) ||
-             m_pClientItem->CommandStartsWith(("getguid"))) {
+    else if (pClientItem->CommandStartsWith(("ggid")) ||
+             pClientItem->CommandStartsWith(("getguid"))) {
         try {
-            handleClientGetChannelGUID();
+            handleClientGetChannelGUID(conn);
         }
         catch (...) {
             spdlog::error(
@@ -740,10 +572,10 @@ tcpipClientObj::CommandHandler(std::string& strCommand)
     //                           Get Version
     //*********************************************************************
 
-    else if (m_pClientItem->CommandStartsWith(("version")) ||
-             m_pClientItem->CommandStartsWith(("vers"))) {
+    else if (pClientItem->CommandStartsWith(("version")) ||
+             pClientItem->CommandStartsWith(("vers"))) {
         try {
-            handleClientGetVersion();
+            handleClientGetVersion(conn);
         }
         catch (...) {
             spdlog::error("TCPIP: Exception occurred handleClientGetVersion");
@@ -754,11 +586,11 @@ tcpipClientObj::CommandHandler(std::string& strCommand)
     //                           Set Filter
     //*********************************************************************
 
-    else if (m_pClientItem->CommandStartsWith(("sflt")) ||
-             m_pClientItem->CommandStartsWith(("setfilter"))) {
-        if (checkPrivilege(VSCP_USER_RIGHT_ALLOW_SETFILTER)) {
+    else if (pClientItem->CommandStartsWith(("sflt")) ||
+             pClientItem->CommandStartsWith(("setfilter"))) {
+        if (isUserAllowedToSendEvent(VSCP_USER_RIGHT_ALLOW_SETFILTER)) {
             try {
-                handleClientSetFilter();
+                handleClientSetFilter(conn);
             }
             catch (...) {
                 spdlog::error(
@@ -771,11 +603,11 @@ tcpipClientObj::CommandHandler(std::string& strCommand)
     //                           Set Mask
     //*********************************************************************
 
-    else if (m_pClientItem->CommandStartsWith(("smsk")) ||
-             m_pClientItem->CommandStartsWith(("setmask"))) {
-        if (checkPrivilege(VSCP_USER_RIGHT_ALLOW_SETFILTER)) {
+    else if (pClientItem->CommandStartsWith(("smsk")) ||
+             pClientItem->CommandStartsWith(("setmask"))) {
+        if (isUserAllowedToSendEvent(VSCP_USER_RIGHT_ALLOW_SETFILTER)) {
             try {
-                handleClientSetMask();
+                handleClientSetMask(conn);
             }
             catch (...) {
                 spdlog::error("TCPIP: Exception occurred handleClientSetMask");
@@ -787,9 +619,9 @@ tcpipClientObj::CommandHandler(std::string& strCommand)
     //                             Help
     //*********************************************************************
 
-    else if (m_pClientItem->CommandStartsWith(("help"))) {
+    else if (pClientItem->CommandStartsWith(("help"))) {
         try {
-            handleClientHelp();
+            handleClientHelp(conn);
         }
         catch (...) {
             spdlog::error("TCPIP: Exception occurred handleClientHelp");
@@ -800,10 +632,10 @@ tcpipClientObj::CommandHandler(std::string& strCommand)
     //                             Restart
     //*********************************************************************
 
-    else if (m_pClientItem->CommandStartsWith(("restart"))) {
-        if (checkPrivilege(VSCP_USER_RIGHT_ALLOW_RESTART)) {
+    else if (pClientItem->CommandStartsWith(("restart"))) {
+        if (isUserAllowedToSendEvent(VSCP_USER_RIGHT_ALLOW_RESTART)) {
             try {
-                handleClientRestart();
+                handleClientRestart(conn);
             }
             catch (...) {
                 spdlog::error("TCPIP: Exception occurred handleClientRestart");
@@ -815,11 +647,11 @@ tcpipClientObj::CommandHandler(std::string& strCommand)
     //                         Client/interface
     //*********************************************************************
 
-    else if (m_pClientItem->CommandStartsWith(("client")) ||
-             m_pClientItem->CommandStartsWith(("interface"))) {
-        if (checkPrivilege(VSCP_USER_RIGHT_ALLOW_INTERFACE)) {
+    else if (pClientItem->CommandStartsWith(("client")) ||
+             pClientItem->CommandStartsWith(("interface"))) {
+        if (isUserAllowedToSendEvent(VSCP_USER_RIGHT_ALLOW_INTERFACE)) {
             try {
-                handleClientInterface();
+                handleClientInterface(conn);
             }
             catch (...) {
                 spdlog::error(
@@ -832,10 +664,10 @@ tcpipClientObj::CommandHandler(std::string& strCommand)
     //                               Test
     //*********************************************************************
 
-    else if (m_pClientItem->CommandStartsWith(("test"))) {
-        if (checkPrivilege(VSCP_USER_RIGHT_ALLOW_TEST)) {
+    else if (pClientItem->CommandStartsWith(("test"))) {
+        if (isUserAllowedToSendEvent(VSCP_USER_RIGHT_ALLOW_TEST)) {
             try {
-                handleClientTest();
+                handleClientTest(conn);
             }
             catch (...) {
                 spdlog::error("TCPIP: Exception occurred handleClientTest");
@@ -847,10 +679,10 @@ tcpipClientObj::CommandHandler(std::string& strCommand)
     //                             WhatCanYouDo
     //*********************************************************************
 
-    else if (m_pClientItem->CommandStartsWith(("wcyd")) ||
-             m_pClientItem->CommandStartsWith(("whatcanyoudo"))) {
+    else if (pClientItem->CommandStartsWith(("wcyd")) ||
+             pClientItem->CommandStartsWith(("whatcanyoudo"))) {
         try {
-            handleClientCapabilityRequest();
+            handleClientCapabilityRequest(conn);
         }
         catch (...) {
             spdlog::error(
@@ -862,9 +694,9 @@ tcpipClientObj::CommandHandler(std::string& strCommand)
     //                             Measurement
     //*********************************************************************
 
-    else if (m_pClientItem->CommandStartsWith(("measurement"))) {
+    else if (pClientItem->CommandStartsWith(("measurement"))) {
         try {
-            handleClientMeasurement();
+            handleClientMeasurement(conn);
         }
         catch (...) {
             spdlog::error("TCPIP: Exception occurred handleClientMeasurement");
@@ -875,10 +707,10 @@ tcpipClientObj::CommandHandler(std::string& strCommand)
     //                                What?
     //*********************************************************************
     else {
-        write(MSG_UNKNOWN_COMMAND, strlen(MSG_UNKNOWN_COMMAND));
+        write(conn, MSG_UNKNOWN_COMMAND, strlen(MSG_UNKNOWN_COMMAND));
     }
 
-    m_pClientItem->m_lastCommand = m_pClientItem->m_currentCommand;
+    pClientItem->setLastCommand(pClientItem->getCurrentCommand());
     return VSCP_TCPIP_RV_OK;
 
 } // clientcommand
@@ -901,7 +733,7 @@ tcpipClientObj::CommandHandler(std::string& strCommand)
 //
 
 void
-tcpipClientObj::handleClientMeasurement(void)
+CTcpipSrv::handleClientMeasurement(struct mg_connection* conn)
 {
     std::string str;
     double value = 0;
@@ -917,29 +749,43 @@ tcpipClientObj::handleClientMeasurement(void)
     uint8_t data[VSCP_MAX_DATA];
     uint16_t sizeData;
 
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
+        return;
+    }
+
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return;
+    }
+
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
     // Check object pointer
-    if (NULL == m_pObj) {
-        write(MSG_INTERNAL_MEMORY_ERROR, strlen(MSG_INTERNAL_MEMORY_ERROR));
+    if (NULL == m_pCtrlObj) {
+        write(conn,
+              MSG_INTERNAL_MEMORY_ERROR,
+              strlen(MSG_INTERNAL_MEMORY_ERROR));
         return;
     }
 
     // Must be connected
-    if (STCP_CONN_STATE_CONNECTED != m_conn->conn_state)
-        return;
-
-    if (NULL == m_pClientItem) {
-        write(MSG_INTERNAL_MEMORY_ERROR, strlen(MSG_INTERNAL_MEMORY_ERROR));
+    if (!pClientItem->isConnected()) {
+        spdlog::error("Client is not connected, cannot handle measurement.");
         return;
     }
 
     std::deque<std::string> tokens;
-    vscp_split(tokens, m_pClientItem->m_currentCommand, ",");
+    vscp_split(tokens, pClientItem->getCurrentCommand(), ",");
 
     // * * * event format * * *
 
     // Get event format (float | string | 0 | 1 - float=0, string=1.)
     if (tokens.empty()) {
-        write(MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
         return;
     }
 
@@ -964,14 +810,14 @@ tcpipClientObj::handleClientMeasurement(void)
         eventFormat = 0;
     }
     else {
-        write(MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
         return;
     }
 
     // * * * Level * * *
 
     if (tokens.empty()) {
-        write(MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
         return;
     }
 
@@ -994,13 +840,13 @@ tcpipClientObj::handleClientMeasurement(void)
         level = VSCP_LEVEL2;
     }
     else {
-        write(MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
         return;
     }
 
     // * * * vscp-measurement-type * * *
     if (tokens.empty()) {
-        write(MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
         return;
     }
 
@@ -1010,7 +856,7 @@ tcpipClientObj::handleClientMeasurement(void)
 
     // * * * value * * *
     if (tokens.empty()) {
-        write(MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
         return;
     }
 
@@ -1123,7 +969,8 @@ tcpipClientObj::handleClientMeasurement(void)
 
                 vscpEvent* pEvent = new vscpEvent;
                 if (NULL == pEvent) {
-                    write(MSG_INTERNAL_MEMORY_ERROR,
+                    write(conn,
+                          MSG_INTERNAL_MEMORY_ERROR,
                           strlen(MSG_INTERNAL_MEMORY_ERROR));
                     return;
                 }
@@ -1142,17 +989,18 @@ tcpipClientObj::handleClientMeasurement(void)
                 pEvent->vscp_type  = vscptype;
 
                 // send the event
-                if (!m_pObj->sendEvent(m_pClientItem, pEvent)) {
-                    vscp_deleteEvent_v2(&pEvent);
-                    write(MSG_UNABLE_TO_SEND_EVENT,
-                          strlen(MSG_UNABLE_TO_SEND_EVENT));
-                    return;
-                }
+                // if (!m_pCtrlObj->sendEvent(pClientItem, pEvent)) {
+                //     vscp_deleteEvent_v2(&pEvent);
+                //     write(conn,
+                //           MSG_UNABLE_TO_SEND_EVENT,
+                //           strlen(MSG_UNABLE_TO_SEND_EVENT));
+                //     return;
+                // }
 
                 vscp_deleteEvent_v2(&pEvent);
             }
             else {
-                write(MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+                write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
             }
         }
         else {
@@ -1161,7 +1009,8 @@ tcpipClientObj::handleClientMeasurement(void)
 
             vscpEvent* pEvent = new vscpEvent;
             if (NULL == pEvent) {
-                write(MSG_INTERNAL_MEMORY_ERROR,
+                write(conn,
+                      MSG_INTERNAL_MEMORY_ERROR,
                       strlen(MSG_INTERNAL_MEMORY_ERROR));
                 return;
             }
@@ -1172,7 +1021,7 @@ tcpipClientObj::handleClientMeasurement(void)
                                                  value,
                                                  unit,
                                                  sensoridx)) {
-                write(MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+                write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
             }
 
             // TODO have to send also
@@ -1186,7 +1035,8 @@ tcpipClientObj::handleClientMeasurement(void)
 
             vscpEvent* pEvent = new vscpEvent;
             if (NULL == pEvent) {
-                write(MSG_INTERNAL_MEMORY_ERROR,
+                write(conn,
+                      MSG_INTERNAL_MEMORY_ERROR,
                       strlen(MSG_INTERNAL_MEMORY_ERROR));
                 return;
             }
@@ -1215,7 +1065,8 @@ tcpipClientObj::handleClientMeasurement(void)
             // Copy in data
             pEvent->pdata = new uint8_t[4 + 8];
             if (NULL == pEvent->pdata) {
-                write(MSG_INTERNAL_MEMORY_ERROR,
+                write(conn,
+                      MSG_INTERNAL_MEMORY_ERROR,
                       strlen(MSG_INTERNAL_MEMORY_ERROR));
                 delete pEvent;
                 return;
@@ -1224,12 +1075,13 @@ tcpipClientObj::handleClientMeasurement(void)
             memcpy(pEvent->pdata, data, 4 + 8);
 
             // send the event
-            if (!m_pObj->sendEvent(m_pClientItem, pEvent)) {
-                vscp_deleteEvent_v2(&pEvent);
-                write(MSG_UNABLE_TO_SEND_EVENT,
-                      strlen(MSG_UNABLE_TO_SEND_EVENT));
-                return;
-            }
+            // if (!m_pCtrlObj->sendEvent(pClientItem, pEvent)) {
+            //     vscp_deleteEvent_v2(&pEvent);
+            //     write(conn,
+            //           MSG_UNABLE_TO_SEND_EVENT,
+            //           strlen(MSG_UNABLE_TO_SEND_EVENT));
+            //     return;
+            // }
 
             vscp_deleteEvent_v2(&pEvent);
         }
@@ -1259,7 +1111,8 @@ tcpipClientObj::handleClientMeasurement(void)
 
             pEvent->pdata = new uint8_t[4 + strValue.length()];
             if (NULL == pEvent->pdata) {
-                write(MSG_INTERNAL_MEMORY_ERROR,
+                write(conn,
+                      MSG_INTERNAL_MEMORY_ERROR,
                       strlen(MSG_INTERNAL_MEMORY_ERROR));
                 delete pEvent;
                 return;
@@ -1269,18 +1122,19 @@ tcpipClientObj::handleClientMeasurement(void)
                    strValue.length()); // copy in double
 
             // send the event
-            if (!m_pObj->sendEvent(m_pClientItem, pEvent)) {
-                vscp_deleteEvent_v2(&pEvent);
-                write(MSG_UNABLE_TO_SEND_EVENT,
-                      strlen(MSG_UNABLE_TO_SEND_EVENT));
-                return;
-            }
+            // if (!m_pCtrlObj->sendEvent(pClientItem, pEvent)) {
+            //     vscp_deleteEvent_v2(&pEvent);
+            //     write(conn,
+            //           MSG_UNABLE_TO_SEND_EVENT,
+            //           strlen(MSG_UNABLE_TO_SEND_EVENT));
+            //     return;
+            // }
 
             vscp_deleteEvent_v2(&pEvent);
         }
     }
 
-    write(MSG_OK, strlen(MSG_OK));
+    write(conn, MSG_OK, strlen(MSG_OK));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1288,12 +1142,27 @@ tcpipClientObj::handleClientMeasurement(void)
 //
 
 void
-tcpipClientObj::handleClientCapabilityRequest(void)
+CTcpipSrv::handleClientCapabilityRequest(struct mg_connection* conn)
 {
     std::string str;
     uint8_t capabilities[8];
 
-    m_pObj->getVscpCapabilities(capabilities);
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
+        return;
+    }
+
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return;
+    }
+
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
+    m_pCtrlObj->getVscpCapabilities(capabilities);
     str = vscp_str_format("%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X\r\n",
                           capabilities[7],
                           capabilities[6],
@@ -1303,8 +1172,8 @@ tcpipClientObj::handleClientCapabilityRequest(void)
                           capabilities[2],
                           capabilities[1],
                           capabilities[0]);
-    write(str.c_str(), str.length());
-    write(MSG_OK, strlen(MSG_OK));
+    write(conn, str.c_str(), str.length());
+    write(conn, MSG_OK, strlen(MSG_OK));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1312,20 +1181,31 @@ tcpipClientObj::handleClientCapabilityRequest(void)
 //
 
 bool
-tcpipClientObj::isVerified(void)
+CTcpipSrv::isVerified(struct mg_connection* conn)
 {
-    // Check object
-    if (NULL == m_pObj) {
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
         return false;
     }
 
     // Must be connected
-    if (STCP_CONN_STATE_CONNECTED != m_conn->conn_state)
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+    if (NULL == pClientItem) {
+        spdlog::error("isVerified: Client item not found for connection id: {}",
+                      conn->id);
         return false;
+    }
+
+    // Must be connected
+    if (!pClientItem->isConnected()) {
+        spdlog::error("Client is not connected, cannot verify.");
+        return false;
+    }
 
     // Must be accredited to do this
-    if (!m_pClientItem->bAuthenticated) {
-        write(MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
+    if (! pClientItem->getUserItem()->isAuthenticated()) {
+        write(conn, MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
         return false;
     }
 
@@ -1333,36 +1213,49 @@ tcpipClientObj::isVerified(void)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// checkPrivilege
+// isUserAllowedToSendEvent
 //
 
 bool
-tcpipClientObj::checkPrivilege(unsigned long reqiredPrivilege)
+CTcpipSrv::isUserAllowedToSendEvent(struct mg_connection* conn,
+                          unsigned long reqiredPrivilege)
 {
-    // Check objects
-    if (NULL == m_pObj) {
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
         return false;
     }
 
-    // Must be connected
-    if (STCP_CONN_STATE_CONNECTED != m_conn->conn_state)
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
         return false;
+    }
+
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
+    // Must be connected
+    if (!pClientItem->isConnected()) {
+        spdlog::error("Client is not connected, cannot check privilege.");
+        return false;
+    }
 
     // Must be authenticated
-    if (!m_pClientItem->bAuthenticated) {
-        write(MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
+    if (! pClientItem->getUserItem()->isAuthenticated()) {
+        write(conn, MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
         return false;
     }
 
     // Must be accredited
-    if (NULL == m_pClientItem->m_pUserItem) {
-        write(MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
+    if (NULL == pClientItem->m_pUserItem) {
+        write(conn, MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
         return false;
     }
 
     // Check the privileges
-    if (!(m_pClientItem->m_pUserItem->getUserRights() & reqiredPrivilege)) {
-        write(MSG_NO_RIGHTS_ERROR, strlen(MSG_NO_RIGHTS_ERROR));
+    if (!(pClientItem->m_pUserItem->getUserRights() & reqiredPrivilege)) {
+        write(conn, MSG_NO_RIGHTS_ERROR, strlen(MSG_NO_RIGHTS_ERROR));
         return false;
     }
 
@@ -1374,36 +1267,48 @@ tcpipClientObj::checkPrivilege(unsigned long reqiredPrivilege)
 //
 
 void
-tcpipClientObj::handleClientSend(void)
+CTcpipSrv::handleClientSend(struct mg_connection* conn)
 {
     vscpEvent event;
 
-    // Must be connected
-    if (STCP_CONN_STATE_CONNECTED != m_conn->conn_state)
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
         return;
+    }
+
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return;
+    }
+
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
+    // Must be connected
+    if (!pClientItem->isConnected()) {
+        spdlog::error("Client is not connected, cannot handle client send.");
+        return;
+    }
 
     // Set timestamp block for event
     vscp_setEventDateTimeBlockToNow(&event); // TODO - change to UTC
 
-    if (NULL == m_pObj) {
-        write(MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
-        return;
-    }
-
-    if (NULL == m_pClientItem) {
-        write(MSG_INTERNAL_ERROR, strlen(MSG_INTERNAL_ERROR));
+    if (NULL == m_pCtrlObj) {
+        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
         return;
     }
 
     // Must be accredited to do this
-    if (!m_pClientItem->bAuthenticated) {
-        write(MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
+    if (! pClientItem->getUserItem()->isAuthenticated()) {
+        write(conn, MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
         return;
     }
 
     std::string str;
     std::deque<std::string> tokens;
-    vscp_split(tokens, m_pClientItem->m_currentCommand, ",");
+    vscp_split(tokens, pClientItem->getCurrentCommand(), ",");
 
     // If first character is $ user request us to send content from
     // a variable
@@ -1416,7 +1321,7 @@ tcpipClientObj::handleClientSend(void)
         event.head = vscp_readStringValue(str);
     }
     else {
-        write(MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
         return;
     }
 
@@ -1427,7 +1332,7 @@ tcpipClientObj::handleClientSend(void)
         event.vscp_class = vscp_readStringValue(str);
     }
     else {
-        write(MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
         return;
     }
 
@@ -1438,7 +1343,7 @@ tcpipClientObj::handleClientSend(void)
         event.vscp_type = vscp_readStringValue(str);
     }
     else {
-        write(MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
         return;
     }
 
@@ -1449,7 +1354,7 @@ tcpipClientObj::handleClientSend(void)
         event.obid = vscp_readStringValue(str);
     }
     else {
-        write(MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
         return;
     }
 
@@ -1478,7 +1383,7 @@ tcpipClientObj::handleClientSend(void)
         }
     }
     else {
-        write(MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
         return;
     }
 
@@ -1495,7 +1400,7 @@ tcpipClientObj::handleClientSend(void)
         }
     }
     else {
-        write(MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
         return;
     }
 
@@ -1509,7 +1414,7 @@ tcpipClientObj::handleClientSend(void)
         // Check if i/f GUID should be used
         if ('-' == strGUID[0]) {
             // Copy in the i/f GUID
-            m_pClientItem->m_guid.writeGUID(event.GUID);
+            pClientItem->m_guid.writeGUID(event.GUID);
         }
         else {
             vscp_setEventGuidFromString(&event, strGUID);
@@ -1517,18 +1422,18 @@ tcpipClientObj::handleClientSend(void)
             // Check if i/f GUID should be used
             if (true == vscp_isGUIDEmpty(event.GUID)) {
                 // Copy in the i/f GUID
-                m_pClientItem->m_guid.writeGUID(event.GUID);
+                pClientItem->m_guid.writeGUID(event.GUID);
             }
         }
     }
     else {
-        write(MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
         return;
     }
 
     // Handle data
     if (VSCP_MAX_DATA < tokens.size()) {
-        write(MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
         return;
     }
 
@@ -1541,7 +1446,9 @@ tcpipClientObj::handleClientSend(void)
         event.pdata = new uint8_t[event.sizeData];
 
         if (NULL == event.pdata) {
-            write(MSG_INTERNAL_MEMORY_ERROR, strlen(MSG_INTERNAL_MEMORY_ERROR));
+            write(conn,
+                  MSG_INTERNAL_MEMORY_ERROR,
+                  strlen(MSG_INTERNAL_MEMORY_ERROR));
             return;
         }
 
@@ -1552,7 +1459,7 @@ tcpipClientObj::handleClientSend(void)
         }
 
         if (!tokens.empty()) {
-            write(MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+            write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
 
             delete[] event.pdata;
             event.pdata = NULL;
@@ -1566,18 +1473,19 @@ tcpipClientObj::handleClientSend(void)
 
     // Check if we are allowed to send CLASS1.PROTOCOL events
     if ((VSCP_CLASS1_PROTOCOL == event.vscp_class) &&
-        !checkPrivilege(VSCP_USER_RIGHT_ALLOW_SEND_L1CTRL_EVENT)) {
+        !pClientItem->getUserItem()->isUserAllowedToSendEvent(VSCP_USER_RIGHT_ALLOW_SEND_L1CTRL_EVENT)) {
 
         std::string strErr = vscp_str_format(
           ("[TCP/IP srv] User [%s] not allowed to send event class=%d "
            "type=%d.\n"),
-          (const char*)m_pClientItem->m_pUserItem->getUserName().c_str(),
+          (const char*)pClientItem->getUserItem()->getUserName().c_str(),
           event.vscp_class,
           event.vscp_type);
 
         spdlog::error("%s", strErr.c_str());
 
-        write(MSG_MOT_ALLOWED_TO_SEND_EVENT,
+        write(conn,
+              MSG_MOT_ALLOWED_TO_SEND_EVENT,
               strlen(MSG_MOT_ALLOWED_TO_SEND_EVENT));
 
         if (NULL != event.pdata) {
@@ -1590,18 +1498,19 @@ tcpipClientObj::handleClientSend(void)
 
     // Check if we are allowed top send CLASS1.PROTOCOL events
     if ((VSCP_CLASS1_PROTOCOL == event.vscp_class) &&
-        !checkPrivilege(VSCP_CLASS2_LEVEL1_PROTOCOL)) {
+        !pClientItem->getUserItem()->isUserAllowedToSendEvent(VSCP_CLASS2_LEVEL1_PROTOCOL)) {
 
         std::string strErr = vscp_str_format(
           ("[TCP/IP srv] User [%s] not allowed to send event class=%d "
            "type=%d.\n"),
-          (const char*)m_pClientItem->m_pUserItem->getUserName().c_str(),
+          (const char*)pClientItem->getUserItem()->getUserName().c_str(),
           event.vscp_class,
           event.vscp_type);
 
         spdlog::error("%s", strErr.c_str());
 
-        write(MSG_MOT_ALLOWED_TO_SEND_EVENT,
+        write(conn,
+              MSG_MOT_ALLOWED_TO_SEND_EVENT,
               strlen(MSG_MOT_ALLOWED_TO_SEND_EVENT));
 
         if (NULL != event.pdata) {
@@ -1614,18 +1523,19 @@ tcpipClientObj::handleClientSend(void)
 
     // Check if we are allowed top send CLASS2.PROTOCOL events
     if ((VSCP_CLASS2_PROTOCOL == event.vscp_class) &&
-        !checkPrivilege(VSCP_USER_RIGHT_ALLOW_SEND_L2CTRL_EVENT)) {
+        !pClientItem->getUserItem()->isUserAllowedToSendEvent(VSCP_USER_RIGHT_ALLOW_SEND_L2CTRL_EVENT)) {
 
         std::string strErr = vscp_str_format(
           ("[TCP/IP srv] User [%s] not allowed to send event class=%d "
            "type=%d.\n"),
-          (const char*)m_pClientItem->m_pUserItem->getUserName().c_str(),
+          (const char*)pClientItem->getUserItem()->getUserName().c_str(),
           event.vscp_class,
           event.vscp_type);
 
         spdlog::error("%s", strErr.c_str());
 
-        write(MSG_MOT_ALLOWED_TO_SEND_EVENT,
+        write(conn,
+              MSG_MOT_ALLOWED_TO_SEND_EVENT,
               strlen(MSG_MOT_ALLOWED_TO_SEND_EVENT));
 
         if (NULL != event.pdata) {
@@ -1638,18 +1548,19 @@ tcpipClientObj::handleClientSend(void)
 
     // Check if we are allowed top send CLASS2.HLO events
     if ((VSCP_CLASS2_HLO == event.vscp_class) &&
-        !checkPrivilege(VSCP_USER_RIGHT_ALLOW_SEND_HLO_EVENT)) {
+        !pClientItem->getUserItem()->isUserAllowedToSendEvent(VSCP_CLASS2_HLO, 0)) {
 
         std::string strErr = vscp_str_format(
           ("[TCP/IP srv] User [%s] not allowed to send event class=%d "
            "type=%d.\n"),
-          (const char*)m_pClientItem->m_pUserItem->getUserName().c_str(),
+          (const char*)pClientItem->getUserItem()->getUserName().c_str(),
           event.vscp_class,
           event.vscp_type);
 
         spdlog::error("%s", strErr.c_str());
 
-        write(MSG_MOT_ALLOWED_TO_SEND_EVENT,
+        write(conn,
+              MSG_MOT_ALLOWED_TO_SEND_EVENT,
               strlen(MSG_MOT_ALLOWED_TO_SEND_EVENT));
 
         if (NULL != event.pdata) {
@@ -1661,20 +1572,20 @@ tcpipClientObj::handleClientSend(void)
     }
 
     // Check if this user is allowed to send this event
-    if (!m_pClientItem->m_pUserItem->isUserAllowedToSendEvent(
-          event.vscp_class,
-          event.vscp_type)) {
+    if (!pClientItem->getUserItem()->isUserAllowedToSendEvent(event.vscp_class,
+                                                            event.vscp_type)) {
 
         std::string strErr = vscp_str_format(
           ("[TCP/IP srv] User [%s] not allowed to send event class=%d "
            "type=%d.\n"),
-          (const char*)m_pClientItem->m_pUserItem->getUserName().c_str(),
+          (const char*)pClientItem->getUserItem()->getUserName().c_str(),
           event.vscp_class,
           event.vscp_type);
 
         spdlog::error("%s", strErr.c_str());
 
-        write(MSG_MOT_ALLOWED_TO_SEND_EVENT,
+        write(conn,
+              MSG_MOT_ALLOWED_TO_SEND_EVENT,
               strlen(MSG_MOT_ALLOWED_TO_SEND_EVENT));
 
         if (NULL != event.pdata) {
@@ -1686,14 +1597,14 @@ tcpipClientObj::handleClientSend(void)
     }
 
     // send event
-    if (!m_pObj->sendEvent(m_pClientItem, &event)) {
-        vscp_deleteEvent(&event); // Deallocate data
-        write(MSG_BUFFER_FULL, strlen(MSG_BUFFER_FULL));
-        return;
-    }
+    // if (!m_pCtrlObj->sendEvent(pClientItem, &event)) {
+    //     vscp_deleteEvent(&event); // Deallocate data
+    //     write(conn, MSG_BUFFER_FULL, strlen(MSG_BUFFER_FULL));
+    //     return;
+    // }
     vscp_deleteEvent(&event); // Deallocate data
 
-    write(MSG_OK, strlen(MSG_OK));
+    write(conn, MSG_OK, strlen(MSG_OK));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1701,22 +1612,39 @@ tcpipClientObj::handleClientSend(void)
 //
 
 void
-tcpipClientObj::handleClientReceive(void)
+CTcpipSrv::handleClientReceive(struct mg_connection* conn)
 {
     unsigned short cnt = 0; // # of messages to read
 
-    // Must be connected
-    if (STCP_CONN_STATE_CONNECTED != m_conn->conn_state)
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
         return;
+    }
+
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return;
+    }
+
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
+    // Must be connected
+    if (!pClientItem->isConnected()) {
+        spdlog::error("Client is not connected, cannot handle client receive.");
+        return;
+    }
 
     // Must be accredited to do this
-    if (!m_pClientItem->bAuthenticated) {
-        write(MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
+    if (! pClientItem->getUserItem()->isAuthenticated()) {
+        write(conn, MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
         return;
     }
 
     std::string str;
-    cnt = vscp_readStringValue(m_pClientItem->m_currentCommand);
+    cnt = vscp_readStringValue(pClientItem->getCurrentCommand());
 
     if (!cnt) {
         cnt = 1; // No arg is "read one"
@@ -1727,12 +1655,12 @@ tcpipClientObj::handleClientReceive(void)
 
         std::string strOut;
 
-        if (!m_pClientItem->m_bOpen) {
-            write(MSG_NO_MSG, strlen(MSG_NO_MSG));
+        if (!pClientItem->isOpen()) {
+            write(conn, MSG_NO_MSG, strlen(MSG_NO_MSG));
             return;
         }
         else {
-            if (false == sendOneEventFromQueue()) {
+            if (false == sendOneEventFromQueue(conn)) {
                 return;
             }
         }
@@ -1741,7 +1669,7 @@ tcpipClientObj::handleClientReceive(void)
 
     } // while
 
-    write(MSG_OK, strlen(MSG_OK));
+    write(conn, MSG_OK, strlen(MSG_OK));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1749,33 +1677,51 @@ tcpipClientObj::handleClientReceive(void)
 //
 
 bool
-tcpipClientObj::sendOneEventFromQueue(bool bStatusMsg)
+CTcpipSrv::sendOneEventFromQueue(struct mg_connection* conn, bool bStatusMsg)
 {
     std::string strOut;
 
-    // Must be connected
-    if (STCP_CONN_STATE_CONNECTED != m_conn->conn_state)
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
         return false;
+    }
 
-    if (m_pClientItem->m_clientInputQueue.size()) {
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return false;
+    }
 
-        vscpEvent* pqueueEvent;
-        pthread_mutex_lock(&m_pClientItem->m_mutexClientInputQueue);
-        {
-            pqueueEvent = m_pClientItem->m_clientInputQueue.front();
-            m_pClientItem->m_clientInputQueue.pop_front();
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
+    // Must be connected
+    if (!pClientItem->isConnected()) {
+        spdlog::error(
+          "Client is not connected, cannot send one event from queue.");
+        return false;
+    }
+
+    if (pClientItem->getClientInputQueueSize() > 0) {
+
+        // Get event
+        vscpEvent* pev = pClientItem->getEventFromClientInputQueue(true);
+        if (nullptr == pev) {
+            spdlog::error("sendOneEventFromQueue: Failed to get event from "
+                          "client input queue.");
+            return false;
         }
-        pthread_mutex_unlock(&m_pClientItem->m_mutexClientInputQueue);
 
-        vscp_convertEventToString(strOut, pqueueEvent);
+        vscp_convertEventToString(strOut, pev);
         strOut += ("\r\n");
-        write(strOut.c_str(), strlen(strOut.c_str()));
+        write(conn, strOut.c_str(), strlen(strOut.c_str()));
 
-        vscp_deleteEvent_v2(&pqueueEvent);
+        vscp_deleteEvent_v2(&pev);
     }
     else {
         if (bStatusMsg) {
-            write(MSG_NO_MSG, strlen(MSG_NO_MSG));
+            write(conn, MSG_NO_MSG, strlen(MSG_NO_MSG));
         }
 
         return false;
@@ -1789,25 +1735,45 @@ tcpipClientObj::sendOneEventFromQueue(bool bStatusMsg)
 //
 
 void
-tcpipClientObj::handleClientDataAvailable(void)
+CTcpipSrv::handleClientDataAvailable(struct mg_connection* conn)
 {
     char outbuf[1024];
 
-    // Must be connected
-    if (STCP_CONN_STATE_CONNECTED != m_conn->conn_state)
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
         return;
+    }
+
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return;
+    }
+
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
+    // Must be connected
+    if (!pClientItem->isConnected()) {
+        spdlog::error(
+          "Client is not connected, cannot handle client data available.");
+        return;
+    }
 
     // Must be accredited to do this
-    if (!m_pClientItem->bAuthenticated) {
-        write(MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
+    if (! pClientItem->getUserItem()->isAuthenticated()) {
+        spdlog::debug(
+          "handleClientDataAvailable: Client is not authenticated.");
+        write(conn, MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
         return;
     }
 
     sprintf(outbuf,
             "%zd\r\n%s",
-            m_pClientItem->m_clientInputQueue.size(),
+            pClientItem->getClientInputQueueSize(),
             MSG_OK);
-    write(outbuf, strlen(outbuf));
+    write(conn, outbuf, strlen(outbuf));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1815,30 +1781,42 @@ tcpipClientObj::handleClientDataAvailable(void)
 //
 
 void
-tcpipClientObj::handleClientClearInputQueue(void)
+CTcpipSrv::handleClientClearInputQueue(struct mg_connection* conn)
 {
     // Must be connected
-    if (STCP_CONN_STATE_CONNECTED != m_conn->conn_state)
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
         return;
+    }
+
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return;
+    }
+
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
+    // Must be connected
+    if (!pClientItem->isConnected()) {
+        spdlog::error(
+          "Client is not connected, cannot handle client clear input queue.");
+        return;
+    }
 
     // Must be accredited to do this
-    if (!m_pClientItem->bAuthenticated) {
-        write(MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
+    if (! pClientItem->getUserItem()->isAuthenticated()) {
+        spdlog::debug(
+          "handleClientClearInputQueue: Client is not authenticated.");
+        write(conn, MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
         return;
     }
 
-    pthread_mutex_lock(&m_pClientItem->m_mutexClientInputQueue);
-    std::deque<vscpEvent*>::iterator iter;
-    for (iter = m_pClientItem->m_clientInputQueue.begin();
-         iter != m_pClientItem->m_clientInputQueue.end();
-         ++iter) {
-        vscpEvent* pEvent = *iter;
-        vscp_deleteEvent_v2(&pEvent);
-    }
-    m_pClientItem->m_clientInputQueue.clear();
-    pthread_mutex_unlock(&m_pClientItem->m_mutexClientInputQueue);
+    pClientItem->clearClientInputQueue();
 
-    write(MSG_QUEUE_CLEARED, strlen(MSG_QUEUE_CLEARED));
+    write(conn, MSG_QUEUE_CLEARED, strlen(MSG_QUEUE_CLEARED));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1846,32 +1824,52 @@ tcpipClientObj::handleClientClearInputQueue(void)
 //
 
 void
-tcpipClientObj::handleClientGetStatistics(void)
+CTcpipSrv::handleClientGetStatistics(struct mg_connection* conn)
 {
     char outbuf[1024];
 
-    // Must be connected
-    if (STCP_CONN_STATE_CONNECTED != m_conn->conn_state)
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
         return;
+    }
+
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return;
+    }
+
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
+    // Must be connected
+    if (!pClientItem->isConnected()) {
+        spdlog::error(
+          "Client is not connected, cannot handle client get statistics.");
+        return;
+    }
 
     // Must be accredited to do this
-    if (!m_pClientItem->bAuthenticated) {
-        write(MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
+    if (! pClientItem->getUserItem()->isAuthenticated()) {
+        spdlog::debug(
+          "handleClientGetStatistics: Client is not authenticated.");
+        write(conn, MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
         return;
     }
 
     sprintf(outbuf,
             "%lu,%lu,%lu,%lu,%lu,%lu,%lu\r\n%s",
-            m_pClientItem->m_statistics.cntBusOff,
-            m_pClientItem->m_statistics.cntBusWarnings,
-            m_pClientItem->m_statistics.cntOverruns,
-            m_pClientItem->m_statistics.cntReceiveData,
-            m_pClientItem->m_statistics.cntReceiveFrames,
-            m_pClientItem->m_statistics.cntTransmitData,
-            m_pClientItem->m_statistics.cntTransmitFrames,
+            pClientItem->getStatistics().cntBusOff,
+            pClientItem->getStatistics().cntBusWarnings,
+            pClientItem->getStatistics().cntOverruns,
+            pClientItem->getStatistics().cntReceiveData,
+            pClientItem->getStatistics().cntReceiveFrames,
+            pClientItem->getStatistics().cntTransmitData,
+            pClientItem->getStatistics().cntTransmitFrames,
             MSG_OK);
 
-    write(outbuf, strlen(outbuf));
+    write(conn, outbuf, strlen(outbuf));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1879,29 +1877,48 @@ tcpipClientObj::handleClientGetStatistics(void)
 //
 
 void
-tcpipClientObj::handleClientGetStatus(void)
+CTcpipSrv::handleClientGetStatus(struct mg_connection* conn)
 {
     char outbuf[1024];
 
-    // Must be connected
-    if (STCP_CONN_STATE_CONNECTED != m_conn->conn_state)
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
         return;
+    }
+
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return;
+    }
+
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
+    // Must be connected
+    if (!pClientItem->isConnected()) {
+        spdlog::error(
+          "Client is not connected, cannot handle client get status.");
+        return;
+    }
 
     // Must be accredited to do this
-    if (!m_pClientItem->bAuthenticated) {
-        write(MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
+    if (! pClientItem->getUserItem()->isAuthenticated()) {
+        spdlog::debug("handleClientGetStatus: Client is not authenticated.");
+        write(conn, MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
         return;
     }
 
     sprintf(outbuf,
             "%lu,%lu,%lu,\"%s\"\r\n%s",
-            m_pClientItem->m_status.channel_status,
-            m_pClientItem->m_status.lasterrorcode,
-            m_pClientItem->m_status.lasterrorsubcode,
-            m_pClientItem->m_status.lasterrorstr,
+            pClientItem->getStatus().channel_status,
+            pClientItem->getStatus().lasterrorcode,
+            pClientItem->getStatus().lasterrorsubcode,
+            pClientItem->getStatus().lasterrorstr,
             MSG_OK);
 
-    write(outbuf, strlen(outbuf));
+    write(conn, outbuf, strlen(outbuf));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1909,26 +1926,45 @@ tcpipClientObj::handleClientGetStatus(void)
 //
 
 void
-tcpipClientObj::handleClientGetChannelID(void)
+CTcpipSrv::handleClientGetChannelID(struct mg_connection* conn)
 {
     char outbuf[1024];
 
-    // Must be connected
-    if (STCP_CONN_STATE_CONNECTED != m_conn->conn_state)
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
         return;
+    }
+
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return;
+    }
+
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
+    // Must be connected
+    if (!pClientItem->isConnected()) {
+        spdlog::error(
+          "Client is not connected, cannot handle client get channel ID.");
+        return;
+    }
 
     // Must be accredited to do this
-    if (!m_pClientItem->bAuthenticated) {
-        write(MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
+    if (! pClientItem->getUserItem()->isAuthenticated()) {
+        spdlog::debug("handleClientGetChannelID: Client is not authenticated.");
+        write(conn, MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
         return;
     }
 
     sprintf(outbuf,
             "%lu\r\n%s",
-            (unsigned long)m_pClientItem->m_clientID,
+            (unsigned long)pClientItem->getClientID(),
             MSG_OK);
 
-    write(outbuf, strlen(outbuf));
+    write(conn, outbuf, strlen(outbuf));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1936,22 +1972,42 @@ tcpipClientObj::handleClientGetChannelID(void)
 //
 
 void
-tcpipClientObj::handleClientSetChannelGUID(void)
+CTcpipSrv::handleClientSetChannelGUID(struct mg_connection* conn)
 {
-    // Must be connected
-    if (STCP_CONN_STATE_CONNECTED != m_conn->conn_state)
-        return;
-
-    // Must be accredited to do this
-    if (!m_pClientItem->bAuthenticated) {
-        write(MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
         return;
     }
 
-    vscp_trim(m_pClientItem->m_currentCommand);
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return;
+    }
 
-    m_pClientItem->m_guid.getFromString(m_pClientItem->m_currentCommand);
-    write(MSG_OK, strlen(MSG_OK));
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
+    // Must be connected
+    if (!pClientItem->isConnected()) {
+        spdlog::error(
+          "Client is not connected, cannot handle client set channel GUID.");
+        return;
+    }
+
+    // Must be accredited to do this
+    if (! pClientItem->getUserItem()->isAuthenticated()) {
+        spdlog::error(
+          "handleClientSetChannelGUID: Client is not authenticated.");
+        write(conn, MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
+        return;
+    }
+
+    vscp_trim(pClientItem->getCurrentCommand());
+
+    pClientItem->getInterfaceGUID().getFromString(pClientItem->getCurrentCommand());
+    write(conn, MSG_OK, strlen(MSG_OK));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1959,25 +2015,45 @@ tcpipClientObj::handleClientSetChannelGUID(void)
 //
 
 void
-tcpipClientObj::handleClientGetChannelGUID(void)
+CTcpipSrv::handleClientGetChannelGUID(struct mg_connection* conn)
 {
     std::string strBuf;
 
-    // Must be connected
-    if (STCP_CONN_STATE_CONNECTED != m_conn->conn_state)
-        return;
-
-    // Must be accredited to do this
-    if (!m_pClientItem->bAuthenticated) {
-        write(MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
         return;
     }
 
-    m_pClientItem->m_guid.toString(strBuf);
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return;
+    }
+
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
+    // Must be connected
+    if (!pClientItem->isConnected()) {
+        spdlog::error(
+          "Client is not connected, cannot handle client get channel GUID.");
+        return;
+    }
+
+    // Must be accredited to do this
+    if (! pClientItem->getUserItem()->isAuthenticated()) {
+        spdlog::error(
+          "handleClientGetChannelGUID: Client is not authenticated.");
+        write(conn, MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
+        return;
+    }
+
+    pClientItem->getInterfaceGUID().toString(strBuf);
     strBuf += std::string("\r\n");
     strBuf += std::string(MSG_OK);
 
-    write(strBuf);
+    write(conn, strBuf);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1985,13 +2061,31 @@ tcpipClientObj::handleClientGetChannelGUID(void)
 //
 
 void
-tcpipClientObj::handleClientGetVersion(void)
+CTcpipSrv::handleClientGetVersion(struct mg_connection* conn)
 {
     char outbuf[1024];
 
-    // Must be connected
-    if (STCP_CONN_STATE_CONNECTED != m_conn->conn_state)
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
         return;
+    }
+
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return;
+    }
+
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
+    // Must be connected
+    if (!pClientItem->isConnected()) {
+        spdlog::error(
+          "Client is not connected, cannot handle client get version.");
+        return;
+    }
 
     sprintf(outbuf,
             "%d,%d,%d\r\n%s",
@@ -2000,7 +2094,7 @@ tcpipClientObj::handleClientGetVersion(void)
             VSCPD_VERSION_PATCH,
             MSG_OK);
 
-    write(outbuf, strlen(outbuf));
+    write(conn, outbuf, strlen(outbuf));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2008,31 +2102,52 @@ tcpipClientObj::handleClientGetVersion(void)
 //
 
 void
-tcpipClientObj::handleClientSetFilter(void)
+CTcpipSrv::handleClientSetFilter(struct mg_connection* conn)
 {
     // Must be connected
-    if (STCP_CONN_STATE_CONNECTED != m_conn->conn_state)
-        return;
-
-    // Must be accredited to do this
-    if (!m_pClientItem->bAuthenticated) {
-        write(MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
         return;
     }
 
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return;
+    }
+
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
+    // Must be connected
+    if (!pClientItem->isConnected()) {
+        spdlog::error(
+          "Client is not connected, cannot handle client set filter.");
+        return;
+    }
+
+    // Must be accredited to do this
+    if (! pClientItem->getUserItem()->isAuthenticated()) {
+        spdlog::error("handleClientSetFilter: Client is not authenticated.");
+        write(conn, MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
+        return;
+    }
+    vscp_trim(pClientItem->getCurrentCommand());
+
     std::string str;
-    vscp_trim(m_pClientItem->m_currentCommand);
+    vscp_trim(pClientItem->getCurrentCommand());
     std::deque<std::string> tokens;
-    vscp_split(tokens, m_pClientItem->m_currentCommand, ",");
+    vscp_split(tokens, pClientItem->getCurrentCommand(), ",");
 
     // Get priority
     if (!tokens.empty()) {
         str = tokens.front();
         tokens.pop_front();
-        m_pClientItem->m_filter.filter_priority = vscp_readStringValue(str);
+        pClientItem->getFilter().filter_priority = vscp_readStringValue(str);
     }
     else {
-        write(MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
         return;
     }
 
@@ -2040,10 +2155,10 @@ tcpipClientObj::handleClientSetFilter(void)
     if (!tokens.empty()) {
         str = tokens.front();
         tokens.pop_front();
-        m_pClientItem->m_filter.filter_class = vscp_readStringValue(str);
+        pClientItem->getFilter().filter_class = vscp_readStringValue(str);
     }
     else {
-        write(MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
         return;
     }
 
@@ -2051,10 +2166,10 @@ tcpipClientObj::handleClientSetFilter(void)
     if (!tokens.empty()) {
         str = tokens.front();
         tokens.pop_front();
-        m_pClientItem->m_filter.filter_type = vscp_readStringValue(str);
+        pClientItem->getFilter().filter_type = vscp_readStringValue(str);
     }
     else {
-        write(MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
         return;
     }
 
@@ -2062,14 +2177,15 @@ tcpipClientObj::handleClientSetFilter(void)
     if (!tokens.empty()) {
         str = tokens.front();
         tokens.pop_front();
-        vscp_getGuidFromStringToArray(m_pClientItem->m_filter.filter_GUID, str);
+        vscp_getGuidFromStringToArray(pClientItem->getFilter().filter_GUID,
+                                      str);
     }
     else {
-        write(MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
         return;
     }
 
-    write(MSG_OK, strlen(MSG_OK));
+    write(conn, MSG_OK, strlen(MSG_OK));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2077,31 +2193,50 @@ tcpipClientObj::handleClientSetFilter(void)
 //
 
 void
-tcpipClientObj::handleClientSetMask(void)
+CTcpipSrv::handleClientSetMask(struct mg_connection* conn)
 {
-    // Must be connected
-    if (STCP_CONN_STATE_CONNECTED != m_conn->conn_state)
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
         return;
+    }
+
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return;
+    }
+
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
+    // Must be connected
+    if (!pClientItem->isConnected()) {
+        spdlog::error(
+          "Client is not connected, cannot handle client set mask.");
+        return;
+    }
 
     // Must be accredited to do this
-    if (!m_pClientItem->bAuthenticated) {
-        write(MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
+    if (! pClientItem->getUserItem()->isAuthenticated()) {
+        spdlog::error("handleClientSetMask: Client is not authenticated.");
+        write(conn, MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
         return;
     }
 
     std::string str;
-    vscp_trim(m_pClientItem->m_currentCommand);
+    vscp_trim(pClientItem->getCurrentCommand());
     std::deque<std::string> tokens;
-    vscp_split(tokens, m_pClientItem->m_currentCommand, ",");
+    vscp_split(tokens, pClientItem->getCurrentCommand(), ",");
 
     // Get priority
     if (!tokens.empty()) {
         str = tokens.front();
         tokens.pop_front();
-        m_pClientItem->m_filter.mask_priority = vscp_readStringValue(str);
+        pClientItem->getFilter().mask_priority = vscp_readStringValue(str);
     }
     else {
-        write(MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
         return;
     }
 
@@ -2109,10 +2244,10 @@ tcpipClientObj::handleClientSetMask(void)
     if (!tokens.empty()) {
         str = tokens.front();
         tokens.pop_front();
-        m_pClientItem->m_filter.mask_class = vscp_readStringValue(str);
+        pClientItem->getFilter().mask_class = vscp_readStringValue(str);
     }
     else {
-        write(MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
         return;
     }
 
@@ -2120,10 +2255,10 @@ tcpipClientObj::handleClientSetMask(void)
     if (!tokens.empty()) {
         str = tokens.front();
         tokens.pop_front();
-        m_pClientItem->m_filter.mask_type = vscp_readStringValue(str);
+        pClientItem->getFilter().mask_type = vscp_readStringValue(str);
     }
     else {
-        write(MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
         return;
     }
 
@@ -2131,14 +2266,14 @@ tcpipClientObj::handleClientSetMask(void)
     if (!tokens.empty()) {
         str = tokens.front();
         tokens.pop_front();
-        vscp_getGuidFromStringToArray(m_pClientItem->m_filter.mask_GUID, str);
+        vscp_getGuidFromStringToArray(pClientItem->getFilter().mask_GUID, str);
     }
     else {
-        write(MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
         return;
     }
 
-    write(MSG_OK, strlen(MSG_OK));
+    write(conn, MSG_OK, strlen(MSG_OK));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2146,25 +2281,43 @@ tcpipClientObj::handleClientSetMask(void)
 //
 
 void
-tcpipClientObj::handleClientUser(void)
+CTcpipSrv::handleClientUser(struct mg_connection* conn)
 {
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
+        return;
+    }
+
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return;
+    }
+
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
     // Must be connected
-    if (STCP_CONN_STATE_CONNECTED != m_conn->conn_state)
-        return;
-
-    if (m_pClientItem->bAuthenticated) {
-        write(MSG_OK, strlen(MSG_OK));
+    if (!pClientItem->isConnected()) {
+        spdlog::error("Client is not connected, cannot handle client user.");
         return;
     }
 
-    m_pClientItem->m_UserName = m_pClientItem->m_currentCommand;
-    vscp_trim(m_pClientItem->m_UserName);
-    if (m_pClientItem->m_UserName.empty()) {
-        write(MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+    if ( pClientItem->getUserItem()->isAuthenticated()) {
+        write(conn, MSG_OK, strlen(MSG_OK));
         return;
     }
 
-    write(MSG_USENAME_OK, strlen(MSG_USENAME_OK));
+    CUserItem* pUserItem =
+      m_pCtrlObj->getUserList().getUser(pClientItem->getCurrentCommand().c_str());
+    if (NULL == pUserItem) {
+        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+        return;
+    }
+    pClientItem->setUserItem(pUserItem);
+
+    write(conn, MSG_USENAME_OK, strlen(MSG_USENAME_OK));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2172,47 +2325,67 @@ tcpipClientObj::handleClientUser(void)
 //
 
 bool
-tcpipClientObj::handleClientPassword(void)
+CTcpipSrv::handleClientPassword(struct mg_connection* conn)
 {
-    // Must be connected
-    if (STCP_CONN_STATE_CONNECTED != m_conn->conn_state)
+    // Check pointer
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
         return false;
-
-    if (m_pClientItem->bAuthenticated) {
-        write(MSG_OK, strlen(MSG_OK));
-        return true;
     }
 
-    // Must have username before password can be entered.
-    if (0 == m_pClientItem->m_UserName.length()) {
-        write(MSG_NEED_USERNAME, strlen(MSG_NEED_USERNAME));
-        return true;
+    // Must have a client item associated with the connection
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has no associated client item.");
+        return false;
     }
 
-    std::string strPassword = m_pClientItem->m_currentCommand;
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
+    // Must be connected
+    if (!pClientItem->isConnected()) {
+        spdlog::error(
+          "Client is not connected, cannot handle client password.");
+        return false;
+    }
+
+    /*!
+        When a user name is entered a useritem is set, fetched from
+        one of the users in the userlist that is filled from the 
+        configuration file on startup.
+    */
+
+    // Must must have a username before password can be entered.
+    if ((NULL != pClientItem->getUserItem()) &&
+        (0 == pClientItem->getUserItem()->getUserName().length())) {
+        write(conn, MSG_INVALID_USER, strlen(MSG_INVALID_USER));
+        return false;
+    }
+
+    std::string strPassword = pClientItem->getCurrentCommand();
     vscp_trim(strPassword);
 
+    // Must be a password
     if (strPassword.empty()) {
-        m_pClientItem->m_UserName = ("");
-        write(MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+        pClientItem->setUserItem(nullptr);
+        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
         return false;
     }
 
-    pthread_mutex_lock(&m_pObj->m_mutex_UserList);
+    // pthread_mutex_lock(&m_pCtrlObj->m_mutex_UserList);
+    // pClientItem->setUserItem(m_pCtrlObj->m_userList.validateUser(
+    //   pClientItem->getUserItem()->getUserName().c_str(),
+    //   strPassword));
+    // pthread_mutex_unlock(&m_pCtrlObj->m_mutex_UserList);
 
-    m_pClientItem->m_pUserItem =
-      m_pObj->m_userList.validateUser(m_pClientItem->m_UserName, strPassword);
-    pthread_mutex_unlock(&m_pObj->m_mutex_UserList);
-
-    if (NULL == m_pClientItem->m_pUserItem) {
+    if (!pClientItem->getUserItem()->validatePassword(strPassword)) {
 
         std::string strErr = vscp_str_format(
           ("[TCP/IP srv] User [%s][%s] not allowed to connect.\n"),
-          (const char*)m_pClientItem->m_UserName.c_str(),
+          (const char*)pClientItem->getUserItem()->getUserName().c_str(),
           (const char*)strPassword.c_str());
 
         spdlog::error("%s", strErr.c_str());
-        write(MSG_PASSWORD_ERROR, strlen(MSG_PASSWORD_ERROR));
+        write(conn, MSG_PASSWORD_ERROR, strlen(MSG_PASSWORD_ERROR));
         return false;
     }
 
@@ -2220,16 +2393,14 @@ tcpipClientObj::handleClientPassword(void)
     struct sockaddr_in cli_addr;
     socklen_t clilen = 0;
     clilen           = sizeof(cli_addr);
-    (void)getpeername(m_conn->client.sock,
-                      (struct sockaddr*)&cli_addr,
-                      &clilen);
+    (void)getpeername((int) (uintptr_t)conn->fd, (struct sockaddr*)&cli_addr, &clilen);
     std::string remoteaddr = std::string(inet_ntoa(cli_addr.sin_addr));
 
     // Check if this user is allowed to connect from this location
-    pthread_mutex_lock(&m_pObj->m_mutex_UserList);
-    bool bValidHost = (1 == m_pClientItem->m_pUserItem->isAllowedToConnect(
+    //pthread_mutex_lock(&m_pCtrlObj->m_mutex_UserList);
+    bool bValidHost = (1 == pClientItem->getUserItem()->isAllowedToConnect(
                               cli_addr.sin_addr.s_addr));
-    pthread_mutex_unlock(&m_pObj->m_mutex_UserList);
+    //pthread_mutex_unlock(&m_pCtrlObj->m_mutex_UserList);
 
     if (!bValidHost) {
         std::string strErr =
@@ -2237,24 +2408,24 @@ tcpipClientObj::handleClientPassword(void)
                           (const char*)remoteaddr.c_str());
 
         spdlog::error("%s", strErr.c_str());
-        write(MSG_INVALID_REMOTE_ERROR, strlen(MSG_INVALID_REMOTE_ERROR));
+        write(conn, MSG_INVALID_REMOTE_ERROR, strlen(MSG_INVALID_REMOTE_ERROR));
         return false;
     }
 
     // Copy in the user filter
-    memcpy(&m_pClientItem->m_filter,
-           m_pClientItem->m_pUserItem->getUserFilter(),
+    memcpy(&pClientItem->getFilter(),
+           pClientItem->getUserItem()->getUserFilter(),
            sizeof(vscpEventFilter));
 
     std::string strErr = vscp_str_format(
       ("[TCP/IP srv] Host [%s] User [%s] allowed to connect.\n"),
       (const char*)remoteaddr.c_str(),
-      (const char*)m_pClientItem->m_UserName.c_str());
+      (const char*)pClientItem->getUserItem()->getUserName().c_str());
 
-    spdlog::error("%s", strErr.c_str());
+    spdlog::error("{}", strErr.c_str());
 
-    m_pClientItem->bAuthenticated = true;
-    write(MSG_OK, strlen(MSG_OK));
+    pClientItem->setUserItem(nullptr); 
+    write(conn, MSG_OK, strlen(MSG_OK));
 
     return true;
 }
@@ -2264,27 +2435,47 @@ tcpipClientObj::handleClientPassword(void)
 //
 
 void
-tcpipClientObj::handleChallenge(void)
+CTcpipSrv::handleChallenge(struct mg_connection* conn)
 {
     std::string str;
 
-    // Must be connected
-    if (STCP_CONN_STATE_CONNECTED != m_conn->conn_state)
-        return;
-
-    vscp_trim(m_pClientItem->m_currentCommand);
-
-    memset(m_pClientItem->m_sid, 0, sizeof(m_pClientItem->m_sid));
-    if (!m_pObj->generateSessionId(
-          (const char*)m_pClientItem->m_currentCommand.c_str(),
-          m_pClientItem->m_sid)) {
-        write(MSG_FAILED_TO_GENERATE_SID, strlen(MSG_FAILED_TO_GENERATE_SID));
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
         return;
     }
 
-    str = std::string("+OK - ") + std::string(m_pClientItem->m_sid) +
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return;
+    }
+
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
+    // Must be connected
+    if (!pClientItem->isConnected()) {
+        spdlog::error("Client is not connected, cannot handle challenge.");
+        return;
+    }
+
+    vscp_trim(pClientItem->getCurrentCommand());
+
+    // pClientItem->clearSessionId();
+    // if (!m_pCtrlObj->generateSessionId(
+    //       (const char*)pClientItem->getCurrentCommand().c_str(),
+    //       pClientItem->getSessionId().c_str())) {
+    //     write(conn,
+    //           MSG_FAILED_TO_GENERATE_SID,
+    //           strlen(MSG_FAILED_TO_GENERATE_SID));
+    //     return;
+    // }
+
+    str = std::string("+OK - ") +
+          std::string(pClientItem->getSessionId().c_str()) +
           std::string("\r\n");
-    write(str);
+    write(conn, str);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2292,20 +2483,36 @@ tcpipClientObj::handleChallenge(void)
 //
 
 void
-tcpipClientObj::handleClientRcvLoop(void)
+CTcpipSrv::handleClientRcvLoop(struct mg_connection* conn)
 {
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
+        return;
+    }
+
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return;
+    }
+
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
     // Must be connected
-    if (STCP_CONN_STATE_CONNECTED != m_conn->conn_state) {
+    if (!pClientItem->isConnected()) {
+        spdlog::error("Client is not connected, cannot enter receive loop.");
         return;
     }
 
     m_bReceiveLoop = true; // Mark connection as being in receive loop
 
     // Notify the client that it has entered the receive loop
-    write(MSG_RECEIVE_LOOP, strlen(MSG_RECEIVE_LOOP));
+    write(conn, MSG_RECEIVE_LOOP, strlen(MSG_RECEIVE_LOOP));
 
     // Clear the read buffer before entering the receive loop
-    m_pClientItem->m_readBuffer = "";
+    pClientItem->clearReadBuffer();
 
     return;
 }
@@ -2315,9 +2522,24 @@ tcpipClientObj::handleClientRcvLoop(void)
 //
 
 void
-tcpipClientObj::handleClientTest(void)
+CTcpipSrv::handleClientTest(struct mg_connection* conn)
 {
-    write(MSG_OK, strlen(MSG_OK));
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
+        return;
+    }
+
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return;
+    }
+
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
+    write(conn, MSG_OK, strlen(MSG_OK));
     return;
 }
 
@@ -2326,9 +2548,24 @@ tcpipClientObj::handleClientTest(void)
 //
 
 void
-tcpipClientObj::handleClientRestart(void)
+CTcpipSrv::handleClientRestart(struct mg_connection* conn)
 {
-    write(MSG_OK, strlen(MSG_OK));
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
+        return;
+    }
+
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return;
+    }
+
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
+    write(conn, MSG_OK, strlen(MSG_OK));
 
     sleep(1);
     kill(getpid(), SIGUSR2);
@@ -2341,19 +2578,36 @@ tcpipClientObj::handleClientRestart(void)
 //
 
 void
-tcpipClientObj::handleClientShutdown(void)
+CTcpipSrv::handleClientShutdown(struct mg_connection* conn)
 {
-    // Must be connected
-    if (STCP_CONN_STATE_CONNECTED != m_conn->conn_state)
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
         return;
-
-    SYSLOG(LOG_INFO, "tcp/ip client requested shutdown!!!");
-
-    if (!m_pClientItem->bAuthenticated) {
-        write(MSG_OK, strlen(MSG_OK));
     }
 
-    write(MSG_GOODBY, strlen(MSG_GOODBY));
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return;
+    }
+
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
+    // Must be connected
+    if (!pClientItem->isConnected()) {
+        spdlog::error("Client is not connected, cannot handle shutdown.");
+        return;
+    }
+
+    spdlog::info("tcp/ip client requested shutdown!!!");
+
+    if (!pClientItem->getUserItem()->isAuthenticated()) {
+        write(conn, MSG_OK, strlen(MSG_OK));
+    }
+
+    write(conn, MSG_GOODBY, strlen(MSG_GOODBY));
     sleep(1);
 
     kill(getpid(), SIGUSR1);
@@ -2364,7 +2618,7 @@ tcpipClientObj::handleClientShutdown(void)
 //
 
 void
-tcpipClientObj::handleClientRemote(void)
+CTcpipSrv::handleClientRemote(struct mg_connection* conn)
 {
     return;
 }
@@ -2382,26 +2636,44 @@ tcpipClientObj::handleClientRemote(void)
 // close    Close interfaces. Full format is INTERFACE CLOSE id
 
 void
-tcpipClientObj::handleClientInterface(void)
+CTcpipSrv::handleClientInterface(struct mg_connection* conn)
 {
-    // Must be connected
-    if (STCP_CONN_STATE_CONNECTED != m_conn->conn_state)
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
         return;
+    }
 
-    if (m_pClientItem->CommandStartsWith(("list"))) {
-        handleClientInterface_List();
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return;
     }
-    else if (m_pClientItem->CommandStartsWith(("unique"))) {
-        handleClientInterface_Unique();
+
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
+    // Must be connected
+    if (!pClientItem->isConnected()) {
+        spdlog::error(
+          "Client is not connected, cannot handle interface command.");
+        return;
     }
-    else if (m_pClientItem->CommandStartsWith(("normal"))) {
-        handleClientInterface_Normal();
+
+    if (pClientItem->CommandStartsWith(("list"))) {
+        handleClientInterface_List(conn);
     }
-    else if (m_pClientItem->CommandStartsWith(("close"))) {
-        handleClientInterface_Close();
+    else if (pClientItem->CommandStartsWith(("unique"))) {
+        handleClientInterface_Unique(conn);
+    }
+    else if (pClientItem->CommandStartsWith(("normal"))) {
+        handleClientInterface_Normal(conn);
+    }
+    else if (pClientItem->CommandStartsWith(("close"))) {
+        handleClientInterface_Close(conn);
     }
     else {
-        handleClientInterface_List();
+        handleClientInterface_List(conn);
     }
 }
 
@@ -2410,37 +2682,52 @@ tcpipClientObj::handleClientInterface(void)
 //
 
 void
-tcpipClientObj::handleClientInterface_List(void)
+CTcpipSrv::handleClientInterface_List(struct mg_connection* conn)
 {
     std::string strGUID;
     std::string strBuf;
 
-    // Display Interface List
-    pthread_mutex_lock(&m_pObj->m_clientList.m_mutexItemList);
-
-    std::deque<CClientItem*>::iterator it;
-    for (it = m_pObj->m_clientList.m_itemList.begin();
-         it != m_pObj->m_clientList.m_itemList.end();
-         ++it) {
-
-        CClientItem* pItem = *it;
-
-        pItem->m_guid.toString(strGUID);
-        strBuf = vscp_str_format("%d,", pItem->m_clientID);
-        strBuf += vscp_str_format("%d,", pItem->m_type);
-        strBuf += strGUID;
-        strBuf += std::string(",");
-        strBuf += pItem->m_strDeviceName;
-        strBuf += std::string(" | Started at ");
-        strBuf += pItem->m_dtutc.getISODateTime();
-        strBuf += std::string("\r\n");
-
-        write(strBuf);
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
+        return;
     }
 
-    write(MSG_OK, strlen(MSG_OK));
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return;
+    }
 
-    pthread_mutex_unlock(&m_pObj->m_clientList.m_mutexItemList);
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
+    // Display Interface List
+    //pthread_mutex_lock(&m_pCtrlObj->getClientList().m_mutexClientItemList);
+
+    // std::deque<CClientItem*>::iterator it;
+    // for (it = m_pCtrlObj->getClientList().m_itemList.begin();
+    //      it != m_pCtrlObj->getClientList().m_itemList.end();
+    //      ++it) {
+
+    //     CClientItem* pItem = *it;
+
+    //     pItem->getInterfaceGUID().toString(strGUID);
+    //     strBuf = vscp_str_format("%d,", pItem->getClientID());
+    //     strBuf += vscp_str_format("%d,", pItem->getInterfaceType());
+    //     strBuf += strGUID;
+    //     strBuf += std::string(",");
+    //     strBuf += pItem->getDeviceName().c_str();
+    //     strBuf += std::string(" | Started at ");
+    //     strBuf += pItem->getDateUtcStarted().getISODateTime();
+    //     strBuf += std::string("\r\n");
+
+    //     write(conn, strBuf);
+    // }
+
+    write(conn, MSG_OK, strlen(MSG_OK));
+
+    //pthread_mutex_unlock(&m_pCtrlObj->getClientList().m_mutexClientItemList);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2448,23 +2735,41 @@ tcpipClientObj::handleClientInterface_List(void)
 //
 
 void
-tcpipClientObj::handleClientInterface_Unique(void)
+CTcpipSrv::handleClientInterface_Unique(struct mg_connection* conn)
 {
     unsigned char ifGUID[16];
     memset(ifGUID, 0, 16);
 
-    // Must be connected
-    if (STCP_CONN_STATE_CONNECTED != m_conn->conn_state)
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
         return;
+    }
+
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return;
+    }
+
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
+    // Must be connected
+    if (!pClientItem->isConnected()) {
+        spdlog::error(
+          "Client is not connected, cannot handle interface unique command.");
+        return;
+    }
 
     // Get GUID
-    vscp_trim(m_pClientItem->m_currentCommand);
-    vscp_getGuidFromStringToArray(ifGUID, m_pClientItem->m_currentCommand);
+    vscp_trim(pClientItem->getCurrentCommand());
+    vscp_getGuidFromStringToArray(ifGUID, pClientItem->getCurrentCommand());
 
     // Add the client to the Client List
     // TODO
 
-    write(MSG_INTERFACE_NOT_FOUND, strlen(MSG_INTERFACE_NOT_FOUND));
+    write(conn, MSG_INTERFACE_NOT_FOUND, strlen(MSG_INTERFACE_NOT_FOUND));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2472,8 +2777,23 @@ tcpipClientObj::handleClientInterface_Unique(void)
 //
 
 void
-tcpipClientObj::handleClientInterface_Normal(void)
+CTcpipSrv::handleClientInterface_Normal(struct mg_connection* conn)
 {
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
+        return;
+    }
+
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return;
+    }
+
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
     // TODO
 }
 
@@ -2482,8 +2802,23 @@ tcpipClientObj::handleClientInterface_Normal(void)
 //
 
 void
-tcpipClientObj::handleClientInterface_Close(void)
+CTcpipSrv::handleClientInterface_Close(struct mg_connection* conn)
 {
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
+        return;
+    }
+
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return;
+    }
+
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
     // TODO
 }
 
@@ -2496,15 +2831,32 @@ tcpipClientObj::handleClientInterface_Close(void)
 //
 
 void
-tcpipClientObj::handleClientHelp(void)
+CTcpipSrv::handleClientHelp(struct mg_connection* conn)
 {
-    // Must be connected
-    if (STCP_CONN_STATE_CONNECTED != m_conn->conn_state)
+    // Check that conn is valid
+    if (NULL == conn) {
+        spdlog::info("Connection is NULL.");
         return;
+    }
 
-    vscp_trim(m_pClientItem->m_currentCommand);
+    // Client item must be available
+    if (NULL == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return;
+    }
 
-    if (0 == m_pClientItem->m_currentCommand.length()) {
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
+    // Must be connected
+    if (!pClientItem->isConnected()) {
+        spdlog::error("Client is not connected, cannot handle help command.");
+        return;
+    }
+
+    vscp_trim(pClientItem->getCurrentCommand());
+
+    if (0 == pClientItem->getCurrentCommand().length()) {
 
         std::string str = "Help for the VSCP tcp/ip interface\r\n";
         str += "=============================================================="
@@ -2544,40 +2896,40 @@ tcpipClientObj::handleClientHelp(void)
         str += "DRIVER            - Driver manipulation.\r\n";
         str += "INTERFACE         - Interface handling. \r\n";
         str += "WCYD/WHATCANYOUDO - Check server capabilities. \r\n";
-        write((const char*)str.c_str(), str.length());
+        write(conn, (const char*)str.c_str(), str.length());
     }
-    else if (m_pClientItem->CommandStartsWith("+")) {
+    else if (pClientItem->CommandStartsWith("+")) {
         std::string str = "'+' repeats the last given command.\r\n";
-        write((const char*)str.c_str(), str.length());
+        write(conn, (const char*)str.c_str(), str.length());
     }
-    else if (m_pClientItem->CommandStartsWith("noop")) {
+    else if (pClientItem->CommandStartsWith("noop")) {
         std::string str =
           "'NOOP' Does absolutely nothing but giving a success in return.\r\n";
-        write((const char*)str.c_str(), str.length());
+        write(conn, (const char*)str.c_str(), str.length());
     }
-    else if (m_pClientItem->CommandStartsWith(("quit"))) {
+    else if (pClientItem->CommandStartsWith(("quit"))) {
         std::string str = "'QUIT' Quit a session with the VSCP daemon and "
                           "closes the m_connection.\r\n";
-        write((const char*)str.c_str(), str.length());
+        write(conn, (const char*)str.c_str(), str.length());
     }
-    else if (m_pClientItem->CommandStartsWith(("user"))) {
+    else if (pClientItem->CommandStartsWith(("user"))) {
         std::string str =
           "'USER' Used to login to the system together with PASS. Connection "
           "will be closed if bad credentials are given.\r\n";
-        write((const char*)str.c_str(), str.length());
+        write(conn, (const char*)str.c_str(), str.length());
     }
-    else if (m_pClientItem->CommandStartsWith(("pass"))) {
+    else if (pClientItem->CommandStartsWith(("pass"))) {
         std::string str =
           "'PASS' Used to login to the system together with USER. Connection "
           "will be closed if bad credentials are given.\r\n";
-        write((const char*)str.c_str(), str.length());
+        write(conn, (const char*)str.c_str(), str.length());
     }
-    else if (m_pClientItem->CommandStartsWith(("quit"))) {
+    else if (pClientItem->CommandStartsWith(("quit"))) {
         std::string str = "'QUIT' Quit a session with the VSCP daemon and "
                           "closes the m_connection.\r\n";
-        write((const char*)str.c_str(), str.length());
+        write(conn, (const char*)str.c_str(), str.length());
     }
-    else if (m_pClientItem->CommandStartsWith(("send"))) {
+    else if (pClientItem->CommandStartsWith(("send"))) {
         std::string str = "'SEND event'.\r\nThe event is given as "
                           "'head,class,type,obid,datetime,time-stamp,GUID,"
                           "data1,data2,data3....' \r\n";
@@ -2586,393 +2938,650 @@ tcpipClientObj::handleClientHelp(void)
           "zero it will be set by the server. \r\nIf GUID is given as '-' ";
         str += "the GUID of the interface will be used. \r\nThe GUID should "
                "be given on the form MSB-byte:MSB-byte-1:MSB-byte-2. \r\n";
-        write((const char*)str.c_str(), str.length());
+        write(conn, (const char*)str.c_str(), str.length());
     }
-    else if (m_pClientItem->CommandStartsWith(("retr"))) {
+    else if (pClientItem->CommandStartsWith(("retr"))) {
         std::string str = "'RETR count' - Retrieve one (if no argument) or "
                           "'count' event(s). ";
         str += "Events are retrived on the form "
                "head,class,type,obid,datetime,time-stamp,GUID,data0,data1,"
                "data2,...........\r\n";
-        write((const char*)str.c_str(), str.length());
+        write(conn, (const char*)str.c_str(), str.length());
     }
-    else if (m_pClientItem->CommandStartsWith("rcvloop")) {
+    else if (pClientItem->CommandStartsWith("rcvloop")) {
         std::string str = "'RCVLOOP' - Enter the receive loop and receive "
                           "events continously or until ";
         str += "terminated with 'QUITLOOP'. Events are retrived on the form "
                "head,class,type,obid,time-stamp,GUID,data0,data1,data2,......."
                "....\r\n";
-        write((const char*)str.c_str(), str.length());
+        write(conn, (const char*)str.c_str(), str.length());
     }
-    else if (m_pClientItem->CommandStartsWith(("quitloop"))) {
+    else if (pClientItem->CommandStartsWith(("quitloop"))) {
         std::string str = "'QUITLOOP' - End 'RCVLOOP' event receives.\r\n";
-        write((const char*)str.c_str(), str.length());
+        write(conn, (const char*)str.c_str(), str.length());
     }
-    else if (m_pClientItem->CommandStartsWith("cdta") ||
-             m_pClientItem->CommandStartsWith("chkdata")) {
+    else if (pClientItem->CommandStartsWith("cdta") ||
+             pClientItem->CommandStartsWith("chkdata")) {
         std::string str = "'CDTA' or 'CHKDATA' - Check if there is events in "
                           "the input queue.\r\n";
-        write((const char*)str.c_str(), str.length());
+        write(conn, (const char*)str.c_str(), str.length());
     }
-    else if (m_pClientItem->CommandStartsWith(("clra")) ||
-             m_pClientItem->CommandStartsWith(("clrall"))) {
+    else if (pClientItem->CommandStartsWith(("clra")) ||
+             pClientItem->CommandStartsWith(("clrall"))) {
         std::string str = "'CLRA' or 'CLRALL' - Clear input queue.\r\n";
-        write((const char*)str.c_str(), str.length());
+        write(conn, (const char*)str.c_str(), str.length());
     }
-    else if (m_pClientItem->CommandStartsWith(("stat"))) {
+    else if (pClientItem->CommandStartsWith(("stat"))) {
         std::string str = "'STAT' - Get statistical information.\r\n";
-        write((const char*)str.c_str(), str.length());
+        write(conn, (const char*)str.c_str(), str.length());
     }
-    else if (m_pClientItem->CommandStartsWith("info")) {
+    else if (pClientItem->CommandStartsWith("info")) {
         std::string str = "'INFO' - Get status information.\r\n";
-        write((const char*)str.c_str(), str.length());
+        write(conn, (const char*)str.c_str(), str.length());
     }
-    else if (m_pClientItem->CommandStartsWith("chid") ||
-             m_pClientItem->CommandStartsWith("getchid")) {
+    else if (pClientItem->CommandStartsWith("chid") ||
+             pClientItem->CommandStartsWith("getchid")) {
         std::string str = "'CHID' or 'GETCHID' - Get channel id.\r\n";
-        write((const char*)str.c_str(), str.length());
+        write(conn, (const char*)str.c_str(), str.length());
     }
-    else if (m_pClientItem->CommandStartsWith("sgid") ||
-             m_pClientItem->CommandStartsWith("setguid")) {
+    else if (pClientItem->CommandStartsWith("sgid") ||
+             pClientItem->CommandStartsWith("setguid")) {
         std::string str = "'SGID' or 'SETGUID' - Set GUID for channel.\r\n";
-        write((const char*)str.c_str(), str.length());
+        write(conn, (const char*)str.c_str(), str.length());
     }
-    else if (m_pClientItem->CommandStartsWith("ggid") ||
-             m_pClientItem->CommandStartsWith("getguid")) {
+    else if (pClientItem->CommandStartsWith("ggid") ||
+             pClientItem->CommandStartsWith("getguid")) {
         std::string str = ("'GGID' or 'GETGUID' - Get GUID for channel.\r\n");
-        write((const char*)str.c_str(), str.length());
+        write(conn, (const char*)str.c_str(), str.length());
     }
-    else if (m_pClientItem->CommandStartsWith("vers") ||
-             m_pClientItem->CommandStartsWith("version")) {
+    else if (pClientItem->CommandStartsWith("vers") ||
+             pClientItem->CommandStartsWith("version")) {
         std::string str =
           "'VERS' or 'VERSION' - Get version of VSCP daemon.\r\n";
-        write((const char*)str.c_str(), str.length());
+        write(conn, (const char*)str.c_str(), str.length());
     }
-    else if (m_pClientItem->CommandStartsWith("sflt") ||
-             m_pClientItem->CommandStartsWith("setfilter")) {
+    else if (pClientItem->CommandStartsWith("sflt") ||
+             pClientItem->CommandStartsWith("setfilter")) {
         std::string str = "'SFLT' or 'SETFILTER' - Set filter for channel. ";
         str += "The format is 'filter-priority, filter-class, filter-type, "
                "filter-GUID' \r\n";
         str += "Example:  \r\nSETFILTER "
                "1,0x0000,0x0006,ff:ff:ff:ff:ff:ff:ff:01:00:00:00:00:00:00:00:"
                "00\r\n";
-        write((const char*)str.c_str(), str.length());
+        write(conn, (const char*)str.c_str(), str.length());
     }
-    else if (m_pClientItem->CommandStartsWith("smsk") ||
-             m_pClientItem->CommandStartsWith("setmask")) {
+    else if (pClientItem->CommandStartsWith("smsk") ||
+             pClientItem->CommandStartsWith("setmask")) {
         std::string str = "'SMSK' or 'SETMASK' - Set mask for channel. ";
         str += "The format is 'mask-priority, mask-class, mask-type, "
                "mask-GUID' \r\n";
         str += "Example:  \r\nSETMASK "
                "0x0f,0xffff,0x00ff,ff:ff:ff:ff:ff:ff:ff:01:00:00:00:00:00:00:"
                "00:00 \r\n";
-        write((const char*)str.c_str(), str.length());
+        write(conn, (const char*)str.c_str(), str.length());
     }
-    else if (m_pClientItem->CommandStartsWith(("help"))) {
+    else if (pClientItem->CommandStartsWith(("help"))) {
         std::string str = "'HELP [command]' This command. Gives help about "
                           "available commands and the usage.\r\n";
-        write((const char*)str.c_str(), str.length());
+        write(conn, (const char*)str.c_str(), str.length());
     }
-    else if (m_pClientItem->CommandStartsWith("test")) {
+    else if (pClientItem->CommandStartsWith("test")) {
         std::string str = "'TEST [sequency]' Test command for debugging.\r\n";
-        write((const char*)str.c_str(), str.length());
+        write(conn, (const char*)str.c_str(), str.length());
     }
-    else if (m_pClientItem->CommandStartsWith("shutdown")) {
+    else if (pClientItem->CommandStartsWith("shutdown")) {
         std::string str = "'SHUTDOWN' Shutdown the daemon.\r\n";
-        write((const char*)str.c_str(), str.length());
+        write(conn, (const char*)str.c_str(), str.length());
     }
-    else if (m_pClientItem->CommandStartsWith("restart")) {
+    else if (pClientItem->CommandStartsWith("restart")) {
         std::string str = "'RESTART' Restart the daemon.\r\n";
-        write((const char*)str.c_str(), str.length());
+        write(conn, (const char*)str.c_str(), str.length());
     }
-    else if (m_pClientItem->CommandStartsWith("interface")) {
+    else if (pClientItem->CommandStartsWith("interface")) {
         std::string str = "'INTERFACE' Handle interfaces on the daemon.\r\n";
         str += "'INTERFACE list'.\r\n";
         str += "'INTERFACE close'.\r\n";
-        write((const char*)str.c_str(), str.length());
+        write(conn, (const char*)str.c_str(), str.length());
     }
-    else if (m_pClientItem->CommandStartsWith("wcyd") ||
-             m_pClientItem->CommandStartsWith("whatcanyoudo")) {
+    else if (pClientItem->CommandStartsWith("wcyd") ||
+             pClientItem->CommandStartsWith("whatcanyoudo")) {
         std::string str = "'WCYD/WHATCANYOUDO' Return the VSCP server "
                           "capabilities 64-bit array.\r\n";
-        write((const char*)str.c_str(), str.length());
+        write(conn, (const char*)str.c_str(), str.length());
     }
     else {
         std::string str =
           vscp_str_format("The command '%s' is not available\r\n",
-                          m_pClientItem->m_currentCommand.c_str());
-        write((const char*)str.c_str(), str.length());
+                          pClientItem->getCurrentCommand().c_str());
+        write(conn, (const char*)str.c_str(), str.length());
     }
 
-    write(MSG_OK, strlen(MSG_OK));
+    write(conn, MSG_OK, strlen(MSG_OK));
     return;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// Entry
+// tcpip_event_handler
+//
+// Handle TCP/IP events for the server
+//
+
+static void
+tcpip_event_handler(struct mg_connection* conn, int ev, void* ev_data)
+{
+    // int *i = &((struct c_res_s *) conn->fn_data)->i;
+
+    CControlObject* pobj = (CControlObject*)conn->fn_data;
+    if (NULL == pobj) {
+        spdlog::error(
+          "Internal error: Eventhandler have invalid control object pointer");
+        return;
+    }
+
+    // Handle communication events
+    if (ev == MG_EV_OPEN && conn->is_listening == 1) {
+        spdlog::debug("SERVER is listening");
+    }
+    else if (ev == MG_EV_ACCEPT) {
+
+#ifdef WITH_WRAP
+        /* Use tcpd / libwrap to determine whether a connection
+         * is allowed. */
+        request_init(&wrap_req, RQ_FILE, conn->fd, RQ_DAEMON, "vscpd", 0);
+        fromhost(&wrap_req);
+        if (!hosts_access(&wrap_req)) {
+            // Access is denied
+            if (!stcp_socket_get_address(conn, address, 1024)) {
+                spdlog::error("Client connection from %s "
+                              "denied access by tcpd.",
+                              address);
+            }
+            // Close the connection
+            conn->is_closing = 1;
+            continue;
+        }
+#endif
+
+        spdlog::debug("SERVER accepted a connection");
+        if (mg_url_is_ssl(pobj->getInterfaceAddress().c_str())) {
+            spdlog::debug("SERVER accepted a secure (SSL/TLS) connection");
+            struct mg_tls_opts opts = pobj->getTlsOptions();
+            mg_tls_init(conn, &opts);
+        }
+
+        // Create a new client item for this connection
+        CClientItem* newClient =
+          new CClientItem(pobj,
+                          CClientItem::CLIENT_ITEM_INTERFACE_TYPE::
+                            CLIENT_ITEM_INTERFACE_TYPE_CLIENT_TCPIP,
+                          conn);
+        if (!pobj->addClient(newClient)) {
+            mg_send(conn, MSG_INTERNAL_ERROR, strlen(MSG_INTERNAL_ERROR));
+            spdlog::error("Failed to add new client to the server");
+            delete newClient;
+            conn->is_closing = 1;
+            return;
+        }
+
+        // Associate the new client item with the connection
+        conn->fn_data = newClient;
+
+        // Greet the new client
+        mg_send(conn, MSG_WELCOME, sizeof(MSG_WELCOME));
+        mg_send(conn, VSCPD_DISPLAY_VERSION, sizeof(VSCPD_DISPLAY_VERSION));
+        mg_send(conn, VSCPD_COPYRIGHT, sizeof(VSCPD_COPYRIGHT));
+        mg_send(conn, MSG_OK, sizeof(MSG_OK));
+        spdlog::debug("SERVER sent welcome message");
+    }
+
+    else if (ev == MG_EV_READ) {
+        struct mg_iobuf* r = &conn->recv;
+        spdlog::trace("-->SERVER got data: <{}>",
+                      std::string((const char*)r->buf, r->len));
+
+        // Find "\r\n" sequence in the received data
+        char* eol = (char*)memmem(r->buf, r->len, "\r\n", 2);
+        if (eol) {
+            spdlog::trace("Found end of line at position {}",
+                          eol - (char*)r->buf);
+        }
+
+        if (eol) {
+            // Null-terminate the line at the end of line sequence
+            *eol = '\0';
+            spdlog::trace("Processed line: {}", (char*)r->buf);
+
+            // Copy the processed line to a separate buffer if needed
+            char line[2048];
+            size_t line_len = 0; // Used length
+            size_t save_len = 0; // Consumed length
+            save_len = line_len = eol - (char*)r->buf;
+            if (line_len >= sizeof(line)) {
+                line_len = sizeof(line) - 1;
+            }
+            memcpy(line, r->buf, line_len);
+            line[line_len] = '\0';
+
+            // Remove consumed data from the buffer
+            mg_iobuf_del(r, 0, save_len);
+
+            spdlog::trace("Consumed {} bytes from the buffer", save_len);
+            spdlog::trace("Processed line: {}", line);
+
+            // Here you can process the line as needed, for example:
+            // ptcpipsrv->commandHandler(std::string(line));
+        }
+
+        // mg_send(conn, r->buf, r->len); // echo it back
+        // r->len = 0; // Tell Mongoose we've consumed the data
+    }
+    else if (ev == MG_EV_CLOSE) {
+        spdlog::debug("SERVER disconnected");
+    }
+    else if (ev == MG_EV_ERROR) {
+        spdlog::error("SERVER error: {}", (char*)ev_data);
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// clientWorkerThread
+//
+// This worker thread handles the communication with a single under  single
+// clients. Typically when events should be sent to all clients, this worker
+// thread will handle the distribution of those events.
+//
+
+void*
+clientWorkerThread(void* pdata)
+{
+    // // Get the TCP/IP server object from the thread data.
+    // CTcpipSrv* ptcpipsrv = (CTcpipSrv*)pdata;
+    // if (NULL == ptcpipsrv) {
+    //     spdlog::error("[TCP/IP srv client thread] Error, "
+    //                   "Client thread object not initialized.");
+    //     return NULL;
+    // }
+
+    // //-------------------------------------------------------------------------
+    // //                            Initiate Mongoose
+    // //-------------------------------------------------------------------------
+    // struct mg_mgr mgr; // Event manager
+    // struct mg_connection* conn;
+
+    // mg_log_set(MG_LL_INFO); // Set log level
+    // mg_mgr_init(&mgr);      // Initialize event manager
+    // mgr.userdata = pdata;
+
+    // // Add a timer to the Mongoose event manager
+    // mg_timer_add(&mgr,
+    //              15000,
+    //              MG_TIMER_REPEAT | MG_TIMER_RUN_NOW,
+    //              timer_fn,
+    //              &mgr);
+
+    // // Start to listen for connections
+    // conn = mg_listen(&mgr,
+    //                  ptcpipsrv->getInterfaceAddress().c_str(),
+    //                  tcpip_event_handler,
+    //                  pdata); // Create server connection
+    // if (conn == NULL) {
+    //     MG_INFO(("SERVER cant' open a connection"));
+    //     return 0;
+    // }
+
+    // // Event loop
+    // while (ptcpipsrv->m_bRun) {
+    //     mg_mgr_poll(&mgr, 100); // Poll the event manager
+    // }
+
+    // mg_mgr_free(&mgr); // Free the event manager resources
+
+    // // while (ptcpipsrv->m_bRun) {
+
+    // //     // Here would be the code to handle client communication.
+    // //     // For now, just sleep for a short period to simulate work.
+    // //     std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    // // }
+
+    // spdlog::debug("clientWorkerThread: Client worker thread exiting.");
+
+    return NULL; // Ensure the thread function returns a value even if it does
+                 // nothing.
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// tcpipClientThread
+//
+// This thread handles a single TCP/IP client connection. It initializes the
+// client structure, adds it to the client list, and manages communication with
+// the client. It runs in its own thread and communicates with the client over
+// the TCP/IP connection.
 //
 
 void*
 tcpipClientThread(void* pData)
 {
-    tcpipClientObj* ptcpipobj = (tcpipClientObj*)pData;
-    if (NULL == ptcpipobj) {
-        spdlog::error("[TCP/IP srv client thread] Error, "
-                      "Client thread object not initialized.");
+    // Get the TCP/IP server object from the thread data.
+    // CTcpipSrv* ptcpipsrv = (CTcpipSrv*)pData;
+    // if (NULL == ptcpipsrv) {
+    //     spdlog::error("[TCP/IP srv client thread] Error, "
+    //                   "Client thread object not initialized.");
+    //     return NULL;
+    // }
+
+    // if (NULL == ptcpipsrv->m_pParent) {
+    //     spdlog::error("[TCP/IP srv client thread] Error, "
+    //                   "Control object not initialized.");
+    //     return NULL;
+    // }
+
+    // spdlog::debug("[TCP/IP srv client thread] Thread started.");
+
+    // ptcpipsrv->pClientItem = new CClientItem();
+    // if (NULL == ptcpipsrv->pClientItem) {
+    //     spdlog::error("[TCP/IP srv client thread] Memory error, "
+    //                   "Cant allocate client structure.");
+    //     return NULL;
+    // }
+
+    // vscpdatetime now;
+    // ptcpipsrv->pClientItem->m_dtutc = now;
+    // ptcpipsrv->pClientItem->m_bOpen = true;
+    // ptcpipsrv->pClientItem->m_type  =
+    // CLIENT_ITEM_INTERFACE_TYPE_CLIENT_TCPIP;
+    // ptcpipsrv->pClientItem->m_strDeviceName =
+    //   ("Remote tcp/ip server connection @ [");
+    // ptcpipsrv->pClientItem->m_strDeviceName +=
+    //   ptcpipsrv->m_pCtrlObj->m_interfaceAddress;
+    // ptcpipsrv->pClientItem->m_strDeviceName += ("]");
+
+    // // Start of activity
+    // ptcpipsrv->pClientItem->m_clientActivity = time(NULL);
+
+    // // Add the client to the Client List
+    // pthread_mutex_lock(&ptcpipsrv->m_pCtrlObj->m_clientList.m_mutexClientItemList);
+    // if (!ptcpipsrv->m_pCtrlObj->addClient(ptcpipsrv->pClientItem)) {
+    //     // Failed to add client
+    //     delete ptcpipsrv->pClientItem;
+    //     ptcpipsrv->pClientItem = NULL;
+    //     pthread_mutex_unlock(&ptcpipsrv->m_pCtrlObj->m_clientList.m_mutexClientItemList);
+    //     spdlog::error(
+    //       "TCP/IP server: Failed to add client. Terminating thread.");
+    //     return NULL;
+    // }
+    // pthread_mutex_unlock(&ptcpipsrv->m_pCtrlObj->m_clientList.m_mutexClientItemList);
+
+    // // Clear the filter (Allow everything )
+    // vscp_clearVSCPFilter(&ptcpipsrv->pClientItem->m_filter);
+
+    // // Send welcome message
+    // std::string str = std::string(MSG_WELCOME);
+    // str += std::string("Version: ");
+    // str += std::string(VSCPD_DISPLAY_VERSION);
+    // str += std::string("\r\n");
+    // str += std::string(VSCPD_COPYRIGHT);
+    // str += std::string("\r\n");
+    // str += std::string(MSG_OK);
+    // ptcpipsrv->write(conn,(const char*)str.c_str(), str.length());
+
+    // spdlog::debug("[TCP/IP srv] Ready to serve client.");
+
+    // // Enter command loop
+    // char buf[8192];
+    // struct pollfd fd;
+    // while (!ptcpipsrv->m_pParent->m_nStopTcpIpSrv) {
+
+    //     // Check for client inactivity
+    //     if ((time(NULL) - ptcpipsrv->pClientItem->m_clientActivity) >
+    //         TCPIPSRV_INACTIVITY_TIMOUT) {
+    //         spdlog::info(
+    //           "[TCP/IP srv client thread] Client closed due to inactivity.");
+    //         break;
+    //     }
+
+    //     // * * * Receiveloop * * *
+    //     if (ptcpipsrv->m_bReceiveLoop) {
+
+    //         // Wait for data
+    //         vscp_sem_wait(&ptcpipsrv->pClientItem->m_semClientInputQueue,
+    //         10);
+
+    //         // Send everything in the queue
+    //         while (ptcpipsrv->sendOneEventFromQueue(false))
+    //             ;
+
+    //         // Send '+OK<CR><LF>' every two seconds to indicate that the
+    //         // link is open
+    //         if ((time(NULL) - ptcpipsrv->pClientItem->m_timeRcvLoop) > 2) {
+    //             ptcpipsrv->pClientItem->m_timeRcvLoop    = time(NULL);
+    //             ptcpipsrv->pClientItem->m_clientActivity = time(NULL);
+    //             ptcpipsrv->write(conn,"+OK\r\n", 5);
+    //         }
+    //     }
+    //     else {
+
+    //         // Set poll
+    //         fd.fd      = ptcpipsrv->m_conn->client.sock;
+    //         fd.events  = POLLIN;
+    //         fd.revents = 0;
+
+    //         // Wait for data
+    //         if (stcp_poll(&fd,
+    //                       1,
+    //                       500,
+    //                       &(ptcpipsrv->m_pParent->m_nStopTcpIpSrv)) < 0) {
+    //             continue; // Nothing
+    //         }
+
+    //         // Data in?
+    //         if (!(fd.revents & POLLIN)) {
+    //             continue;
+    //         }
+    //     }
+
+    //     // Read possible data from client
+    //     //      If in receive loop we know we have delay
+    //     //      in event waiting above.
+    //     memset(buf, 0, sizeof(buf));
+    //     int nRead = stcp_read(ptcpipsrv->m_conn,
+    //                           buf,
+    //                           sizeof(buf),
+    //                           (ptcpipsrv->m_bReceiveLoop) ? 0 : 0);
+
+    //     if (0 == nRead) {
+    //         ; // Nothing more to read - Check for command and continue ->
+    //         below
+    //     }
+    //     else if (nRead < 0) {
+
+    //         if (STCP_ERROR_TIMEOUT == nRead) {
+    //             ptcpipsrv->m_rv = VSCP_ERROR_TIMEOUT;
+    //         }
+    //         else if (STCP_ERROR_STOPPED == nRead) {
+    //             ptcpipsrv->m_rv = VSCP_ERROR_STOPPED;
+    //             continue;
+    //         }
+    //         break;
+    //     }
+    //     else if (nRead > 0) {
+    //         ptcpipsrv->m_strResponse += std::string(buf, nRead);
+    //     }
+
+    //     // Record client activity
+    //     ptcpipsrv->pClientItem->m_clientActivity = time(NULL);
+
+    //     // get data up to "\r\n" if any
+    //     size_t pos;
+    //     if (ptcpipsrv->m_strResponse.npos !=
+    //         (pos = ptcpipsrv->m_strResponse.find("\n"))) {
+
+    //         // Get the command
+    //         std::string strCommand =
+    //           vscp_str_left(ptcpipsrv->m_strResponse, pos + 1);
+
+    //         // Save the unhandled part
+    //         ptcpipsrv->m_strResponse =
+    //           vscp_str_right(ptcpipsrv->m_strResponse,
+    //                          ptcpipsrv->m_strResponse.length() - pos - 1);
+
+    //         // Remove whitespace
+    //         vscp_trim(strCommand);
+
+    //         // If nothing to do do nothing - pretty obious if you think about
+    //         it if (0 == strCommand.length())
+    //             continue;
+
+    //         // Check for repeat command
+    //         // +    - repear last command
+    //         // +n   - Repeat n-th command
+    //         // ++
+    //         if (ptcpipsrv->m_commandArray.size() && ('+' == strCommand[0])) {
+
+    //             if (vscp_startsWith(strCommand, "++", &strCommand)) {
+    //                 for (int i = ptcpipsrv->m_commandArray.size() - 1; i >=
+    //                 0;
+    //                      i--) {
+    //                     std::string str = vscp_str_format(
+    //                       "%d - %s",
+    //                       ptcpipsrv->m_commandArray.size() - i - 1,
+    //                       ptcpipsrv->m_commandArray[i].c_str());
+    //                     vscp_trim(str);
+    //                     ptcpipsrv->write(conn,str, true);
+    //                 }
+    //                 continue;
+    //             }
+
+    //             // Get pos
+    //             unsigned int n = 0;
+    //             if (strCommand.length() > 1) {
+    //                 strCommand = strCommand.substr(strCommand.length() - 1);
+    //                 n          = vscp_readStringValue(strCommand);
+    //             }
+
+    //             // Pos must be within range
+    //             if (n > ptcpipsrv->m_commandArray.size()) {
+    //                 n = ptcpipsrv->m_commandArray.size() - 1;
+    //             }
+
+    //             // Get the command
+    //             strCommand =
+    //               ptcpipsrv
+    //                 ->m_commandArray[ptcpipsrv->m_commandArray.size() - n -
+    //                 1];
+
+    //             // Write out the command
+    //             ptcpipsrv->write(conn,strCommand, true);
+    //         }
+
+    //         ptcpipsrv->m_commandArray.push_back(
+    //           strCommand); // put at beginning of list
+    //         if (ptcpipsrv->m_commandArray.size() >
+    //             VSCP_TCPIP_COMMAND_LIST_MAX) {
+    //             ptcpipsrv->m_commandArray
+    //               .pop_front(); // Remove last inserted item
+    //         }
+
+    //         // Execute command
+    //         if (VSCP_TCPIP_RV_CLOSE == ptcpipsrv->CommandHandler(strCommand))
+    //         {
+    //             break;
+    //         }
+    //     }
+
+    // } // while
+
+    // // Remove the client from the client queue
+    // pthread_mutex_lock(&ptcpipsrv->m_pParent->m_mutexTcpClientList);
+    // std::list<CTcpipSrv*>::iterator it;
+    // for (it = ptcpipsrv->m_pParent->m_tcpip_clientList.begin();
+    //      it != ptcpipsrv->m_pParent->m_tcpip_clientList.end();
+    //      ++it) {
+
+    //     CTcpipSrv* pclient                  = *it; // TODO check
+    //     struct stcp_connection* stored_conn = pclient->m_conn;
+    //     if (stored_conn->client.id == ptcpipsrv->m_conn->client.id) {
+    //         ptcpipsrv->m_pParent->m_tcpip_clientList.erase(it);
+    //         break;
+    //     }
+    // }
+    // pthread_mutex_unlock(&ptcpipsrv->m_pParent->m_mutexTcpClientList);
+
+    // // Close the connection
+    // stcp_close_connection(ptcpipsrv->m_conn);
+    // ptcpipsrv->m_conn = NULL;
+
+    // // Close the channel
+    // ptcpipsrv->getClientItem()->setIsOpen(false);
+
+    // // Remove the client from the Client List
+    // // pthread_mutex_lock(m_mutexClientItemList);
+    // //
+    // ptcpipsrv->getControlObject()->removeClient(ptcpipsrv->getClientItem());
+    // // pthread_mutex_unlock(m_mutexClientItemList);
+
+    // // Delete the client object
+    // delete ptcpipsrv;
+
+    spdlog::info("[TCP/IP srv client thread] Exit.");
+
+    return NULL;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// clientMsgWorkerThread
+//
+// Is there any messages to send from Level II clients. Send it/them to all
+// devices/clients except for itself.
+//
+
+void*
+clientMsgWorkerThread(void* userdata)
+{
+    std::list<vscpEvent*>::iterator it;
+    vscpEvent* pev = NULL;
+
+    // Must be a valid control object pointer
+    CControlObject* pObj = (CControlObject*)userdata;
+    if (NULL == pObj)
         return NULL;
-    }
 
-    if (NULL == ptcpipobj->m_pParent) {
-        spdlog::error("[TCP/IP srv client thread] Error, "
-                      "Control object not initialized.");
-        return NULL;
-    }
+    // while (!pObj->m_bQuit_clientMsgWorkerThread) {
 
-    SYSLOG(LOG_DEBUG, "[TCP/IP srv client thread] Thread started.");
+    //     // Wait for event
+    //     if ((-1 == vscp_sem_wait(&pObj->m_semClientOutputQueue, 10)) &&
+    //         errno == ETIMEDOUT) {
+    //         continue;
+    //     }
 
-    ptcpipobj->m_pClientItem = new CClientItem();
-    if (NULL == ptcpipobj->m_pClientItem) {
-        spdlog::error("[TCP/IP srv client thread] Memory error, "
-                      "Cant allocate client structure.");
-        return NULL;
-    }
+    //     if (pObj->m_clientOutputQueue.size()) {
 
-    vscpdatetime now;
-    ptcpipobj->m_pClientItem->m_dtutc = now;
-    ptcpipobj->m_pClientItem->m_bOpen = true;
-    ptcpipobj->m_pClientItem->m_type  = CLIENT_ITEM_INTERFACE_TYPE_CLIENT_TCPIP;
-    ptcpipobj->m_pClientItem->m_strDeviceName =
-      ("Remote tcp/ip server connection @ [");
-    ptcpipobj->m_pClientItem->m_strDeviceName +=
-      ptcpipobj->m_pObj->m_interfaceAddress;
-    ptcpipobj->m_pClientItem->m_strDeviceName += ("]");
+    //         pthread_mutex_lock(&pObj->m_mutex_ClientOutputQueue);
+    //         pev = pObj->m_clientOutputQueue.front();
+    //         pObj->m_clientOutputQueue.pop_front();
+    //         pthread_mutex_unlock(&pObj->m_mutex_ClientOutputQueue);
 
-    // Start of activity
-    ptcpipobj->m_pClientItem->m_clientActivity = time(NULL);
+    //         if (NULL != pev) {
 
-    // Add the client to the Client List
-    pthread_mutex_lock(&ptcpipobj->m_pObj->m_clientList.m_mutexItemList);
-    if (!ptcpipobj->m_pObj->addClient(ptcpipobj->m_pClientItem)) {
-        // Failed to add client
-        delete ptcpipobj->m_pClientItem;
-        ptcpipobj->m_pClientItem = NULL;
-        pthread_mutex_unlock(&ptcpipobj->m_pObj->m_clientList.m_mutexItemList);
-        spdlog::error(
-          "TCP/IP server: Failed to add client. Terminating thread.");
-        return NULL;
-    }
-    pthread_mutex_unlock(&ptcpipobj->m_pObj->m_clientList.m_mutexItemList);
+    //             // * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+    //             //
+    //             // Send event to all Level II clients (not to
+    //             // ourself )
+    //             //
+    //             // * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
-    // Clear the filter (Allow everything )
-    vscp_clearVSCPFilter(&ptcpipobj->m_pClientItem->m_filter);
+    //             pObj->sendEventAllClients(pev, pev->obid);
+    //             // Tell main thread that there are work to do
+    //             sem_post(&pObj->m_semSentToAllClients);
 
-    // Send welcome message
-    std::string str = std::string(MSG_WELCOME);
-    str += std::string("Version: ");
-    str += std::string(VSCPD_DISPLAY_VERSION);
-    str += std::string("\r\n");
-    str += std::string(VSCPD_COPYRIGHT);
-    str += std::string("\r\n");
-    str += std::string(MSG_OK);
-    ptcpipobj->write((const char*)str.c_str(), str.length());
+    //         } // Valid event
 
-    SYSLOG(LOG_DEBUG, "[TCP/IP srv] Ready to serve client.");
+    //         // Delete the event - we are done with it
+    //         vscp_deleteEvent_v2(&pev);
 
-    // Enter command loop
-    char buf[8192];
-    struct pollfd fd;
-    while (!ptcpipobj->m_pParent->m_nStopTcpIpSrv) {
+    //     } // Events in queue
 
-        // Check for client inactivity
-        if ((time(NULL) - ptcpipobj->m_pClientItem->m_clientActivity) >
-            TCPIPSRV_INACTIVITY_TIMOUT) {
-            SYSLOG(
-              LOG_INFO,
-              "[TCP/IP srv client thread] Client closed due to inactivity.");
-            break;
-        }
-
-        // * * * Receiveloop * * *
-        if (ptcpipobj->m_bReceiveLoop) {
-
-            // Wait for data
-            vscp_sem_wait(&ptcpipobj->m_pClientItem->m_semClientInputQueue, 10);
-
-            // Send everything in the queue
-            while (ptcpipobj->sendOneEventFromQueue(false))
-                ;
-
-            // Send '+OK<CR><LF>' every two seconds to indicate that the
-            // link is open
-            if ((time(NULL) - ptcpipobj->m_pClientItem->m_timeRcvLoop) > 2) {
-                ptcpipobj->m_pClientItem->m_timeRcvLoop    = time(NULL);
-                ptcpipobj->m_pClientItem->m_clientActivity = time(NULL);
-                ptcpipobj->write("+OK\r\n", 5);
-            }
-        }
-        else {
-
-            // Set poll
-            fd.fd      = ptcpipobj->m_conn->client.sock;
-            fd.events  = POLLIN;
-            fd.revents = 0;
-
-            // Wait for data
-            if (stcp_poll(&fd,
-                          1,
-                          500,
-                          &(ptcpipobj->m_pParent->m_nStopTcpIpSrv)) < 0) {
-                continue; // Nothing
-            }
-
-            // Data in?
-            if (!(fd.revents & POLLIN)) {
-                continue;
-            }
-        }
-
-        // Read possible data from client
-        //      If in receive loop we know we have delay
-        //      in event waiting above.
-        memset(buf, 0, sizeof(buf));
-        int nRead = stcp_read(ptcpipobj->m_conn,
-                              buf,
-                              sizeof(buf),
-                              (ptcpipobj->m_bReceiveLoop) ? 0 : 0);
-
-        if (0 == nRead) {
-            ; // Nothing more to read - Check for command and continue -> below
-        }
-        else if (nRead < 0) {
-
-            if (STCP_ERROR_TIMEOUT == nRead) {
-                ptcpipobj->m_rv = VSCP_ERROR_TIMEOUT;
-            }
-            else if (STCP_ERROR_STOPPED == nRead) {
-                ptcpipobj->m_rv = VSCP_ERROR_STOPPED;
-                continue;
-            }
-            break;
-        }
-        else if (nRead > 0) {
-            ptcpipobj->m_strResponse += std::string(buf, nRead);
-        }
-
-        // Record client activity
-        ptcpipobj->m_pClientItem->m_clientActivity = time(NULL);
-
-        // get data up to "\r\n" if any
-        size_t pos;
-        if (ptcpipobj->m_strResponse.npos !=
-            (pos = ptcpipobj->m_strResponse.find("\n"))) {
-
-            // Get the command
-            std::string strCommand =
-              vscp_str_left(ptcpipobj->m_strResponse, pos + 1);
-
-            // Save the unhandled part
-            ptcpipobj->m_strResponse =
-              vscp_str_right(ptcpipobj->m_strResponse,
-                             ptcpipobj->m_strResponse.length() - pos - 1);
-
-            // Remove whitespace
-            vscp_trim(strCommand);
-
-            // If nothing to do do nothing - pretty obious if you think about it
-            if (0 == strCommand.length())
-                continue;
-
-            // Check for repeat command
-            // +    - repear last command
-            // +n   - Repeat n-th command
-            // ++
-            if (ptcpipobj->m_commandArray.size() && ('+' == strCommand[0])) {
-
-                if (vscp_startsWith(strCommand, "++", &strCommand)) {
-                    for (int i = ptcpipobj->m_commandArray.size() - 1; i >= 0;
-                         i--) {
-                        std::string str = vscp_str_format(
-                          "%d - %s",
-                          ptcpipobj->m_commandArray.size() - i - 1,
-                          ptcpipobj->m_commandArray[i].c_str());
-                        vscp_trim(str);
-                        ptcpipobj->write(str, true);
-                    }
-                    continue;
-                }
-
-                // Get pos
-                unsigned int n = 0;
-                if (strCommand.length() > 1) {
-                    strCommand = strCommand.substr(strCommand.length() - 1);
-                    n          = vscp_readStringValue(strCommand);
-                }
-
-                // Pos must be within range
-                if (n > ptcpipobj->m_commandArray.size()) {
-                    n = ptcpipobj->m_commandArray.size() - 1;
-                }
-
-                // Get the command
-                strCommand =
-                  ptcpipobj
-                    ->m_commandArray[ptcpipobj->m_commandArray.size() - n - 1];
-
-                // Write out the command
-                ptcpipobj->write(strCommand, true);
-            }
-
-            ptcpipobj->m_commandArray.push_back(
-              strCommand); // put at beginning of list
-            if (ptcpipobj->m_commandArray.size() >
-                VSCP_TCPIP_COMMAND_LIST_MAX) {
-                ptcpipobj->m_commandArray
-                  .pop_front(); // Remove last inserted item
-            }
-
-            // Execute command
-            if (VSCP_TCPIP_RV_CLOSE == ptcpipobj->CommandHandler(strCommand)) {
-                break;
-            }
-        }
-
-    } // while
-
-    // Remove the client from the client queue
-    pthread_mutex_lock(&ptcpipobj->m_pParent->m_mutexTcpClientList);
-    std::list<tcpipClientObj*>::iterator it;
-    for (it = ptcpipobj->m_pParent->m_tcpip_clientList.begin();
-         it != ptcpipobj->m_pParent->m_tcpip_clientList.end();
-         ++it) {
-
-        tcpipClientObj* pclient             = *it; // TODO check
-        struct stcp_connection* stored_conn = pclient->m_conn;
-        if (stored_conn->client.id == ptcpipobj->m_conn->client.id) {
-            ptcpipobj->m_pParent->m_tcpip_clientList.erase(it);
-            break;
-        }
-    }
-    pthread_mutex_unlock(&ptcpipobj->m_pParent->m_mutexTcpClientList);
-
-    // Close the connection
-    stcp_close_connection(ptcpipobj->m_conn);
-    ptcpipobj->m_conn = NULL;
-
-    // Close the channel
-    ptcpipobj->m_pClientItem->m_bOpen = false;
-
-    // Remove the client from the Client List
-    pthread_mutex_lock(&ptcpipobj->m_pObj->m_clientList.m_mutexItemList);
-    ptcpipobj->m_pObj->removeClient(ptcpipobj->m_pClientItem);
-    pthread_mutex_unlock(&ptcpipobj->m_pObj->m_clientList.m_mutexItemList);
-
-    ptcpipobj->m_pClientItem = NULL;
-    ptcpipobj->m_pParent     = NULL;
-
-    // Delete the client object
-    delete ptcpipobj;
-
-    SYSLOG(LOG_INFO, "[TCP/IP srv client thread] Exit.");
+    // } // while
 
     return NULL;
 }

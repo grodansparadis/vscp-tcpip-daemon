@@ -29,78 +29,80 @@
 #if !defined(USERLIST__INCLUDED_)
 #define USERLIST__INCLUDED_
 
-#include <iostream>
-#include <map>
+#include <sodium.h>
 
 #include <vscp.h>
 #include <vscphelper.h>
 
-// // User rights bit array
-// // "admin" has all rights.
-// // "user" standard user rights
-// // "driver" can send and receive events and log in to tcp/ip through local host
+#include <iostream>
+#include <map>
 
-// // Rights nibble 7
-// #define VSCP_USER_RIGHT_ALLOW_SHUTDOWN  0x80000000
-// #define VSCP_USER_RIGHT_ALLOW_RESTART   0x40000000
-// #define VSCP_USER_RIGHT_ALLOW_INTERFACE 0x20000000
-// #define VSCP_USER_RIGHT_ALLOW_TEST      0x10000000
+// User rights bit array
+// "admin" has all rights.
+// "user" standard user rights
+// "driver" can send and receive events and log in to tcp/ip through local
 
-// // Rights nibble 6
-// #define VSCP_USER_RIGHT_ALLOW_SETGUID   0x08000000
-// #define VSCP_USER_RIGHT_ALLOW_SETFILTER 0x04000000
+// Rights nibble 7
+#define VSCP_USER_RIGHT_ALLOW_SHUTDOWN  0x80000000
+#define VSCP_USER_RIGHT_ALLOW_RESTART   0x40000000
+#define VSCP_USER_RIGHT_ALLOW_INTERFACE 0x20000000
+#define VSCP_USER_RIGHT_ALLOW_TEST      0x10000000
 
-// // Rights nibble 5
+// Rights nibble 6
+#define VSCP_USER_RIGHT_ALLOW_SETGUID   0x08000000
+#define VSCP_USER_RIGHT_ALLOW_SETFILTER 0x04000000
 
-// // Rights nibble 4
+// Rights nibble 5
 
-// // Rights nibble 3
-// #define VSCP_USER_RIGHT_ALLOW_RCV_EVENT 0x00100000 // Allowed to receive events
+// Rights nibble 4
 
-// // Rights nibble 2
-// #define VSCP_USER_RIGHT_ALLOW_SEND_EVENT 0x00010000 // Allowed to send events
-// #define VSCP_USER_RIGHT_ALLOW_SEND_L1CTRL_EVENT                                \
-//     0x00020000 // Allowed to send Level I protocol events
-// #define VSCP_USER_RIGHT_ALLOW_SEND_L2CTRL_EVENT                                \
-//     0x00040000 // Allowed to send Level 2 protocol events
-// #define VSCP_USER_RIGHT_ALLOW_SEND_HLO_EVENT                                   \
-//     0x00040000 // Allowed to send HLO event(s)
+// Rights nibble 3
+#define VSCP_USER_RIGHT_ALLOW_RCV_EVENT 0x00100000 // Allowed to receive
 
-// // Rights nibble 1
 
-// // Rights nibble 0 - Low nibble is priority. Higher
-// // value allow for more restricted use of commands/functionality
-// #define VSCP_USER_RIGHT_ALLOW_TCPIP     0x00000010
-// #define VSCP_USER_RIGHT_ALLOW_WEBSOCKET 0x00000020
-// #define VSCP_USER_RIGHT_ALLOW_WEB       0x00000040
+// Rights nibble 2
+#define VSCP_USER_RIGHT_ALLOW_SEND_EVENT 0x00010000 // Allowed to send events
+#define VSCP_USER_RIGHT_ALLOW_SEND_L1CTRL_EVENT \
+    0x00020000 // Allowed to send Level I protocol events
+#define VSCP_USER_RIGHT_ALLOW_SEND_L2CTRL_EVENT \
+    0x00040000 // Allowed to send Level 2 protocol events
+#define VSCP_USER_RIGHT_ALLOW_SEND_HLO_EVENT \
+    0x00040000 // Allowed to send HLO event(s)
 
-// // Default user privilege
-// #define VSCP_ADMIN_DEFAULT_RIGHTS 0xFFFFFFFF
+// Rights nibble 1
 
-// #define VSCP_USER_DEFAULT_RIGHTS                                               \
-//     VSCP_USER_RIGHT_ALLOW_TCPIP | VSCP_USER_RIGHT_ALLOW_WEBSOCKET |            \
-//       VSCP_USER_RIGHT_ALLOW_WEB | VSCP_USER_RIGHT_ALLOW_SEND_EVENT |           \
-//       VSCP_USER_RIGHT_ALLOW_RCV_EVENT |                                        \
-//       VSCP_USER_RIGHT_ALLOW_SEND_L1CTRL_EVENT |                                \
-//       VSCP_USER_RIGHT_ALLOW_SEND_L2CTRL_EVENT
+// Rights nibble 0 - Low nibble is priority. Higher
+// value allow for more restricted use of commands/functionality
+#define VSCP_USER_RIGHT_ALLOW_TCPIP     0x00000010
+#define VSCP_USER_RIGHT_ALLOW_WEBSOCKET 0x00000020
+#define VSCP_USER_RIGHT_ALLOW_WEB       0x00000040
 
-// #define VSCP_DRIVER_DEFAULT_RIGHTS                                             \
-//     VSCP_USER_RIGHT_ALLOW_TCPIP | VSCP_USER_RIGHT_ALLOW_WEBSOCKET |            \
-//       VSCP_USER_RIGHT_ALLOW_WEB | VSCP_USER_RIGHT_ALLOW_SEND_EVENT |           \
-//       VSCP_USER_RIGHT_ALLOW_RCV_EVENT |                                        \
-//       VSCP_USER_RIGHT_ALLOW_SEND_L1CTRL_EVENT |                                \
-//       VSCP_USER_RIGHT_ALLOW_SEND_L2CTRL_EVENT |                                \
-//       VSCP_USER_RIGHT_ALLOW_SEND_HLO_EVENT
+// Default user privilege
+#define VSCP_ADMIN_DEFAULT_RIGHTS 0xFFFFFFFF
 
-// #define VSCP_ADD_USER_UNINITIALISED -1
+#define VSCP_USER_DEFAULT_RIGHTS                                               \
+    VSCP_USER_RIGHT_ALLOW_TCPIP | VSCP_USER_RIGHT_ALLOW_WEBSOCKET |            \
+      VSCP_USER_RIGHT_ALLOW_WEB | VSCP_USER_RIGHT_ALLOW_SEND_EVENT |           \
+      VSCP_USER_RIGHT_ALLOW_RCV_EVENT |                                        \
+      VSCP_USER_RIGHT_ALLOW_SEND_L1CTRL_EVENT |                                \
+      VSCP_USER_RIGHT_ALLOW_SEND_L2CTRL_EVENT
 
-// #define USER_PRIVILEGE_MASK  0x0f
-// #define USER_PRIVILEGE_BYTES 8
+#define VSCP_DRIVER_DEFAULT_RIGHTS                                             \
+    VSCP_USER_RIGHT_ALLOW_TCPIP | VSCP_USER_RIGHT_ALLOW_WEBSOCKET |            \
+      VSCP_USER_RIGHT_ALLOW_WEB | VSCP_USER_RIGHT_ALLOW_SEND_EVENT |           \
+      VSCP_USER_RIGHT_ALLOW_RCV_EVENT |                                        \
+      VSCP_USER_RIGHT_ALLOW_SEND_L1CTRL_EVENT |                                \
+      VSCP_USER_RIGHT_ALLOW_SEND_L2CTRL_EVENT |                                \
+      VSCP_USER_RIGHT_ALLOW_SEND_HLO_EVENT
 
-// #define USER_ID_ADMIN 0x00 // The one and only admin user
+#define VSCP_ADD_USER_UNINITIALISED -1
 
-class CGroupItem
-{
+#define USER_PRIVILEGE_MASK  0x0f
+#define USER_PRIVILEGE_BYTES 8
+
+#define USER_ID_ADMIN 0x00 // The one and only admin user
+
+class CGroupItem {
 
   public:
     /// Constructor
@@ -112,8 +114,7 @@ class CGroupItem
   private:
 };
 
-class CUserItem
-{
+class CUserItem {
 
   public:
     /// Constructor
@@ -126,6 +127,16 @@ class CUserItem
      *  Make sure user name is a valid name
      */
     void fixName(void);
+
+    /*!
+        Validate password
+
+        This function checks if the provided password hash matches the client's stored password hash.
+        Argon2 is used.
+        @param password_hash Password hash to validate
+        @return True if the password is valid, false otherwise
+    */ 
+    bool validatePassword(const std::string& password_hash);
 
     /*
         IP ACL. By default, empty or non defined, meaning all IPs are allowed to
@@ -239,8 +250,8 @@ class CUserItem
     void setUserID(const long id) { m_userID = id; };
 
     // Username
-    std::string getUserName(void) { return m_user; };
-    void setUserName(const std::string& strUser) { m_user = strUser; };
+    std::string getUserName(void) { return m_username; };
+    void setUserName(const std::string& strUser) { m_username = strUser; };
 
     // Password
     std::string getPassword(void) { return m_password; };
@@ -450,13 +461,38 @@ class CUserItem
      */
     bool getAsMap(std::map<std::string, std::string>& mapUser);
 
+    /*!
+      Check if the user is authenticated
+      @return true if the user is authenticated, false otherwise
+  */
+    bool isAuthenticated(void) { return m_bAuthenticated; };
+
+    /*!
+        Set the authentication status of the user
+        @param authenticated true if the user is authenticated, false otherwise
+    */
+    void setAuthenticated(bool authenticated)
+    {
+        m_bAuthenticated = authenticated;
+    };
+
+    /*!
+        Reset the authentication status of the user
+    */
+    void resetAuthentication(void) { m_bAuthenticated = false; };
+
   protected:
+    /*!
+      Flag indicating if the user has been authenticated
+    */
+    bool m_bAuthenticated;
+
     // System assigned ID for user (-1 -  for system users (not in DB), 0 for
     // admin user )
     long m_userID;
 
     /// Username
-    std::string m_user;
+    std::string m_username;
 
     /// Password
     std::string m_password;
@@ -497,8 +533,7 @@ class CUserItem
     vscpEventFilter m_filterVSCP;
 };
 
-class CUserList
-{
+class CUserList {
   public:
     /// Constructor
     CUserList(void);
@@ -672,6 +707,13 @@ class CUserList
      *          at that position.
      */
     CUserItem* getUserItemFromOrdinal(uint32_t idx);
+
+    /*!
+     * Get user item from username
+     * @param name Username of the user.
+     * @return A pointer to the useritem with the given username or NULL if no such user exists.
+     */
+    CUserItem* getUserFromName(const std::string& name);
 
   protected:
     /*!

@@ -26,6 +26,20 @@
 // SOFTWARE.
 //
 
+/*!
+    @file devicelist.h
+    @brief Interface for the CDeviceList class.
+
+    This file contains the definition of the CDeviceList class, which
+    manages the list of devices in the VSCP daemon.
+
+    @author Ake Hedman and contributors, the VSCP project
+    @date 2000-2026
+    @version 1.0
+    @copyright Copyright (C) 2000-2026 Ake Hedman and contributors, the VSCP project
+    @license MIT License
+*/
+
 #if !defined(_DEVICELIST_H__0ED35EA7_E9E1_41CD_8A98_5EB3369B3194__INCLUDED_)
 #define _DEVICELIST_H__0ED35EA7_E9E1_41CD_8A98_5EB3369B3194__INCLUDED_
 
@@ -76,6 +90,27 @@ class Driver3Process
 
     void OnTerminate(int pid, int status);
 };
+
+/*!
+    @brief Interface for the Driver3Process class.
+*/
+
+
+/*!
+    @brief CDeviceItem class.
+
+    This class represents an individual device item in the VSCP daemon.
+    It contains information about the device, its configuration, and
+    provides methods to start, pause, resume, and stop the device driver.
+    It also maintains the state of the device and handles the interaction with the underlying driver.
+    It is a crucial component for managing device interactions within the VSCP daemon.
+    @note This class is used internally by the CDeviceList class to manage the collection of device items.
+    @see CDeviceList
+    @ingroup DeviceManagement
+    @version 1.0
+    @copyright Copyright (C) 2000-2026 Ake Hedman and contributors, the VSCP project
+    @license MIT License
+*/
 
 ///////////////////////////////////////////////////////////////////////////////
 // CDeviceItem
@@ -237,6 +272,23 @@ class CDeviceItem
     // Level III
     std::string m_pathExecutable;
 };
+
+/*!
+    @file devicelist.h
+    @brief Interface for the device list in the VSCP daemon.
+
+    This file contains the declaration for the CDeviceList class, which manages
+    a collection of device items within the VSCP daemon. It provides methods
+    to add, remove, and retrieve device items, as well as to count and list
+    all available drivers.
+
+    @author Ake Hedman and contributors, the VSCP project
+    @date 2000-2026
+    @version 1.0
+    @copyright Copyright (C) 2000-2026 Ake Hedman and contributors, the VSCP project
+    @license MIT License
+*/
+
 
 class CDeviceList
 {

@@ -26,14 +26,29 @@
 // SOFTWARE.
 //
 
+/*!
+    @file controlobject.h
+    @brief Interface for the CControlObject class.
+
+    This file contains the definition of the CControlObject class, which
+    manages the main control logic in the VSCP daemon.
+
+    @author Ake Hedman and contributors, the VSCP project
+    @date 2000-2026
+    @version 1.0
+    @copyright Copyright (C) 2000-2026 Ake Hedman and contributors, the VSCP
+   project
+    @license MIT License
+*/
+
 #if !defined(CONTROLOBJECT_H__INCLUDED_)
 #define CONTROLOBJECT_H__INCLUDED_
 
-#include <clientlist.h>
-#include <devicelist.h>
-#include <interfacelist.h>
-#include <tcpipsrv.h>
-#include <userlist.h>
+#include "clientlist.h"
+#include "devicelist.h"
+#include "interfacelist.h"
+#include "tcpipsrv.h"
+#include "userlist.h"
 #include <vscp.h>
 
 #include <atomic>
@@ -153,14 +168,6 @@ class CControlObject {
     bool run(void);
 
     /*!
-        Send automation events
-        @param pClientItem Pointer to client item that want to send
-        automation events
-        @return true on success
-    */
-    bool automation(CClientItem* pClientItem);
-
-    /*!
         Start worker threads for devices
         @return true on success
      */
@@ -216,7 +223,8 @@ class CControlObject {
         client id.
         @return True on success.
     */
-    bool addClient(CClientItem* pClientItem, uint32_t id = 0);
+    bool addClient(CClientItem* pClientItem,
+                   uint16_t id = CClientItem::CLIENT_ID_NONE);
 
     /*!
         Add a new client to the client list using GUID.
@@ -243,21 +251,21 @@ class CControlObject {
 
         @param pClientItem Pointer to client that should be added.
      */
-    void removeClient(CClientItem* pClientItem);
+    //void removeClient(CClientItem* pClientItem);
 
     /*!
         Get device address for primary ehernet adapter
 
         @param guid class
      */
-    bool getMacAddress(cguid& guid);
+    bool getGuidFromMacAddress(cguid& guid);
 
     /*!
-        Get the first IP address computer is known under
+        Get the first IP address computer is known under and convert it to a GUID.
 
         @param pGUID Pointer to GUID class
      */
-    bool getIPAddress(cguid& guid);
+    bool getGuidFromIPAddress(cguid& guid);
 
     /*!
         Read configuration data
@@ -266,41 +274,7 @@ class CControlObject {
      */
     bool readConfiguration(const std::string& strcfgfile);
 
-    /*!
-        send level II message to all clients
-        @param pClientItem Pointer to client object for client that should
-                           receive the event
-        @param pEvent Pointer to event that should be sent to client. Caller
-                        must deallocate if needed.
-        @return true on success
-     */
-    bool sendEventToClient(CClientItem* pClientItem, vscpEvent* pEvent);
-
-    /*!
-        Send Level II event to all clients with exception
-        @param pEvent Pointer to event that should be sent. Caller must
-                        must take care of deallocation.
-        @param excludeID Client with this obid should not receive event.
-        @return True on success
-     */
-    bool sendEventAllClients(vscpEvent* pEvent, uint32_t excludeID = 0);
-
-    /*!
-     * Send event
-     * @param pClientItem Client that send the event.
-     * @param pEvent Event to send. !!! pEventToSend must be
-     *               deallocated by sender !!!
-     * @return True on success false on failure.
-     */
-    bool sendEvent(CClientItem* pClientItem, vscpEvent* peventToSend);
-
-    /*!
-     * Send event
-     * @param pClientItem Client that send the event.
-     * @param pex Eventex to send.
-     * @return True on success false on failure.
-     */
-    bool sendEvent(CClientItem* pClientItem, vscpEventEx* pex);
+    
 
     /*!
      * Check if a driver name is free to us
@@ -335,14 +309,77 @@ class CControlObject {
      */
     bool createFolderStructure(void);
 
-  public:
+    /*!
+        Perform automation tasks for the given client.
+        @param pClientItem Client for which to perform automation.
+        @return True on success, false on failure.
+    */
+    bool doAutomation(CClientItem* pClientItem);
+
+    //**************************************************************************
+    //                            Getters and setters
+    //**************************************************************************
+
+    /*!
+        Set the interface address for the TCP/IP connection.
+        @param interfaceAddress The address of the interface.
+    */
+    void setInterfaceAddress(const std::string& interfaceAddress)
+    {
+        m_interfaceAddress = interfaceAddress;
+    }
+
+    /*!
+        Get the interface address for the TCP/IP connection.
+        @return The address of the interface.
+    */
+    std::string getInterfaceAddress() const { return m_interfaceAddress; }
+
+    /// @brief  Get the TLS options for the TCP/IP interface.
+    /// @param  None
+    /// @return Reference to the TLS options structure.
+    mg_tls_opts& getTlsOptions(void) { return m_tcpip_tls_opts; }
+
+
+    /*!
+        Get client list
+        @return Reference to the map of client items.
+    */
+    CClientList& getClientList() { return m_clientList; };
+
+    // Get client form connection
+    /*!
+        Get client item from connection.
+        @param connectionId The ID of the connection.
+        @return Pointer to the client item, or nullptr if not found.
+    */
+    const CClientItem* getClientFromConnection(struct mg_connection* pConnection);
+
+    /*!
+        Add a client item to the client list.
+        @param pClientItem Pointer to the client item to add.
+    */
+    void addClientItem(CClientItem* pClientItem);
+
+    /*!
+        Remove a client item from the client list.
+        @param pClientItem Pointer to the client item to remove.
+    */
+    void removeClientItem(CClientItem* pClientItem);
+
+    /*!
+        Get the user list.
+        @return Reference to the user list.
+    */
+    CUserList getUserList() { return m_userList; }
+
+  private:
     // This is the root folder for the VSCP daemon, it will look for
     // the configuration database here
     std::string m_rootFolder;
 
     // Set to true of the clientWorkerThread should terminate
     bool m_bQuit_clientMsgWorkerThread;
-
 
     //**************************************************************************
     //                                 Security
@@ -370,18 +407,15 @@ class CControlObject {
     std::string m_runAsUser;
 
     /*!
-        Maximum number of items in receive queue for clients (ClientBufferSize)
-     */
-    uint32_t m_maxItemsInClientReceiveQueue;
-
-    /*!
         Name of this server
      */
     std::string m_strServerName;
 
     /*!
         Server GUID
-        This is the GUID for the server
+        This is the GUID for the server. The server GUID should have
+        the least significant two bytes set to zero so they can be used
+        for interfaces.
     */
     cguid m_guid;
 
@@ -393,34 +427,49 @@ class CControlObject {
     //                      TCP/IP server
     /////////////////////////////////////////////////////////
 
-
-    // Enable encryption on tcp/ip interface if enabled.
-    // 0 = Disabled
-    // 1 = AES-128
-    // 2 = AES-192
-    // 3 = AES-256
-    uint8_t m_encryptionTcpip;
-
-    // Interface used for TCP/IP connection  (only one)
+    /*!
+        Interface used for TCP/IP connection  (only one)
+        Examples for IPv4: 80, 127.0.0.1:9598,
+            192.0.2.3:9598,
+            tcp://192.0.2.3:9599,
+            ssl://192.0.2.3:9598.
+            tls://192.0.2.3:9598
+        Examples for IPv6: [::]:9598,
+            [::1]:9598,
+            tcp://[::1]:9598,
+            tcp://[::1]:9598,
+            ssl://[::1]:9598,
+            tls://[::1]:9598
+    */
     std::string m_interfaceAddress;
 
-    // Data object for the tcp/ip Listen thread
-    tcpipListenThreadObj* m_ptcpipSrvObject;
+    /*!
+        tcp/ip SSL settings
 
-    // Listen thread for tcp/ip connections
-    pthread_t m_tcpipListenThread;
+        ca - Certificate Authority, an mg_str. Used to verify the certificate
+       that the other end sends to us. If NULL, then server authentication for
+       clients and client authentication for servers are disabled.
+       If ca is set but cert is NULL, then only server authentication is
+       performed.
 
-    // tcp/ip SSL settings
-    std::string m_tcpip_ssl_certificate;
-    std::string m_tcpip_ssl_certificate_chain;
-    uint8_t m_tcpip_ssl_verify_peer; // no=0, optional=1, yes=2
-    std::string m_tcpip_ssl_ca_path;
-    std::string m_tcpip_ssl_ca_file;
-    uint8_t m_tcpip_ssl_verify_depth;
-    bool m_tcpip_ssl_default_verify_paths;
-    std::string m_tcpip_ssl_cipher_list;
-    uint8_t m_tcpip_ssl_protocol_version;
-    bool m_tcpip_ssl_short_trust;
+       cert - Our own
+        certificate; an mg_str. If NULL, then we don't authenticate ourselves to
+       the other peer.
+
+
+       key - Our own private key; an mg_str. Sometimes, a
+       certificate and its key are bundled in a single PEM file, in which case
+       the values for cert and key could be the same
+
+       name - Server name; an
+       mg_str. If not empty, enable server name verification.
+
+        NOTE: if both ca and cert are set, then two-way (mutual) TLS
+       authentication is enabled, both sides authenticate each other. Usually,
+       for one-way (server) TLS authentication, server connections set both key
+       and cert, whilst clients only ca and/or possibly name.
+    */
+    mg_tls_opts m_tcpip_tls_opts;
 
     //**************************************************************************
     //                                DATABASE
@@ -500,58 +549,44 @@ class CControlObject {
     pthread_mutex_t m_mutex_deviceList;
 
     // Automation Object
-    // CAutomation m_automation;
+    //CAutomation m_automation;
 
-    // Username for level III drivers
-    std::string m_driverUsername; // TODO remove
+    /// @brief Username for drivers (CClientItem)
+    std::string m_driverUsername;
 
-    // Password for Level III drivers
-    std::string m_driverPassword; // TODO remove
+    /// @brief Password for drivers (CClientItem)
+    std::string m_driverPassword;
 
     //**************************************************************************
     //                                CLIENTS
     //**************************************************************************
 
-    // The list with active clients. (protecting mutex in object)
+    // The list with active clients. (protecting mutex in CClientList object)
     CClientList m_clientList;
 
-    // Mutex for client queue
-    pthread_mutex_t m_mutex_clientList;
+    // map connection to clientitem
+    std::map<struct mg_connection*, CClientItem*> m_connectionClientItemMap;
 
-    // The list of users
+    //**************************************************************************
+    //                                USERS
+    //**************************************************************************
+
+    // The list of users allowed to connect
     CUserList m_userList; // deque
-    pthread_mutex_t m_mutex_UserList;
+    //pthread_mutex_t m_mutex_UserList;
 
     // *************************************************************************
-
-    /*!
-        Send queue
-
-        This is the send queue for all clients attached to the system. A client
-        place events here and the system distribute it to all other clients.
-     */
-    std::list<vscpEvent*> m_clientOutputQueue;
-
-    /*!
-       Event object to indicate that there is an event in the client output
-       queue.
-     */
-    sem_t m_semClientOutputQueue;
-
-    /*!
-        Mutex for Level II message send queue
-     */
-    pthread_mutex_t m_mutex_ClientOutputQueue;
-
-    /*!
-        Semaphore that is signaled when workerthread
-        have send an incoming event to all clients
-    */
-    sem_t m_semSentToAllClients;
-
+    //                      Output queue for clients
     // *************************************************************************
 
-  private:
+
+    /*!
+        Maximum number of items in receive queue for clients (ClientBufferSize)
+     */
+    uint32_t m_maxItemsInClientReceiveQueue;
+
+    
+
     //**************************************************************************
     //                          Threads
     //**************************************************************************

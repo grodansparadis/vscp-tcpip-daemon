@@ -385,54 +385,54 @@ main(int argc, char **argv)
   }
 
   // Console log
-  auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-  if (gpobj->m_bEnableConsoleLog) {
-    console_sink->set_level(gpobj->m_consoleLogLevel);
-    console_sink->set_pattern(gpobj->m_consoleLogPattern);
-  }
-  else {
-    console_sink->set_level(spdlog::level::off);
-  }
+  // auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+  // if (gpobj->m_bEnableConsoleLog) {
+  //   console_sink->set_level(gpobj->m_consoleLogLevel);
+  //   console_sink->set_pattern(gpobj->m_consoleLogPattern);
+  // }
+  // else {
+  //   console_sink->set_level(spdlog::level::off);
+  // }
 
-  try {
-    std::string logDir = gpobj->m_path_to_log_file;
-    size_t slashPos    = logDir.find_last_of('/');
-    if (std::string::npos != slashPos) {
-      logDir = logDir.substr(0, slashPos);
-      if (logDir.length() && !vscp_fileExists(logDir.c_str())) {
-        if (!createDirectoryRecursive(logDir)) {
-          console->error("Failed to create log directory {}. [{}]", logDir, strerror(errno));
-        }
-      }
-    }
+  // try {
+  //   std::string logDir = gpobj->m_path_to_log_file;
+  //   size_t slashPos    = logDir.find_last_of('/');
+  //   if (std::string::npos != slashPos) {
+  //     logDir = logDir.substr(0, slashPos);
+  //     if (logDir.length() && !vscp_fileExists(logDir.c_str())) {
+  //       if (!createDirectoryRecursive(logDir)) {
+  //         console->error("Failed to create log directory {}. [{}]", logDir, strerror(errno));
+  //       }
+  //     }
+  //   }
 
-    auto rotating_file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(gpobj->m_path_to_log_file.c_str(),
-                                                                                     gpobj->m_max_log_size,
-                                                                                     gpobj->m_max_log_files);
-    if (gpobj->m_bEnableFileLog) {
-      rotating_file_sink->set_level(gpobj->m_fileLogLevel);
-      rotating_file_sink->set_pattern(gpobj->m_fileLogPattern);
-    }
-    else {
-      rotating_file_sink->set_level(spdlog::level::off);
-    }
+  //   auto rotating_file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(gpobj->m_path_to_log_file.c_str(),
+  //                                                                                    gpobj->m_max_log_size,
+  //                                                                                    gpobj->m_max_log_files);
+  //   if (gpobj->m_bEnableFileLog) {
+  //     rotating_file_sink->set_level(gpobj->m_fileLogLevel);
+  //     rotating_file_sink->set_pattern(gpobj->m_fileLogPattern);
+  //   }
+  //   else {
+  //     rotating_file_sink->set_level(spdlog::level::off);
+  //   }
 
-    std::vector<spdlog::sink_ptr> sinks{ console_sink, rotating_file_sink };
-    auto logger = std::make_shared<spdlog::async_logger>("logger",
-                                                         sinks.begin(),
-                                                         sinks.end(),
-                                                         spdlog::thread_pool(),
-                                                         spdlog::async_overflow_policy::block);
-    logger->set_level(spdlog::level::trace);
-    spdlog::register_logger(logger);
-    spdlog::set_default_logger(logger);
-  }
-  catch (...) {
-    console->critical("mqttvscpd: Unable to start the application due to spdlog setup failure. Exiting.");
-    spdlog::drop_all();
-    spdlog::shutdown();
-    exit(EXIT_FAILURE);
-  }
+  //   std::vector<spdlog::sink_ptr> sinks{ console_sink, rotating_file_sink };
+  //   auto logger = std::make_shared<spdlog::async_logger>("logger",
+  //                                                        sinks.begin(),
+  //                                                        sinks.end(),
+  //                                                        spdlog::thread_pool(),
+  //                                                        spdlog::async_overflow_policy::block);
+  //   logger->set_level(spdlog::level::trace);
+  //   spdlog::register_logger(logger);
+  //   spdlog::set_default_logger(logger);
+  // }
+  // catch (...) {
+  //   console->critical("mqttvscpd: Unable to start the application due to spdlog setup failure. Exiting.");
+  //   spdlog::drop_all();
+  //   spdlog::shutdown();
+  //   exit(EXIT_FAILURE);
+  // }
 
   console->debug("mqttvscpd: run.");
 

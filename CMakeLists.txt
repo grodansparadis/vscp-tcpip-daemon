@@ -84,6 +84,14 @@ find_package(EXPAT REQUIRED)
 find_package(CURL REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(SQLite3 REQUIRED)
+if(WIN32)
+    find_package(unofficial-sodium CONFIG REQUIRED)
+    set(VSCPD_SODIUM_TARGET unofficial-sodium::sodium)
+else()
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(LIBSODIUM REQUIRED IMPORTED_TARGET libsodium)
+    set(VSCPD_SODIUM_TARGET PkgConfig::LIBSODIUM)
+endif()
 # find_package(nlohmann_json 3.11.0 REQUIRED)
 # find_package(spdlog 1.15 REQUIRED)
 
@@ -103,7 +111,7 @@ include(FetchContent)
 FetchContent_Declare(
   vscp
   GIT_REPOSITORY https://github.com/grodansparadis/vscp.git
-  GIT_TAG 8fdc195103eda6047e2e59ff860eb5394c9434da
+  GIT_TAG 702571630f2eae19ca581d291896500495d3cd1f
 )
 FetchContent_MakeAvailable(vscp)
 
@@ -181,6 +189,12 @@ set(VSCPD_SOURCES
 add_executable(vscpd ${VSCPD_SOURCES})
 set_target_properties(vscpd PROPERTIES OUTPUT_NAME "vscpd")
 
+# ---- Build the password-hash utility ----
+add_executable(mk_password_hash
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/mkpasswd/mk_password_hash.cpp"
+)
+target_link_libraries(mk_password_hash PRIVATE ${VSCPD_SODIUM_TARGET})
+
 # The daemon headers and third-party imports live under src/daemon.
 target_include_directories(vscpd
     PRIVATE
@@ -230,6 +244,7 @@ target_link_libraries(vscpd
         SQLite3::SQLite3
         spdlog
         nlohmann_json
+        ${VSCPD_SODIUM_TARGET}
         ${EXPAT_LIBRARIES}
         ${CURL_LIBRARIES}
 )

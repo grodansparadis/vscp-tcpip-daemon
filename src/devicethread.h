@@ -26,6 +26,21 @@
 // SOFTWARE.
 //
 
+/*!
+    @file devicethread.h
+    @brief Interface for the device threads in the VSCP daemon.
+
+    This file contains the declarations for the device threads used in the VSCP daemon.
+    It provides the necessary function prototypes for handling device communication
+    at both Level 1 and Level 2.
+
+    @author Ake Hedman and contributors, the VSCP project
+    @date 2000-2026
+    @version 1.0
+    @copyright Copyright (C) 2000-2026 Ake Hedman and contributors, the VSCP project
+    @license MIT License
+*/
+
 #if !defined(DEVICETHREAD_H__7D80016B_5EFD_40D5_94E3_6FD9C324CC7B__INCLUDED_)
 #define DEVICETHREAD_H__7D80016B_5EFD_40D5_94E3_6FD9C324CC7B__INCLUDED_
 

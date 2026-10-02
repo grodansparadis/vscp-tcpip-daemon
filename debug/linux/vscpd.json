@@ -3,7 +3,7 @@
   "_docs": "https://docs.vscp.org/vscpd/15.0/#/configuring_the_vscp_daemon",
   "runasuser": "vscp",
   "debug": 0,
-  "guid": "FF:FF:FF:FF:FF:FF:FF:F5:00:00:00:00:00:00:00:01",
+  "guid": "-",
   "servername": "The VSCP daemon",
   "classtypedb": "/var/lib/vscp/vscpd/vscp_events.sqlite3",
   "maindb": "/var/lib/vscp/vscpd/vscp.sqlite3",
@@ -30,8 +30,29 @@
     "udp-port" : 9999
   },
 
+  "users": [
+    {
+      "username": "admin",
+      "_comment_password": "Password is stored hashed using Argon2",
+      "password": "admin",
+      "fullname": "admin",
+      "_comment_remotes": "List of remote connections for this user",
+      "remotes": [],
+      "_comment_events": "List of events this user can send",
+      "events": []
+    }
+  ],
+
+
   "tcpip": {
-    
+    "interface-address": "127.0.0.1:9598",
+    "_comment": "If ssl is used, configure the SSL options below otherwise remove this section",
+    "ssl-options": {
+      "cafile": "",
+      "certfile": "",
+      "keyfile": "",
+      "name": ""
+    }
   },
 
   "drivers": {
@@ -43,71 +64,7 @@
         "flags": 1,
         "translation": 2,
         "path": "/var/lib/vscp/drivers/level1/vscpl1drv-logger.so",
-        "guid": "FF:FF:FF:FF:FF:FF:FF:F5:01:00:00:00:00:00:00:00",
-        "mqtt": {
-          "bind": "",
-          "host": "localhost",
-          "port": 1883,
-          "mqtt-options": {
-            "tcp-nodelay": true,
-            "protocol-version": 311,
-            "receive-maximum": 20,
-            "send-maximum": 20,
-            "ssl-ctx-with-defaults": 0,
-            "tls-ocsp-required": 0,
-            "tls-use-os-certs": 0
-          },
-          "user": "vscp",
-          "password": "secret",
-          "clientid": "",
-          "publish-format": "json",
-          "subscribe-format": "auto",
-          "qos": 1,
-          "bcleansession": false,
-          "bretain": false,
-          "keepalive": 60,
-          "bjsonmeasurementblock": true,
-          "reconnect": {
-            "delay": 2,
-            "delay-max": 10,
-            "exponential-backoff": false
-          },
-          "tls": {
-            "cafile": "",
-            "capath": "",
-            "certfile": "",
-            "keyfile": "",
-            "pwkeyfile": "",
-            "no-hostname-checking": true,
-            "cert-reqs": 0,
-            "version": "",
-            "ciphers": "",
-            "psk": "",
-            "psk-identity": ""
-          },
-          "will": {
-            "topic": "vscp-daemon/{{srvguid}}/drivers/{{ifguid}}/will",
-            "qos": 1,
-            "retain": true,
-            "payload": "Level I logger driver down"
-          },
-          "subscribe": [
-            {
-              "topic": "vscp/{{guid}}/command/#",
-              "qos": 0,
-              "v5-options": 0,
-              "format": "auto"
-            }
-          ],
-          "publish": [
-            {
-              "topic": "vscp/{{srvguid}}/{{ifguid}}/event",
-              "qos": 0,
-              "retain": false,
-              "format": "json"
-            }
-          ]
-        }
+        "guid": "FF:FF:FF:FF:FF:FF:FF:F5:01:00:00:00:00:00:00:00"        
       }
     ],
     "level2": [
@@ -116,216 +73,28 @@
         "name": "lmsensors",
         "path-driver": "/var/lib/vscp/drivers/level2/vscpl2drv-lmsensors.so",
         "path-config": "/var/lib/vscp/vscpd/lmsensors.json",
-        "guid": "FF:FF:FF:FF:FF:FF:FF:F5:02:00:00:00:00:00:00:02",
-        "mqtt": {
-          "bind": "",
-          "host": "localhost",
-          "port": 1883,
-          "user": "vscp",
-          "password": "secret",
-          "clientid": "",
-          "publish-format": "json",
-          "subscribe-format": "auto",
-          "qos": 1,
-          "bcleansession": false,
-          "bretain": false,
-          "keepalive": 60,
-          "reconnect": {
-            "delay": 2,
-            "delay-max": 10,
-            "exponential-backoff": false
-          },
-          "tls": {
-            "cafile": "",
-            "capath": "",
-            "certfile": "",
-            "keyfile": ""
-          },
-          "will": {
-            "topic": "vscp-daemon/{{srvguid}}/drivers/{{ifguid}}/will",
-            "qos": 1,
-            "retain": true,
-            "payload": "Level II lmsensors driver down"
-          },
-          "subscribe": [
-            {
-              "topic": "vscp/{{guid}}/command/#",
-              "qos": 0,
-              "v5-options": 0,
-              "format": "auto"
-            }
-          ],
-          "publish": [
-            {
-              "topic": "vscp/{{srvguid}}/{{ifguid}}/event",
-              "qos": 0,
-              "retain": false,
-              "format": "json"
-            }
-          ]
-        }
+        "guid": "FF:FF:FF:FF:FF:FF:FF:F5:02:00:00:00:00:00:00:02"
       },
       {
         "enable": false,
         "name": "socketcan",
         "path-driver": "/var/lib/vscp/drivers/level2/vscpl2drv-socketcan.so",
         "path-config": "/var/lib/vscp/vscpd/socketcan.json",
-        "guid": "FF:FF:FF:FF:FF:FF:FF:F5:02:00:00:00:00:00:00:03",
-        "mqtt": {
-          "bind": "",
-          "host": "localhost",
-          "port": 1883,
-          "user": "vscp",
-          "password": "secret",
-          "clientid": "",
-          "publish-format": "json",
-          "subscribe-format": "auto",
-          "qos": 1,
-          "bcleansession": false,
-          "bretain": false,
-          "keepalive": 60,
-          "reconnect": {
-            "delay": 2,
-            "delay-max": 10,
-            "exponential-backoff": false
-          },
-          "tls": {
-            "cafile": "",
-            "capath": "",
-            "certfile": "",
-            "keyfile": ""
-          },
-          "will": {
-            "topic": "vscp-daemon/{{srvguid}}/drivers/{{ifguid}}/will",
-            "qos": 1,
-            "retain": true,
-            "payload": "Level II socketcan driver down"
-          },
-          "subscribe": [
-            {
-              "topic": "vscp/{{guid}}/command/#",
-              "qos": 0,
-              "v5-options": 0,
-              "format": "auto"
-            }
-          ],
-          "publish": [
-            {
-              "topic": "vscp/{{srvguid}}/{{ifguid}}/event",
-              "qos": 0,
-              "retain": false,
-              "format": "json"
-            }
-          ]
-        }
+        "guid": "FF:FF:FF:FF:FF:FF:FF:F5:02:00:00:00:00:00:00:03"
       },
       {
         "enable": false,
         "name": "tcpiplink",
         "path-driver": "/var/lib/vscp/drivers/level2/vscpl2drv-tcpiplink.so",
         "path-config": "/var/lib/vscp/vscpd/tcpiplink.json",
-        "guid": "FF:FF:FF:FF:FF:FF:FF:F5:02:00:00:00:00:00:00:05",
-        "mqtt": {
-          "bind": "",
-          "host": "localhost",
-          "port": 1883,
-          "user": "vscp",
-          "password": "secret",
-          "clientid": "",
-          "publish-format": "json",
-          "subscribe-format": "auto",
-          "qos": 1,
-          "bcleansession": false,
-          "bretain": false,
-          "keepalive": 60,
-          "reconnect": {
-            "delay": 2,
-            "delay-max": 10,
-            "exponential-backoff": false
-          },
-          "tls": {
-            "cafile": "",
-            "capath": "",
-            "certfile": "",
-            "keyfile": ""
-          },
-          "will": {
-            "topic": "vscp-daemon/{{srvguid}}/drivers/{{ifguid}}/will",
-            "qos": 1,
-            "retain": true,
-            "payload": "Level II tcpiplink driver down"
-          },
-          "subscribe": [
-            {
-              "topic": "vscp/{{guid}}/command/#",
-              "qos": 0,
-              "v5-options": 0,
-              "format": "auto"
-            }
-          ],
-          "publish": [
-            {
-              "topic": "vscp/{{srvguid}}/{{ifguid}}/event",
-              "qos": 0,
-              "retain": false,
-              "format": "json"
-            }
-          ]
-        }
+        "guid": "FF:FF:FF:FF:FF:FF:FF:F5:02:00:00:00:00:00:00:05"
       },
       {
         "enable": false,
         "name": "sim",
         "path-driver": "/var/lib/vscp/drivers/level2/vscpl2drv-sim.so",
         "path-config": "/var/lib/vscp/vscpd/sim.json",
-        "guid": "FF:FF:FF:FF:FF:FF:FF:F5:02:00:00:00:00:00:00:07",
-        "mqtt": {
-          "bind": "",
-          "host": "localhost",
-          "port": 1883,
-          "user": "vscp",
-          "password": "secret",
-          "clientid": "",
-          "publish-format": "json",
-          "subscribe-format": "auto",
-          "qos": 1,
-          "bcleansession": false,
-          "bretain": false,
-          "keepalive": 60,
-          "reconnect": {
-            "delay": 2,
-            "delay-max": 10,
-            "exponential-backoff": false
-          },
-          "tls": {
-            "cafile": "",
-            "capath": "",
-            "certfile": "",
-            "keyfile": ""
-          },
-          "will": {
-            "topic": "vscp-daemon/{{srvguid}}/drivers/{{ifguid}}/will",
-            "qos": 1,
-            "retain": true,
-            "payload": "Level II sim driver down"
-          },
-          "subscribe": [
-            {
-              "topic": "vscp/{{guid}}/command/#",
-              "qos": 0,
-              "v5-options": 0,
-              "format": "auto"
-            }
-          ],
-          "publish": [
-            {
-              "topic": "vscp/{{srvguid}}/{{ifguid}}/event",
-              "qos": 0,
-              "retain": false,
-              "format": "json"
-            }
-          ]
-        }
+        "guid": "FF:FF:FF:FF:FF:FF:FF:F5:02:00:00:00:00:00:00:07"
       }
     ]
   }

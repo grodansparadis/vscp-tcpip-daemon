@@ -27,23 +27,23 @@
 //
 
 #ifdef __GNUG__
-//#pragma implementation
+// #pragma implementation
 #endif
 
 #include <deque>
 #include <map>
 #include <string>
 
+#include <canal-macro.h>
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
-#include <canal-macro.h>
 
-#include <vscp-aes.h>
+#include "userlist.h"
 #include <controlobject.h>
+#include <vscp-aes.h>
 #include <vscpdb.h>
 #include <vscphelper.h>
-#include "userlist.h"
 
 // Forward declarations
 void
@@ -55,14 +55,121 @@ vscp_md5(char* digest, const unsigned char* buf, size_t len);
 
 extern CControlObject* gpobj;
 
+// ----------------------------------------------------------------------------
+
+/*
+
+    const std::string pw = "correct horse battery staple";
+    const std::string stored = hash_password(pw);
+    std::printf("hash:   %s\n", stored.c_str());
+    std::printf("good:   %s\n", verify_password(stored, pw) ? "ok" : "FAIL");
+    std::printf("bad:    %s\n", verify_password(stored, "wrong") ? "FAIL" : "rejected");
+
+*/
+
+
+
+// Tune these to your server. MODERATE = ~256 MiB RAM, ~0.7 s on a typical CPU.
+// INTERACTIVE = 64 MiB, ~0.1 s (the OWASP-style minimum is roughly this or
+// higher). On a small/embedded box, use INTERACTIVE or lower the values
+// yourself.
+constexpr unsigned long long OPS_LIMIT = crypto_pwhash_OPSLIMIT_INTERACTIVE;
+constexpr size_t MEM_LIMIT             = crypto_pwhash_MEMLIMIT_INTERACTIVE;
+
+// Returns a self-contained string like
+// "$argon2id$v=19$m=65536,t=2,p=1$<salt>$<hash>" Store this string in a single
+// database column.
+std::string
+hash_password(const std::string& password)
+{
+    char out[crypto_pwhash_STRBYTES];
+    if (crypto_pwhash_str_alg(out,
+                              password.c_str(),
+                              password.size(),
+                              OPS_LIMIT,
+                              MEM_LIMIT,
+                              crypto_pwhash_ALG_ARGON2ID13) != 0) {
+        throw std::runtime_error("password hashing failed (out of memory?)");
+    }
+    return std::string(out);
+}
+
+// Constant-time verification.
+bool
+verify_password(const std::string& stored_hash, const std::string& password)
+{
+    return crypto_pwhash_str_verify(stored_hash.c_str(),
+                                    password.c_str(),
+                                    password.size()) == 0;
+}
+
+// True if the stored hash uses weaker parameters than the current settings
+// (or a different algorithm) and should be re-hashed at next successful login.
+bool
+needs_rehash(const std::string& stored_hash)
+{
+    return crypto_pwhash_str_needs_rehash(stored_hash.c_str(),
+                                          OPS_LIMIT,
+                                          MEM_LIMIT) != 0;
+}
+
+// ---------------------------------------------------------------------------
+// Migration from MD5 without forcing a password reset.
+//
+// Step 1 (one-off script): for every user, store
+//     hash_password(legacy_md5_hex)   and set legacy_wrapped = true
+// Step 2 (at login): see login() below.
+// ---------------------------------------------------------------------------
+
+struct UserRecord {
+    std::string hash;
+    bool legacy_wrapped; // true = hash is argon2id(md5_hex_of_password)
+};
+
+// Provide your own MD5 hex function only for the legacy path
+// (e.g. the one your server already uses).
+std::string
+md5_hex(const std::string& s);
+
+bool
+login(UserRecord& user, const std::string& password)
+{
+    if (user.legacy_wrapped) {
+        if (!verify_password(user.hash, md5_hex(password)))
+            return false;
+        // Success: upgrade to a plain Argon2id hash of the real password.
+        user.hash           = hash_password(password);
+        user.legacy_wrapped = false;
+        // ...persist user to the database here...
+        return true;
+    }
+
+    if (!verify_password(user.hash, password))
+        return false;
+
+    if (needs_rehash(user.hash)) {
+        user.hash = hash_password(password);
+        // ...persist user to the database here...
+    }
+    return true;
+}
+
+// ----------------------------------------------------------------------------
+
 ///////////////////////////////////////////////////////////////////////////////
 // Constructor
 //
 
 CUserItem::CUserItem(void)
 {
-    m_userID = -1; // VSCP_ADD_USER_UNINITIALISED;
-    
+    m_userID = -1; // not initialized
+    m_password.clear();
+    m_username.clear();
+    m_fullname.clear();
+    m_note.clear();
+    m_listAllowedRemotes.clear();
+    m_listAllowedEvents.clear();
+    m_bAuthenticated = false;
 
     // Accept all events
     vscp_clearVSCPFilter(&m_filterVSCP);
@@ -103,6 +210,16 @@ CUserItem::fixName(void)
                 break;
         }
     }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// validatePassword
+//
+
+bool CUserItem::validatePassword(const std::string& password_hash)
+{
+    // TODO: Implement password hash validation using Argon2 
+    return false;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -315,31 +432,43 @@ CUserItem::setUserRightsFromString(const std::string& strRights)
             if (0 == strcasecmp(str.c_str(), "admin")) {
                 // All rights
                 m_userRights |= VSCP_ADMIN_DEFAULT_RIGHTS;
-            } else if (0 == strcasecmp(str.c_str(), "user")) {
+            }
+            else if (0 == strcasecmp(str.c_str(), "user")) {
                 // A standard user
                 m_userRights |= VSCP_USER_DEFAULT_RIGHTS;
-            } else if (0 == strcasecmp(str.c_str(), "driver")) {
+            }
+            else if (0 == strcasecmp(str.c_str(), "driver")) {
                 // A standard driver
                 m_userRights |= VSCP_DRIVER_DEFAULT_RIGHTS;
-            } else if (0 == strcasecmp(str.c_str(), "send-events")) {
+            }
+            else if (0 == strcasecmp(str.c_str(), "send-events")) {
                 m_userRights |= VSCP_USER_RIGHT_ALLOW_SEND_EVENT;
-            } else if (0 == strcasecmp(str.c_str(), "receive-events")) {
+            }
+            else if (0 == strcasecmp(str.c_str(), "receive-events")) {
                 m_userRights |= VSCP_USER_RIGHT_ALLOW_RCV_EVENT;
-            } else if (0 == strcasecmp(str.c_str(), "l1ctrl-events")) {
+            }
+            else if (0 == strcasecmp(str.c_str(), "l1ctrl-events")) {
                 m_userRights |= VSCP_USER_RIGHT_ALLOW_SEND_L1CTRL_EVENT;
-            } else if (0 == strcasecmp(str.c_str(), "l2ctrl-events")) {
+            }
+            else if (0 == strcasecmp(str.c_str(), "l2ctrl-events")) {
                 m_userRights |= VSCP_USER_RIGHT_ALLOW_SEND_L2CTRL_EVENT;
-            } else if (0 == strcasecmp(str.c_str(), "hlo-events")) {
+            }
+            else if (0 == strcasecmp(str.c_str(), "hlo-events")) {
                 m_userRights |= VSCP_USER_RIGHT_ALLOW_SEND_HLO_EVENT;
-            } else if (0 == strcasecmp(str.c_str(), "shutdown")) {
+            }
+            else if (0 == strcasecmp(str.c_str(), "shutdown")) {
                 m_userRights |= VSCP_USER_RIGHT_ALLOW_SHUTDOWN;
-            } else if (0 == strcasecmp(str.c_str(), "restart")) {
+            }
+            else if (0 == strcasecmp(str.c_str(), "restart")) {
                 m_userRights |= VSCP_USER_RIGHT_ALLOW_RESTART;
-            } else if (0 == strcasecmp(str.c_str(), "interface")) {
+            }
+            else if (0 == strcasecmp(str.c_str(), "interface")) {
                 m_userRights |= VSCP_USER_RIGHT_ALLOW_INTERFACE;
-            } else if (0 == strcasecmp(str.c_str(), "test")) {
+            }
+            else if (0 == strcasecmp(str.c_str(), "test")) {
                 m_userRights |= VSCP_USER_RIGHT_ALLOW_TEST;
-            } else {
+            }
+            else {
                 // Numerical
                 uint32_t val = vscp_readStringValue(str);
                 m_userRights |= val;
@@ -589,7 +718,7 @@ CUserItem::getUserRightsAsString(void)
     std::string strRights;
 
     for (int i = 0; i < 32; i++) {
-        strRights += vscp_str_format("%d", (m_userRights & (2^i)) ? 1 : 0);
+        strRights += vscp_str_format("%d", (m_userRights & (2 ^ i)) ? 1 : 0);
     }
 
     std::reverse(strRights.begin(), strRights.end());
@@ -732,7 +861,7 @@ CUserList::addSuperUser(const std::string& user,
                         const std::string& allowedRemotes,
                         uint32_t bFlags)
 {
-    //char buf[512];
+    // char buf[512];
 
     // Cant add user with username that is already defined.
     if (NULL != m_userhashmap[user]) {
@@ -761,8 +890,8 @@ CUserList::addSuperUser(const std::string& user,
     tokens.pop_front();
     strCrypto = tokens.front();
 
-    strIV = "5a475c082c80dcdf7f2dfbd976253b24";
-    strCrypto ="69b1180d2f4809d39be34e19c750107f";
+    strIV     = "5a475c082c80dcdf7f2dfbd976253b24";
+    strCrypto = "69b1180d2f4809d39be34e19c750107f";
     if (0 == vscp_hexStr2ByteArray(iv, 16, (const char*)strIV.c_str())) {
         SYSLOG(LOG_ERR,
                "[addSuperUser] Authentication: No room "
@@ -771,7 +900,7 @@ CUserList::addSuperUser(const std::string& user,
     }
 
     size_t len;
-    if (0 == (len = vscp_hexStr2ByteArray((uint8_t *)secret,
+    if (0 == (len = vscp_hexStr2ByteArray((uint8_t*)secret,
                                           strCrypto.length(),
                                           (const char*)strCrypto.c_str()))) {
         SYSLOG(LOG_ERR,
@@ -781,7 +910,12 @@ CUserList::addSuperUser(const std::string& user,
     }
 
     memset(buf, 0, sizeof(buf));
-    AES_CBC_decrypt_buffer(AES128, (uint8_t *)buf, (uint8_t *)secret, len, gpobj->m_systemKey, iv);
+    AES_CBC_decrypt_buffer(AES128,
+                           (uint8_t*)buf,
+                           (uint8_t*)secret,
+                           len,
+                           gpobj->m_systemKey,
+                           iv);
 
     // std::string str = std::string((const char*)buf);
     // std::deque<std::string> tokens;
@@ -972,7 +1106,8 @@ CUserList::addUser(const std::string& strUser,
             strNote = tokens.front();
             tokens.pop_front();
             vscp_base64_std_decode(strNote);
-        } else {
+        }
+        else {
             strNote = tokens.front();
             tokens.pop_front();
         }
@@ -1078,12 +1213,11 @@ CUserList::validateUser(const std::string& user, const std::string& password)
         return NULL;
     }
 
-    // if (!vscp-isPasswordValid(pUserItem->getPassword(), password)) {
-    //     SYSLOG(LOG_INFO,
-    //            "validateUser: Failed to validate user - "
-    //            "Check username/password.");
-    //     return NULL;
-    // }
+    if (!vscp - isPasswordValid(pUserItem->getPassword(), password)) {
+        spdlog::info("validateUser: Failed to validate user - "
+                     "Check username/password.");
+        return NULL;
+    }
 
     return pUserItem;
 }
@@ -1160,7 +1294,8 @@ CUserList::getUserAsString(uint32_t idx, std::string& strUser)
             CUserItem* pUserItem = it->second;
             if (getUserAsString(pUserItem, strUser)) {
                 return true;
-            } else {
+            }
+            else {
                 return false;
             }
         }
@@ -1199,7 +1334,6 @@ CUserList::getAllUsers(std::string& strAllusers)
 ///////////////////////////////////////////////////////////////////////////////
 // getAllUsers
 //
-//
 
 bool
 CUserList::getAllUsers(std::deque<std::string>& arrayUsers)
@@ -1218,7 +1352,6 @@ CUserList::getAllUsers(std::deque<std::string>& arrayUsers)
 
 ///////////////////////////////////////////////////////////////////////////////
 // getUserItemFromOrdinal
-//
 //
 
 CUserItem*
@@ -1239,5 +1372,20 @@ CUserList::getUserItemFromOrdinal(uint32_t idx)
         i++;
     }
 
+    return NULL;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// getUserFromName
+//
+
+CUserItem*
+CUserList::getUserFromName(const std::string& name)
+{
+    std::map<std::string, CUserItem*>::iterator it;
+    it = m_userhashmap.find(name);
+    if (it != m_userhashmap.end()) {
+        return it->second;
+    }
     return NULL;
 }

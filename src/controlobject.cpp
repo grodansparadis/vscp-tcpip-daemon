@@ -74,6 +74,8 @@ extern "C" {
 #include "mongoose.h"
 }
 
+#include <sodium.h>
+
 #include <nlohmann/json.hpp>
 
 #include "spdlog/sinks/basic_file_sink.h"
@@ -130,43 +132,60 @@ tcpip_event_handler(struct mg_connection* conn, int ev, void* ev_data);
 // log_to_spdlog
 //
 
-static void log_to_spdlog(char ch, void *param) {
-  (void) param;
-  static thread_local std::string line;
+static void
+log_to_spdlog(char ch, void* param)
+{
+    (void)param;
+    static thread_local std::string line;
 
-  if (ch != '\n') {
-    line.push_back(ch);
-    return;
-  }
-
-  if (!line.empty() && line.back() == '\r') line.pop_back();
-
-  // Default Mongoose format: "<time> <level> <file>:<line>:<func> <message>"
-  // Level is a single digit: 1=error 2=info 3=debug 4=verbose
-  spdlog::level::level_enum lvl = spdlog::level::info;
-  std::string msg = line;
-
-  size_t p1 = line.find(' ');
-  if (p1 != std::string::npos && p1 + 1 < line.size()) {
-    switch (line[p1 + 1]) {
-      case '1': lvl = spdlog::level::err;   break;
-      case '2': lvl = spdlog::level::info;  break;
-      case '3': lvl = spdlog::level::debug; break;
-      case '4': lvl = spdlog::level::trace; break;
+    if (ch != '\n') {
+        line.push_back(ch);
+        return;
     }
-    // Skip "<time> <level> <file:line:func> " to keep just the message
-    size_t p2 = line.find(' ', p1 + 1);           // after level
-    size_t p3 = (p2 == std::string::npos) ? p2 : line.find(' ', p2 + 1);  // after file:line:func
-    if (p3 != std::string::npos) msg = line.substr(p3 + 1);
-  }
 
-  spdlog::log(lvl, "[mg] {}", msg);
-  line.clear();
+    if (!line.empty() && line.back() == '\r')
+        line.pop_back();
+
+    // Default Mongoose format: "<time> <level> <file>:<line>:<func> <message>"
+    // Level is a single digit: 1=error 2=info 3=debug 4=verbose
+    spdlog::level::level_enum lvl = spdlog::level::info;
+    std::string msg               = line;
+
+    size_t p1 = line.find(' ');
+    if (p1 != std::string::npos && p1 + 1 < line.size()) {
+        switch (line[p1 + 1]) {
+            case '1':
+                lvl = spdlog::level::err;
+                break;
+            case '2':
+                lvl = spdlog::level::info;
+                break;
+            case '3':
+                lvl = spdlog::level::debug;
+                break;
+            case '4':
+                lvl = spdlog::level::trace;
+                break;
+        }
+        // Skip "<time> <level> <file:line:func> " to keep just the message
+        size_t p2 = line.find(' ', p1 + 1); // after level
+        size_t p3 = (p2 == std::string::npos)
+                      ? p2
+                      : line.find(' ', p2 + 1); // after file:line:func
+        if (p3 != std::string::npos)
+            msg = line.substr(p3 + 1);
+    }
+
+    spdlog::log(lvl, "[mg] {}", msg);
+    line.clear();
 }
 
-void init_mongoose_logging() {
-  mg_log_set_fn(log_to_spdlog, nullptr);
-  mg_log_set(MG_LL_DEBUG);   // Mongoose's own filter, spdlog filters again after
+void
+init_mongoose_logging()
+{
+    mg_log_set_fn(log_to_spdlog, nullptr);
+    mg_log_set(
+      MG_LL_DEBUG); // Mongoose's own filter, spdlog filters again after
 }
 
 // ----------------------------------------------------------------------------
@@ -185,33 +204,8 @@ CControlObject::CControlObject()
     m_bQuit_clientMsgWorkerThread =
       false; // true for clientWorkerThread termination
 
-    if (-1 == sem_init(&m_semClientOutputQueue, 0, 0)) {
-        spdlog::error("Unable to init m_semClientOutputQueue");
-        return;
-    }
-
-    if (-1 == sem_init(&m_semSentToAllClients, 0, 0)) {
-        spdlog::error("Unable to init m_semSentToAllClients");
-        return;
-    }
-
-    if (0 != pthread_mutex_init(&m_mutex_ClientOutputQueue, NULL)) {
-        spdlog::error("Unable to init m_mutex_ClientOutputQueue");
-        return;
-    }
-
-    if (0 != pthread_mutex_init(&m_mutex_DeviceList, NULL)) {
+   if (0 != pthread_mutex_init(&m_mutex_DeviceList, NULL)) {
         spdlog::error("Unable to init m_mutex_DeviceList");
-        return;
-    }
-
-    if (0 != pthread_mutex_init(&m_mutex_clientList, NULL)) {
-        spdlog::error("Unable to init m_mutex_clientList");
-        return;
-    }
-
-    if (0 != pthread_mutex_init(&m_mutex_UserList, NULL)) {
-        spdlog::error("Unable to init m_mutex_UserList");
         return;
     }
 
@@ -237,17 +231,10 @@ CControlObject::CControlObject()
 
     // Default TCP/IP interface settings
     m_interfaceAddress = "tcp://localhost:9598";
-    m_encryptionTcpip  = 0;
-    m_tcpip_ssl_certificate.clear();
-    m_tcpip_ssl_certificate_chain.clear();
-    m_tcpip_ssl_verify_peer = 0; // no=0, optional=1, yes=2
-    m_tcpip_ssl_ca_path.clear();
-    m_tcpip_ssl_ca_file.clear();
-    m_tcpip_ssl_verify_depth         = 9;
-    m_tcpip_ssl_default_verify_paths = false;
-    m_tcpip_ssl_cipher_list.clear();
-    m_tcpip_ssl_protocol_version = 0;
-    m_tcpip_ssl_short_trust      = false;
+
+    // No TLS by default
+    memset(&m_tcpip_tls_opts, 0, sizeof(m_tcpip_tls_opts));
+
 
     // Logging defaults
     m_bEnableFileLog   = false;
@@ -306,49 +293,12 @@ CControlObject::~CControlObject()
 
     spdlog::debug("Cleaning up");
 
-    // Remove objects in Client send queue
-    std::list<vscpEvent*>::iterator iterVSCP;
-    pthread_mutex_lock(&m_mutex_ClientOutputQueue);
-    for (iterVSCP = m_clientOutputQueue.begin();
-         iterVSCP != m_clientOutputQueue.end();
-         ++iterVSCP) {
-        vscpEvent* pEvent = *iterVSCP;
-        vscp_deleteEvent_v2(&pEvent);
-    }
-    m_clientOutputQueue.clear();
-    pthread_mutex_unlock(&m_mutex_ClientOutputQueue);
+    
 
-    // Remove all clients
-    m_clientList.removeAllClients();
-
-    // Clean up civetweb
-    // mg_exit_library();
-
-    if (0 != sem_destroy(&m_semClientOutputQueue)) {
-        spdlog::error("Unable to destroy m_semClientOutputQueue");
-    }
-
-    if (0 != sem_destroy(&m_semSentToAllClients)) {
-        spdlog::error("Unable to destroy m_semSentToAllClients");
-    }
-
-    if (0 != pthread_mutex_destroy(&m_mutex_ClientOutputQueue)) {
-        spdlog::error("Unable to destroy m_mutex_ClientOutputQueue");
-        return;
-    }
+   
 
     if (0 != pthread_mutex_destroy(&m_mutex_DeviceList)) {
         spdlog::error("Unable to destroy m_mutex_DeviceList");
-        return;
-    }
-
-    if (0 != pthread_mutex_destroy(&m_mutex_clientList)) {
-        spdlog::error("Unable to destroy m_mutex_clientList");
-        return;
-    }
-
-    if (0 != pthread_mutex_destroy(&m_mutex_UserList)) {
-        spdlog::error("Unable to destroy m_mutex_UserList");
         return;
     }
 
@@ -365,6 +315,12 @@ bool
 CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
 {
     std::string str;
+
+    // Sodium init
+    if (sodium_init() < 0) {  // call once at startup
+        std::fprintf(stderr, "libsodium init failed\n");
+        return false;
+    }
 
     // Save root folder for later use.
     m_rootFolder = rootFolder;
@@ -402,7 +358,7 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
               "Unable to open/parse configuration file. Can't initialize! "
               "Path =%s",
               strcfgfile.c_str());
-            return FALSE;
+            return false;
         }
     }
     catch (...) {
@@ -474,10 +430,10 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
 
     // Get GUID
     if (m_guid.isNULL()) {
-        if (!getMacAddress(m_guid)) {
+        if (!getGuidFromMacAddress(m_guid)) {
             // We failed to create GUID from MAC address use
             // 'localhost' IP instead as the base.
-            getIPAddress(m_guid);
+            getGuidFromIPAddress(m_guid);
         }
     }
 
@@ -538,18 +494,7 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
     return true;
 }
 
-static void
-timer_fn(void* arg)
-{
-    struct mg_mgr* mgr       = (struct mg_mgr*)arg;
-    CControlObject* pCtrlObj = (CControlObject*)mgr->userdata;
 
-    // if (c_res.c == NULL) {
-    //     c_res.i = 0;
-    //     c_res.c = mg_connect(mgr, s_conn, cfn, &c_res);
-    //     MG_INFO(("CLIENT %s", c_res.c ? "connecting" : "failed"));
-    // }
-}
 
 /////////////////////////////////////////////////////////////////////////////
 // run - Program main loop
@@ -562,7 +507,7 @@ CControlObject::run(void)
 {
     std::deque<CClientItem*>::iterator nodeClient;
 
-    // We need to create a clientItem and add this object to the list
+    // We need to create a clientItem for ourself and add this object to the list
     CClientItem* pClientItem = new CClientItem;
     if (NULL == pClientItem) {
         spdlog::error("Unable to allocate Client item, Ending.");
@@ -570,22 +515,19 @@ CControlObject::run(void)
     }
 
     // This is an active client
-    pClientItem->m_bOpen         = true;
-    pClientItem->m_type          = CLIENT_ITEM_INTERFACE_TYPE_CLIENT_INTERNAL;
-    pClientItem->m_strDeviceName = "Internal Server Client.|Started at ";
-    pClientItem->m_strDeviceName += vscpdatetime::Now().getISODateTime();
+    pClientItem->setOpen(true);
+    pClientItem->setInterfaceType(CClientItem::CLIENT_ITEM_INTERFACE_TYPE_CLIENT_INTERNAL);
+    pClientItem->setDeviceName("Internal Server Client.|Started at " +
+                               vscpdatetime::Now().getISODateTime());
 
-    // Add the client to the Client List
-    pthread_mutex_lock(&m_clientList.m_mutexItemList);
-    if (!addClient(pClientItem, CLIENT_ID_INTERNAL)) {
+    // Add the client to the Client List (protected (mutex) in addClient)
+    if (!m_clientList.addClient(pClientItem, CClientItem::CLIENT_ID_INTERNAL)) {
         // Failed to add client
         delete pClientItem;
         spdlog::error("ControlObject: Failed to add internal client.");
-        pthread_mutex_unlock(&m_clientList.m_mutexItemList);
         delete pClientItem;
         return false;
     }
-    pthread_mutex_unlock(&m_clientList.m_mutexItemList);
 
     spdlog::debug("Mainloop starting");
 
@@ -593,29 +535,7 @@ CControlObject::run(void)
     sd_notify(0, "READY=1");
 #endif
 
-    //-------------------------------------------------------------------------
-    //                            Initiate Mongoose
-    //-------------------------------------------------------------------------
-    struct mg_mgr mgr; // Event manager
-    struct mg_connection* conn;
-
-    mg_log_set(MG_LL_INFO); // Set log level
-    mg_mgr_init(&mgr);      // Initialize event manager
-    mgr.userdata = this;
-
-    mg_timer_add(&mgr,
-                 15000,
-                 MG_TIMER_REPEAT | MG_TIMER_RUN_NOW,
-                 timer_fn,
-                 &mgr);
-    conn = mg_listen(&mgr,
-                     m_interfaceAddress.c_str(),
-                     tcpip_event_handler,
-                     this); // Create server connection
-    if (conn == NULL) {
-        MG_INFO(("SERVER cant' open a connection"));
-        return 0;
-    }
+    
 
     //-------------------------------------------------------------------------
     //                            MAIN - LOOP
@@ -635,7 +555,7 @@ CControlObject::run(void)
             // Save time
             clock_gettime(CLOCK_REALTIME, &old_now);
 
-            if (!automation(pClientItem)) {
+            if (!doAutomation(pClientItem)) {
                 spdlog::error("Failed to send automation events!");
             }
         }
@@ -646,7 +566,7 @@ CControlObject::run(void)
         //     continue;
         // }
 
-        mg_mgr_poll(&mgr, 100); // Infinite event loop, blocks for upto 100ms
+        //mg_mgr_poll(&mgr, 100); // Infinite event loop, blocks for upto 100ms
                                 // unless there is network activity
 
         // Send events to websocket clients
@@ -657,28 +577,18 @@ CControlObject::run(void)
         //                   from one of the incoming source
         //----------------------------------------------------------------------
 
-        if (pClientItem->m_clientInputQueue.size()) {
-
-            vscpEvent* pEvent;
-
-            pthread_mutex_lock(&pClientItem->m_mutexClientInputQueue);
-            pEvent = pClientItem->m_clientInputQueue.front();
-            pClientItem->m_clientInputQueue.pop_front();
-            pthread_mutex_unlock(&pClientItem->m_mutexClientInputQueue);
-
-            if (NULL != pEvent) {
-            }
-
-            vscp_deleteEvent_v2(&pEvent);
-
-        } // Event in queue
+        // vscpEvent* pev = pClientItem->getEventFromClientInputQueue(true);
+        // if (NULL == pev) {
+        //     continue;
+        // }
+        // // Process the received event here
+        // // TODO
+        // vscp_deleteEvent_v2(&pev);
 
     } // while
 
-    // Remove messages in the client queues
-    pthread_mutex_lock(&m_clientList.m_mutexItemList);
-    removeClient(pClientItem);
-    pthread_mutex_unlock(&m_clientList.m_mutexItemList);
+    // Remove messages in the client queues (protected inside removeClient)
+    m_clientList.removeClient(pClientItem);
 
     // Clean up is called in main file
 
@@ -691,7 +601,7 @@ CControlObject::run(void)
 // automation
 
 bool
-CControlObject::automation(CClientItem* pClientItem)
+CControlObject::doAutomation(CClientItem* pClientItem) 
 {
     vscpEventEx ex;
 
@@ -712,9 +622,9 @@ CControlObject::automation(CClientItem* pClientItem)
     ex.data[1] = 0; // zone
     ex.data[2] = 0; // subzone
 
-    if (!sendEvent(pClientItem, &ex)) {
-        spdlog::error("Failed to send Class1 heartbeat");
-    }
+    // if (!sendEvent(pClientItem, &ex)) {
+    //     spdlog::error("Failed to send Class1 heartbeat");
+    // }
 
     // Send VSCP_CLASS2_INFORMATION,
     // Type=2/VSCP2_TYPE_INFORMATION_HEART_BEAT
@@ -734,9 +644,9 @@ CControlObject::automation(CClientItem* pClientItem)
            m_strServerName.c_str(),
            std::min((int)strlen(m_strServerName.c_str()), 64));
 
-    if (!sendEvent(pClientItem, &ex)) {
-        spdlog::error("Failed to send Class2 heartbeat");
-    }
+    // if (!sendEvent(pClientItem, &ex)) {
+    //     spdlog::error("Failed to send Class2 heartbeat");
+    // }
 
     // Send VSCP_CLASS1_PROTOCOL,
     // Type=1/VSCP_TYPE_PROTOCOL_SEGCTRL_HEARTBEAT
@@ -761,9 +671,9 @@ CControlObject::automation(CClientItem* pClientItem)
     ex.data[3] = (uint8_t)((time32 >> 8) & 0xff);
     ex.data[4] = (uint8_t)((time32) & 0xff); // Time since epoch LSB
 
-    if (!sendEvent(pClientItem, &ex)) {
-        spdlog::error("Failed to send segment controller heartbeat");
-    }
+    // if (!sendEvent(pClientItem, &ex)) {
+    //     spdlog::error("Failed to send segment controller heartbeat");
+    // }
 
     // Send VSCP_CLASS2_PROTOCOL,
     // Type=20/VSCP2_TYPE_PROTOCOL_HIGH_END_SERVER_CAPS
@@ -782,7 +692,7 @@ CControlObject::automation(CClientItem* pClientItem)
 
     // Server ip address
     cguid guid;
-    if (getIPAddress(guid)) {
+    if (getGuidFromIPAddress(guid)) {
         ex.data[VSCP_CAPABILITY_OFFSET_IP_ADDR]     = guid.getAt(8);
         ex.data[VSCP_CAPABILITY_OFFSET_IP_ADDR + 1] = guid.getAt(9);
         ex.data[VSCP_CAPABILITY_OFFSET_IP_ADDR + 2] = guid.getAt(10);
@@ -802,9 +712,9 @@ CControlObject::automation(CClientItem* pClientItem)
 
     ex.sizeData = 104;
 
-    if (!sendEvent(pClientItem, &ex)) {
-        spdlog::error("Failed to send high end server capabilities.");
-    }
+    // if (!sendEvent(pClientItem, &ex)) {
+    //     spdlog::error("Failed to send high end server capabilities.");
+    // }
 
     return true;
 }
@@ -1034,13 +944,16 @@ CControlObject::generateSessionId(const char* pKey, char* psid)
     char buf[8193];
 
     // Check pointers
-    if (NULL == pKey)
+    if (NULL == pKey) {
         return false;
-    if (NULL == psid)
+    }
+    if (NULL == psid) {
         return false;
+    }
 
-    if (strlen(pKey) > 256)
+    if (strlen(pKey) > 256) {
         return false;
+    }
 
     // Generate a random session ID
     time_t t;
@@ -1132,355 +1045,7 @@ CControlObject::getVscpCapabilities(uint8_t* pCapability)
     return true;
 }
 
-///////////////////////////////////////////////////////////////////////////////
-// sendEventToClient
-//
 
-bool
-CControlObject::sendEventToClient(CClientItem* pClientItem, vscpEvent* pEvent)
-{
-    // Must be valid pointers
-    if (NULL == pClientItem) {
-        spdlog::error("sendEventToClient - Pointer to clientitem is null");
-        return false;
-    }
-    if (NULL == pEvent) {
-        spdlog::error("sendEventToClient - Pointer to event is null");
-        return false;
-    }
-
-    // Check if filtered out - if so do nothing here
-    if (!vscp_doLevel2Filter(pEvent, &pClientItem->m_filter)) {
-
-        spdlog::debug("sendEventToClient - Filtered out");
-
-        return false;
-    }
-
-    // If the client queue is full for this client then the
-    // client will not receive the message
-    if (pClientItem->m_clientInputQueue.size() >
-        m_maxItemsInClientReceiveQueue) {
-
-        spdlog::debug("sendEventToClient - overrun");
-
-        // Overrun
-        pClientItem->m_statistics.cntOverruns++;
-        return false;
-    }
-
-    // Create a new event
-    vscpEvent* pnewvscpEvent = new vscpEvent;
-    if (NULL != pnewvscpEvent) {
-
-        // Copy in the new event
-        if (!vscp_copyEvent(pnewvscpEvent, pEvent)) {
-            vscp_deleteEvent_v2(&pnewvscpEvent);
-            return false;
-        }
-
-        // Add the new event to the input queue
-        pthread_mutex_lock(&pClientItem->m_mutexClientInputQueue);
-        pClientItem->m_clientInputQueue.push_back(pnewvscpEvent);
-        pthread_mutex_unlock(&pClientItem->m_mutexClientInputQueue);
-        sem_post(&pClientItem->m_semClientInputQueue);
-    }
-
-    return true;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// sendEventAllClients
-//
-
-bool
-CControlObject::sendEventAllClients(vscpEvent* pEvent, uint32_t excludeID)
-{
-    CClientItem* pClientItem;
-    std::deque<CClientItem*>::iterator it;
-
-    if (NULL == pEvent) {
-        spdlog::error("sendEventAllClients - null event");
-        return false;
-    }
-
-    pthread_mutex_lock(&m_clientList.m_mutexItemList);
-    for (it = m_clientList.m_itemList.begin();
-         it != m_clientList.m_itemList.end();
-         ++it) {
-        pClientItem = *it;
-
-        if ((NULL != pClientItem) && (excludeID != pClientItem->m_clientID)) {
-
-            spdlog::debug("Send event to client [%s]",
-                          pClientItem->m_strDeviceName.c_str());
-
-            if (!sendEventToClient(pClientItem, pEvent)) {
-                spdlog::error("sendEventAllClients - Failed to send event");
-            }
-        }
-    }
-
-    pthread_mutex_unlock(&m_clientList.m_mutexItemList);
-
-    return true;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// sendEvent
-//
-// !!! pEventToSend must be deallocated by sender !!!
-//
-
-bool
-CControlObject::sendEvent(CClientItem* pClientItem, vscpEvent* peventToSend)
-{
-    bool bSent = false;
-
-    // Check pointers
-    if (NULL == pClientItem) {
-        spdlog::error("sendEvent - null clientItem");
-        return false;
-    }
-    if (NULL == peventToSend) {
-        spdlog::error("sendEvent - null event");
-        return false;
-    }
-
-    // If timestamp is nulled make one
-    if (0 == peventToSend->timestamp) {
-        peventToSend->timestamp = vscp_makeTimeStamp();
-    }
-
-    // If obid is nulled set client interface id
-    if (0 == peventToSend->obid) {
-        peventToSend->obid = pClientItem->m_clientID;
-    }
-
-    // If GUID is all nilled set interface GUID
-    if (vscp_isGUIDEmpty(peventToSend->GUID)) {
-        memcpy(peventToSend->GUID, pClientItem->m_guid.getGUID(), 16);
-    }
-
-    vscpEvent* pEvent = new vscpEvent; // Create new VSCP Event
-    if (NULL == pEvent) {
-        spdlog::error("sendEvent - Allocation of event failed");
-        return false;
-    }
-
-    pEvent->pdata = NULL;
-
-    // Copy event
-    if (!vscp_copyEvent(pEvent, peventToSend)) {
-        vscp_deleteEvent_v2(&pEvent);
-        spdlog::error("sendEvent - Event copy failed");
-        return false;
-    }
-
-    // Save the originating clients id so
-    // this client don't get the message back
-    if (0 == pEvent->obid) {
-        pEvent->obid = pClientItem->m_clientID;
-    }
-
-    // Level II events between 512-1023 is recognised by the daemon and
-    // sent to the correct interface as Level I events if the interface
-    // is addressed by the client.
-    if ((pEvent->vscp_class <= 1023) && (pEvent->vscp_class >= 512) &&
-        (pEvent->sizeData >= 16)) {
-
-        // This event should be sent to the correct interface if it is
-        // available on this machine. If not it should be sent to
-        // the rest of the network as normal
-
-        cguid destguid;
-        destguid.getFromArray(pEvent->pdata);
-
-        destguid.setAt(14, 0); // Interface GUID's have LSB bytes nilled
-        destguid.setAt(15, 0);
-
-        spdlog::debug("Level I event over Level II "
-                      "dest = %02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:"
-                      "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:",
-                      destguid.getAt(0),
-                      destguid.getAt(1),
-                      destguid.getAt(2),
-                      destguid.getAt(3),
-                      destguid.getAt(4),
-                      destguid.getAt(5),
-                      destguid.getAt(6),
-                      destguid.getAt(7),
-                      destguid.getAt(8),
-                      destguid.getAt(9),
-                      destguid.getAt(10),
-                      destguid.getAt(11),
-                      destguid.getAt(12),
-                      destguid.getAt(13),
-                      destguid.getAt(14),
-                      destguid.getAt(15));
-
-        // Find client
-        pthread_mutex_lock(&m_clientList.m_mutexItemList);
-
-        std::deque<CClientItem*>::iterator it;
-        for (it = m_clientList.m_itemList.begin();
-             it != m_clientList.m_itemList.end();
-             ++it) {
-
-            CClientItem* pItem = *it;
-
-            spdlog::debug(
-              "Test if = "
-              "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:"
-              "%02X:%02X:%02X:%02X:%02X:  - %s",
-              pItem->m_guid.getAt(0),
-              pItem->m_guid.getAt(1),
-              pItem->m_guid.getAt(2),
-              pItem->m_guid.getAt(3),
-              pItem->m_guid.getAt(4),
-              pItem->m_guid.getAt(5),
-              pItem->m_guid.getAt(6),
-              pItem->m_guid.getAt(7),
-              pItem->m_guid.getAt(8),
-              pItem->m_guid.getAt(9),
-              pItem->m_guid.getAt(10),
-              pItem->m_guid.getAt(11),
-              pItem->m_guid.getAt(12),
-              pItem->m_guid.getAt(13),
-              pItem->m_guid.getAt(14),
-              pItem->m_guid.getAt(15),
-              pItem->m_strDeviceName.c_str());
-            spdlog::debug("Match = %s",
-                          (pItem->m_guid == destguid) ? "true" : "false");
-
-            if (pItem->m_guid == destguid) {
-                // Found
-                // pDestClientItem = pItem;
-                bSent = true;
-                if (!sendEventToClient(pItem, pEvent)) {
-                    spdlog::debug("sendEventToClient: Failed!");
-                }
-                break;
-            }
-        }
-
-        pthread_mutex_unlock(&m_clientList.m_mutexItemList);
-    }
-
-    if (!bSent) {
-
-        // There must be room in the send queue
-        if (m_maxItemsInClientReceiveQueue > m_clientOutputQueue.size()) {
-
-            pthread_mutex_lock(&m_mutex_ClientOutputQueue);
-            m_clientOutputQueue.push_back(pEvent);
-
-            // TX Statistics
-            pClientItem->m_statistics.cntTransmitData += pEvent->sizeData;
-            pClientItem->m_statistics.cntTransmitFrames++;
-
-            pthread_mutex_unlock(&m_mutex_ClientOutputQueue);
-
-            sem_post(&m_semClientOutputQueue);
-        }
-        else {
-
-            spdlog::debug("sendEvent - overrun");
-
-            pClientItem->m_statistics.cntOverruns++;
-            vscp_deleteEvent_v2(&pEvent);
-            return false;
-        }
-    }
-
-    return true;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// sendEvent
-//
-
-bool
-CControlObject::sendEvent(CClientItem* pClientItem, vscpEventEx* pex)
-{
-    bool rv;
-    vscpEvent ev;
-
-    if (!vscp_convertEventExToEvent(&ev, pex)) {
-        spdlog::error("sendEvent: Failed in vscp_convertEventExToEvent");
-        return false;
-    }
-
-    if (!(rv = sendEvent(pClientItem, &ev))) {
-        spdlog::error("sendEvent: Failed to send event");
-    }
-
-    vscp_deleteEvent(&ev);
-
-    return rv;
-}
-
-//////////////////////////////////////////////////////////////////////////////
-// addClient
-//
-
-bool
-CControlObject::addClient(CClientItem* pClientItem, uint32_t id)
-{
-    // Check pointer
-    if (NULL == pClientItem) {
-        return false;
-    }
-
-    // Add client to client list
-    if (!m_clientList.addClient(pClientItem, id)) {
-        return false;
-    }
-
-    // Set GUID for interface
-    pClientItem->m_guid = m_guid;
-
-    // Fill in client id
-    pClientItem->m_guid.setNicknameID(0);
-    pClientItem->m_guid.setClientID(pClientItem->m_clientID);
-
-    return true;
-}
-
-//////////////////////////////////////////////////////////////////////////////
-// addClient - GUID (for drivers with set GUID)
-//
-
-bool
-CControlObject::addClient(CClientItem* pClientItem, cguid& guid)
-{
-    // Check pointer
-    if (NULL == pClientItem) {
-        return false;
-    }
-
-    // Add client to client list
-    if (!m_clientList.addClient(pClientItem, guid)) {
-        return false;
-    }
-
-    return true;
-}
-
-//////////////////////////////////////////////////////////////////////////////
-// removeClient
-//
-
-void
-CControlObject::removeClient(CClientItem* pClientItem)
-{
-    // Do not try to handle invalid clients
-    if (NULL == pClientItem)
-        return;
-
-    // Remove the client
-    m_clientList.removeClient(pClientItem);
-}
 
 //////////////////////////////////////////////////////////////////////////////
 // addKnowNode
@@ -1493,11 +1058,11 @@ CControlObject::addKnownNode(cguid& guid, cguid& ifguid, std::string& name)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-//  getMacAddress
+//  getGuidFromMacAddress
 //
 
 bool
-CControlObject::getMacAddress(cguid& guid)
+CControlObject::getGuidFromMacAddress(cguid& guid)
 {
 #ifdef WIN32
 
@@ -1634,11 +1199,11 @@ CControlObject::getMacAddress(cguid& guid)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-//  getIPAddress
+//  getGuidFromIPAddress
 //
 
 bool
-CControlObject::getIPAddress(cguid& guid)
+CControlObject::getGuidFromIPAddress(cguid& guid)
 {
     // Clear the GUID
     guid.clear();
@@ -2342,8 +1907,13 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
     get_string(j, "runasuser", m_runAsUser);
     get_string(j, "servername", m_strServerName);
 
+    // GUID is set from mac address or IP address if not explicitly specified.
+    // This is done in the constructor
     if (j.contains("guid") && j["guid"].is_string()) {
         m_guid.getFromString(j["guid"].get<std::string>());
+    }
+    else {
+        spdlog::debug("ReadConfig: 'guid' not found or invalid, using default GUID.");
     }
 
     // Optional legacy/general object support.
@@ -2379,28 +1949,24 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
 
     // TCP/IP section.
     if (j.contains("tcpip") && j["tcpip"].is_object()) {
-        const json& t = j["tcpip"];
+        const json& jj = j["tcpip"];
         bool b        = false;
         uint32_t n    = 0;
 
-        get_string(t, "interface", m_interfaceAddress);
-        get_string(t, "ssl_certificate", m_tcpip_ssl_certificate);
-        get_string(t, "ssl_certificate_chain", m_tcpip_ssl_certificate_chain);
-        if (get_uint(t, "ssl_verify_peer", n))
-            m_tcpip_ssl_verify_peer = n;
-        get_string(t, "ssl_ca_path", m_tcpip_ssl_ca_path);
-        get_string(t, "ssl_ca_file", m_tcpip_ssl_ca_file);
-        if (get_uint(t, "ssl_verify_depth", n))
-            m_tcpip_ssl_verify_depth = n;
-        if (get_bool(t, "ssl_default_verify_paths", b)) {
-            m_tcpip_ssl_default_verify_paths = b;
+        get_string(jj, "interface", m_interfaceAddress);
+
+        if (jj.contains("ssl-options") && jj["ssl-options"].is_object()) {
+            const json& jjj = jj["ssl-options"];
+            std::string str;
+            get_string(jjj, "cafile", str);
+            m_tcpip_tls_opts.ca = mg_str(str.c_str());
+            get_string(jjj, "certfile", str);
+            m_tcpip_tls_opts.cert = mg_str(str.c_str());
+            get_string(jjj, "keyfile", str);
+            m_tcpip_tls_opts.key = mg_str(str.c_str());
+            get_string(jjj, "name", str);
+            m_tcpip_tls_opts.name = mg_str(str.c_str());
         }
-        get_string(t, "ssl_cipher_list", m_tcpip_ssl_cipher_list);
-        if (get_uint(t, "ssl_protocol_version", n)) {
-            m_tcpip_ssl_protocol_version = n;
-        }
-        if (get_bool(t, "ssl_short_trust", b))
-            m_tcpip_ssl_short_trust = b;
     }
 
     // Users.
@@ -2443,16 +2009,16 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
                             vscp_readMaskFromString(&vfilter, mask);
             }
 
-            // m_userList.addUser(name,
-            //                    password,
-            //                    fullname,
-            //                    note,
-            //                    m_web_authentication_domain,
-            //                    hasFilter ? &vfilter : NULL,
-            //                    privilege,
-            //                    allowfrom,
-            //                    allowevent,
-            //                    0);
+            m_userList.addUser(name,
+                               password,
+                               fullname,
+                               note,
+                               "",
+                               hasFilter ? &vfilter : NULL,
+                               privilege,
+                               allowfrom,
+                               allowevent,
+                               0);
         }
     }
 
@@ -2526,132 +2092,7 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
     return true;
 } // JSON config
 
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
-
-///////////////////////////////////////////////////////////////////////////////
-// clientMsgWorkerThread
-//
-// Is there any messages to send from Level II clients. Send it/them to all
-// devices/clients except for itself.
-//
-
-void*
-clientMsgWorkerThread(void* userdata)
-{
-    std::list<vscpEvent*>::iterator it;
-    vscpEvent* pvscpEvent = NULL;
-
-    // Must be a valid control object pointer
-    CControlObject* pObj = (CControlObject*)userdata;
-    if (NULL == pObj)
-        return NULL;
-
-    while (!pObj->m_bQuit_clientMsgWorkerThread) {
-
-        // Wait for event
-        if ((-1 == vscp_sem_wait(&pObj->m_semClientOutputQueue, 10)) &&
-            errno == ETIMEDOUT) {
-            continue;
-        }
-
-        if (pObj->m_clientOutputQueue.size()) {
-
-            pthread_mutex_lock(&pObj->m_mutex_ClientOutputQueue);
-            pvscpEvent = pObj->m_clientOutputQueue.front();
-            pObj->m_clientOutputQueue.pop_front();
-            pthread_mutex_unlock(&pObj->m_mutex_ClientOutputQueue);
-
-            if (NULL != pvscpEvent) {
-
-                // * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-                //
-                // Send event to all Level II clients (not to
-                // ourself )
-                //
-                // * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-
-                pObj->sendEventAllClients(pvscpEvent, pvscpEvent->obid);
-                // Tell main thread that there are work to do
-                sem_post(&pObj->m_semSentToAllClients);
-
-            } // Valid event
-
-            // Delete the event - we are done with it
-            vscp_deleteEvent_v2(&pvscpEvent);
-
-        } // Events in queue
-
-    } // while
-
-    return NULL;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// tcpip_event_handler
-//
-// Handle TCP/IP events for the server
-//
-
-static void
-tcpip_event_handler(struct mg_connection* conn, int ev, void* ev_data)
-{
-    //int *i = &((struct c_res_s *) conn->fn_data)->i;
 
 
 
-    CControlObject* pobj = (CControlObject*)conn->fn_data;
-    if (NULL == pobj) {
-        spdlog::error("Internal error: Eventhandler have invalid control object pointer");
-        return;
-    }
 
-    if (ev == MG_EV_OPEN && conn->is_listening == 1) {
-        MG_INFO(("SERVER is listening"));
-        spdlog::debug("SERVER is listening");
-    }
-    else if (ev == MG_EV_ACCEPT) {
-        //MG_INFO(("SERVER accepted a connection"));
-        spdlog::debug("SERVER accepted a connection");
-        // if (mg_url_is_ssl(pobj->m_interfaceAddress.c_str())) {
-        //     struct mg_tls_opts opts = { .ca =
-        //     mg_unpacked("/certs/ss_ca.pem"),
-        //                                 .cert =
-        //                                   mg_unpacked("/certs/ss_server.pem"),
-        //                                 .key =
-        //                                   mg_unpacked("/certs/ss_server.pem")
-        //                                   };
-        //     mg_tls_init(conn, &opts);
-        // }
-        mg_send(conn, "Welcome\r\n", 10);
-    }
-    else if (ev == MG_EV_CONNECT) {
-        //MG_INFO(("CLIENT connected"));
-        spdlog::debug("CLIENT connected");
-        mg_send(conn, "Hi\r\n", 10);
-        // if (mg_url_is_ssl(s_conn)) {
-        //     struct mg_tls_opts opts = { .ca = mg_unpacked("/certs/ss_ca.pem"),
-        //                                 .cert =
-        //                                   mg_unpacked("/certs/ss_client.pem"),
-        //                                 .key =
-        //                                   mg_unpacked("/certs/ss_client.pem") };
-        //     mg_tls_init(c, &opts);
-            // }
-        //*i = 1; // do something
-    }
-    else if (ev == MG_EV_READ) {
-        struct mg_iobuf* r = &conn->recv;
-        //MG_INFO(("SERVER got data: %.*s", r->len, r->buf));
-        spdlog::debug("-->SERVER got data: <{}>", std::string((const char*)r->buf, r->len));
-        //mg_send(conn, r->buf, r->len); // echo it back
-        r->len = 0; // Tell Mongoose we've consumed the data
-    }
-    else if (ev == MG_EV_CLOSE) {
-        //MG_INFO(("SERVER disconnected"));
-        spdlog::debug("SERVER disconnected");    
-    }
-    else if (ev == MG_EV_ERROR) {
-        //MG_INFO(("SERVER error: %s", (char*)ev_data));
-        spdlog::error("SERVER error: {}", (char*)ev_data);
-    }
-}
