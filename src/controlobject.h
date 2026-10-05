@@ -296,6 +296,7 @@ class CControlObject {
      */
     uint8_t* getSystemKey(uint8_t* pKey);
 
+
     /*!
      * Get MD5 of system key (vscptoken)
      *
@@ -346,6 +347,11 @@ class CControlObject {
         @return Reference to the map of client items.
     */
     CClientList& getClientList() { return m_clientList; };
+
+    uint32_t getMaxItemsInClientReceiveQueue(void) const
+    {
+        return m_maxItemsInClientReceiveQueue;
+    }
 
     // Get client form connection
     /*!

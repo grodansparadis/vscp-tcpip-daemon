@@ -59,14 +59,13 @@
 // Rights nibble 3
 #define VSCP_USER_RIGHT_ALLOW_RCV_EVENT 0x00100000 // Allowed to receive
 
-
 // Rights nibble 2
 #define VSCP_USER_RIGHT_ALLOW_SEND_EVENT 0x00010000 // Allowed to send events
-#define VSCP_USER_RIGHT_ALLOW_SEND_L1CTRL_EVENT \
+#define VSCP_USER_RIGHT_ALLOW_SEND_L1CTRL_EVENT                                \
     0x00020000 // Allowed to send Level I protocol events
-#define VSCP_USER_RIGHT_ALLOW_SEND_L2CTRL_EVENT \
+#define VSCP_USER_RIGHT_ALLOW_SEND_L2CTRL_EVENT                                \
     0x00040000 // Allowed to send Level 2 protocol events
-#define VSCP_USER_RIGHT_ALLOW_SEND_HLO_EVENT \
+#define VSCP_USER_RIGHT_ALLOW_SEND_HLO_EVENT                                   \
     0x00040000 // Allowed to send HLO event(s)
 
 // Rights nibble 1
@@ -114,6 +113,12 @@ class CGroupItem {
   private:
 };
 
+
+/*!
+    @brief User item class representing a user in the system.
+    A user has a username, password, full name, notes, allowed remotes, allowed events, and user rights.
+*/
+
 class CUserItem {
 
   public:
@@ -131,11 +136,11 @@ class CUserItem {
     /*!
         Validate password
 
-        This function checks if the provided password hash matches the client's stored password hash.
-        Argon2 is used.
+        This function checks if the provided password hash matches the client's
+       stored password hash. Argon2 is used.
         @param password_hash Password hash to validate
         @return True if the password is valid, false otherwise
-    */ 
+    */
     bool validatePassword(const std::string& password_hash);
 
     /*
@@ -175,6 +180,16 @@ class CUserItem {
     */
     bool isUserAllowedToSendEvent(const uint32_t vscp_class,
                                   const uint32_t vscp_type);
+
+    /*!
+        Check if user has a specific right
+        @param right Right to check
+        @return true if user has the right, false otherwise
+    */
+    bool isUserAllowed(uint64_t right)
+    {
+        return (m_userRights & right) == right;
+    };
 
     /*!
      * Set user rights from a comma separated string. The string can have
@@ -272,8 +287,8 @@ class CUserItem {
     };
 
     // Full name
-    std::string getFullname(void) { return m_fullName; };
-    void setFullname(const std::string& strUser) { m_fullName = strUser; };
+    std::string getFullname(void) { return m_fullname; };
+    void setFullname(const std::string& strUser) { m_fullname = strUser; };
 
     // Note
     std::string getNote(void) { return m_note; };
@@ -501,7 +516,7 @@ class CUserItem {
     std::string m_md5PasswordDomain;
 
     /// Full name
-    std::string m_fullName;
+    std::string m_fullname;
 
     /// note
     std::string m_note;
@@ -532,6 +547,15 @@ class CUserItem {
     */
     vscpEventFilter m_filterVSCP;
 };
+
+/*!
+    @brief User list class representing a collection of users in the system.
+
+    The CUserList class provides methods to load users from the database,
+    add super users, and add regular users to the in-memory list. Changes
+    must be persisted to the database to be permanent.
+*/
+
 
 class CUserList {
   public:
@@ -642,20 +666,12 @@ class CUserList {
     /*!
         Validate a username/password pair
         @param user Username to test.
-        @param password Password to test
+        @param passwordhash Password hash to test
         @return Pointer to useritem if valid, NULL if not.
     */
     CUserItem* validateUser(const std::string& user,
-                            const std::string& password);
+                            const std::string& passwordhash);
 
-    /*!
-        Validate a username using the user domain. (WEB/WEBSOCKETS)
-        @param user Username to test.
-        @param md5password MD5(user;domain;password)
-        @return Pointer to useritem if valid, NULL if not.
-    */
-    CUserItem* validateUserDomain(const std::string& user,
-                                  const std::string& md5password);
 
     /*!
      * Get number of users on the system
@@ -711,7 +727,8 @@ class CUserList {
     /*!
      * Get user item from username
      * @param name Username of the user.
-     * @return A pointer to the useritem with the given username or NULL if no such user exists.
+     * @return A pointer to the useritem with the given username or NULL if no
+     * such user exists.
      */
     CUserItem* getUserFromName(const std::string& name);
 

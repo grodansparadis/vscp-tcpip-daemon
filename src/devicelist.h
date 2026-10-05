@@ -36,7 +36,8 @@
     @author Ake Hedman and contributors, the VSCP project
     @date 2000-2026
     @version 1.0
-    @copyright Copyright (C) 2000-2026 Ake Hedman and contributors, the VSCP project
+    @copyright Copyright (C) 2000-2026 Ake Hedman and contributors, the VSCP
+   project
     @license MIT License
 */
 
@@ -67,11 +68,7 @@
 
 // In - translation bit definitions
 
-enum _driver_levels
-{
-    VSCP_DRIVER_LEVEL1 = 1,
-    VSCP_DRIVER_LEVEL2
-};
+enum _driver_levels { VSCP_DRIVER_LEVEL1 = 1, VSCP_DRIVER_LEVEL2 };
 
 class CClientItem;
 class cguid;
@@ -81,8 +78,7 @@ class CControlObject;
 // Driver3Process
 //
 
-class Driver3Process
-{
+class Driver3Process {
 
   public:
     Driver3Process();
@@ -95,20 +91,22 @@ class Driver3Process
     @brief Interface for the Driver3Process class.
 */
 
-
 /*!
     @brief CDeviceItem class.
 
     This class represents an individual device item in the VSCP daemon.
     It contains information about the device, its configuration, and
     provides methods to start, pause, resume, and stop the device driver.
-    It also maintains the state of the device and handles the interaction with the underlying driver.
-    It is a crucial component for managing device interactions within the VSCP daemon.
-    @note This class is used internally by the CDeviceList class to manage the collection of device items.
+    It also maintains the state of the device and handles the interaction with
+   the underlying driver. It is a crucial component for managing device
+   interactions within the VSCP daemon.
+    @note This class is used internally by the CDeviceList class to manage the
+   collection of device items.
     @see CDeviceList
     @ingroup DeviceManagement
     @version 1.0
-    @copyright Copyright (C) 2000-2026 Ake Hedman and contributors, the VSCP project
+    @copyright Copyright (C) 2000-2026 Ake Hedman and contributors, the VSCP
+   project
     @license MIT License
 */
 
@@ -116,8 +114,7 @@ class Driver3Process
 // CDeviceItem
 //
 
-class CDeviceItem
-{
+class CDeviceItem {
 
   public:
     /// Constructor
@@ -158,13 +155,394 @@ class CDeviceItem
     */
     bool stopDriver(void);
 
-  public:
+    // Getters/setters
+
+    /*!
+        @brief Get the driver level.
+        @param  None
+        @return Driver level as uint8_t.
+    */
+    uint8_t getLevel(void) const { return m_driverLevel; }
+
+    /*!
+        Set the driver level.
+        @param level The driver level to set.
+        @return void
+    */
+    void setLevel(uint8_t level) { m_driverLevel = level; }
+
+    /*!
+        Get the control object associated with the driver.
+        @return Pointer to the control object.
+    */
+    CControlObject* getControlObject(void) const { return m_pObj; }
+
+    /*!
+        Get the client item associated with the driver.
+        @return Pointer to the client item.
+    */
+    CClientItem* getClientItem(void) const { return m_pClientItem; }
+
+    /*!
+        Set the client item associated with the driver.
+        @param pClientItem Pointer to the client item to set.
+        @return void
+    */
+    void setClientItem(CClientItem* pClientItem) { m_pClientItem = pClientItem; }
+
+    /*!
+        Get the open handle for the driver.
+        @return Open handle as a long.
+    */
+    long getOpenHandle(void) const { return m_openHandle; }
+
+    /*!
+        Set the open handle for the driver.
+        @param handle The open handle to set for the driver.
+        @return void
+    */
+    void setOpenHandle(long handle) { m_openHandle = handle; }
+
+    /*!
+        Set the device flags for the driver.
+        @param flags The device flags to set for the driver.
+        @return void
+    */
+    void setDeviceFlags(uint32_t flags) { m_DeviceFlags = flags; }
+    
+    /*!
+        Get the device flags for the driver.
+        @return Device flags as a uint32_t.
+    */
+    uint32_t getDeviceFlags(void) const { return m_DeviceFlags; }
+
+    /*!
+        Set the translation value of the driver.
+        @param translation The translation value to set for the driver.
+        @return void
+    */
+    void setTranslation(uint32_t translation) { m_translation = translation; }
+
+    /*!
+        Get the translation value of the driver.
+        @return Translation value as a uint32_t.
+    */
+    uint32_t getTranslation(void) const { return m_translation; }
+
+    /*!
+        Get the name of the device.
+        @return Device name as a std::string.
+    */
+    std::string getName(void) const { return m_strName; }
+
+    /*!
+        Set the name of the device.
+        @param name The name to set for the device.
+        @return void
+    */
+    void setName(const std::string& name) { m_strName = name; }
+
+    /*!
+        Get the path of the device driver.
+        @return Device driver path as a std::string.
+    */
+    std::string getPath(void) const { return m_strPath; }
+
+    /*!
+        Set the path of the device driver.
+        @param path The path to set for the device driver.
+        @return void
+    */
+    void setPath(const std::string& path) { m_strPath = path; }
+
+    /*!
+        Get the parameter string for the device.
+        @return Device parameter string as a std::string.
+    */
+    std::string getConfigurationString(void) const { return m_strConfiguration; }
+
+    /*!
+        Set the parameter string for the device.
+        @param configuration The configuration string to set for the device.
+        @return void
+    */
+    void setConfigurationString(const std::string& configuration) { m_strConfiguration = configuration; }
+
+    /*!
+        Get the flags for the device.
+        @return Device flags as a uint32_t.
+    */
+    uint32_t getFlags(void) const { return m_flags; }
+
+    /*!
+        Set the flags for the device.
+        @param flags The flags to set for the device.
+        @return void
+    */
+    void setFlags(uint32_t flags) { m_flags = flags; }
+
+    /*!
+        Get the enable status of the driver.
+        @return true if the driver is enabled, false otherwise.
+    */
+    bool isEnabled(void) const { return m_bEnable; }
+
+    /*!
+        Set Enabled status of the driver.
+        @param bEnable true to enable the driver, false to disable it.
+        @return void
+    */
+    void setEnabled(bool bEnable) { m_bEnable = bEnable; }
+
+    /*!
+        Get the quit status of the driver.
+        @return true if the driver is set to quit, false otherwise.
+    */
+    bool isQuit(void) const { return m_bQuit; }
+
+    /*!
+        Set Quit status of the driver.
+        @param bQuit true to set the driver to quit, false otherwise.
+        @return void
+    */
+    void setQuit(bool bQuit) { m_bQuit = bQuit; }
+
+    /*!
+        Get the active status of the driver.
+        @return true if the driver is active, false otherwise.
+    */
+    bool isActive(void) const { return m_bActive; }
+
+    /*!
+        Set Active status of the driver.
+        @param bActive true to set the driver as active, false otherwise.
+        @return void
+    */
+    void setActive(bool bActive) { m_bActive = bActive; }
+
+    /*!
+        Get the driver interface GUID.
+        @return Driver interface GUID as a cguid.
+    */
+    cguid getInterfaceGUID(void) const { return m_interface_guid; }
+
+    /*!
+        Set the driver interface GUID.
+        @param guid The GUID to set for the driver interface.
+        @return void
+    */
+    void setInterfaceGUID(const cguid& guid) { m_interface_guid = guid; }
+
+    /*!
+        All level II driver must have a GUID
+    */
+    /*!
+        Get the driver GUID.
+        @return Driver GUID as a cguid.
+    */
+    cguid getDriverGuid(void) const { return m_drvGuid; }
+
+    /*!
+        Set the driver GUID.
+        @param guid The GUID to set for the driver.
+        @return void
+    */
+    void setDriverGuid(const cguid& guid) { m_drvGuid = guid; }
+
+    
+
+    LPFNDLL_CANALOPEN getProcCanalOpen(void) const { return m_proc_CanalOpen; }
+    void setProcCanalOpen(LPFNDLL_CANALOPEN proc)
+    {
+        m_proc_CanalOpen = proc;
+    }
+
+    LPFNDLL_CANALCLOSE getProcCanalClose(void) const { return m_proc_CanalClose; }
+    void setProcCanalClose(LPFNDLL_CANALCLOSE proc)
+    {
+        m_proc_CanalClose = proc;
+    }
+
+    LPFNDLL_CANALGETLEVEL getProcCanalGetLevel(void) const
+    {
+        return m_proc_CanalGetLevel;
+    }
+    void setProcCanalGetLevel(LPFNDLL_CANALGETLEVEL proc)
+    {
+        m_proc_CanalGetLevel = proc;
+    }
+
+    LPFNDLL_CANALSEND getProcCanalSend(void) const { return m_proc_CanalSend; }
+    void setProcCanalSend(LPFNDLL_CANALSEND proc) { m_proc_CanalSend = proc; }
+
+    LPFNDLL_CANALRECEIVE getProcCanalReceive(void) const
+    {
+        return m_proc_CanalReceive;
+    }
+    void setProcCanalReceive(LPFNDLL_CANALRECEIVE proc)
+    {
+        m_proc_CanalReceive = proc;
+    }
+
+    LPFNDLL_CANALDATAAVAILABLE getProcCanalDataAvailable(void) const
+    {
+        return m_proc_CanalDataAvailable;
+    }
+    void setProcCanalDataAvailable(LPFNDLL_CANALDATAAVAILABLE proc)
+    {
+        m_proc_CanalDataAvailable = proc;
+    }
+
+    LPFNDLL_CANALGETSTATUS getProcCanalGetStatus(void) const
+    {
+        return m_proc_CanalGetStatus;
+    }
+    void setProcCanalGetStatus(LPFNDLL_CANALGETSTATUS proc)
+    {
+        m_proc_CanalGetStatus = proc;
+    }
+
+    LPFNDLL_CANALGETSTATISTICS getProcCanalGetStatistics(void) const
+    {
+        return m_proc_CanalGetStatistics;
+    }
+    void setProcCanalGetStatistics(LPFNDLL_CANALGETSTATISTICS proc)
+    {
+        m_proc_CanalGetStatistics = proc;
+    }
+
+    LPFNDLL_CANALSETFILTER getProcCanalSetFilter(void) const
+    {
+        return m_proc_CanalSetFilter;
+    }
+    void setProcCanalSetFilter(LPFNDLL_CANALSETFILTER proc)
+    {
+        m_proc_CanalSetFilter = proc;
+    }
+
+    LPFNDLL_CANALSETMASK getProcCanalSetMask(void) const
+    {
+        return m_proc_CanalSetMask;
+    }
+    void setProcCanalSetMask(LPFNDLL_CANALSETMASK proc)
+    {
+        m_proc_CanalSetMask = proc;
+    }
+
+    LPFNDLL_CANALSETBAUDRATE getProcCanalSetBaudrate(void) const
+    {
+        return m_proc_CanalSetBaudrate;
+    }
+    void setProcCanalSetBaudrate(LPFNDLL_CANALSETBAUDRATE proc)
+    {
+        m_proc_CanalSetBaudrate = proc;
+    }
+
+    LPFNDLL_CANALGETVERSION getProcCanalGetVersion(void) const
+    {
+        return m_proc_CanalGetVersion;
+    }
+    void setProcCanalGetVersion(LPFNDLL_CANALGETVERSION proc)
+    {
+        m_proc_CanalGetVersion = proc;
+    }
+
+    LPFNDLL_CANALGETDLLVERSION getProcCanalGetDllVersion(void) const
+    {
+        return m_proc_CanalGetDllVersion;
+    }
+    void setProcCanalGetDllVersion(LPFNDLL_CANALGETDLLVERSION proc)
+    {
+        m_proc_CanalGetDllVersion = proc;
+    }
+
+    LPFNDLL_CANALGETVENDORSTRING getProcCanalGetVendorString(void) const
+    {
+        return m_proc_CanalGetVendorString;
+    }
+    void setProcCanalGetVendorString(LPFNDLL_CANALGETVENDORSTRING proc)
+    {
+        m_proc_CanalGetVendorString = proc;
+    }
+
+    LPFNDLL_CANALBLOCKINGSEND getProcCanalBlockingSend(void) const
+    {
+        return m_proc_CanalBlockingSend;
+    }
+    void setProcCanalBlockingSend(LPFNDLL_CANALBLOCKINGSEND proc)
+    {
+        m_proc_CanalBlockingSend = proc;
+    }
+
+    LPFNDLL_CANALBLOCKINGRECEIVE getProcCanalBlockingReceive(void) const
+    {
+        return m_proc_CanalBlockingReceive;
+    }
+    void setProcCanalBlockingReceive(LPFNDLL_CANALBLOCKINGRECEIVE proc)
+    {
+        m_proc_CanalBlockingReceive = proc;
+    }
+
+    LPFNDLL_CANALGETDRIVERINFO getProcCanalGetDriverInfo(void) const
+    {
+        return m_proc_CanalGetdriverInfo;
+    }
+    void setProcCanalGetDriverInfo(LPFNDLL_CANALGETDRIVERINFO proc)
+    {
+        m_proc_CanalGetdriverInfo = proc;
+    }
+
+    LPFNDLL_VSCPOPEN getProcVSCPOpen(void) const { return m_proc_VSCPOpen; }
+    void setProcVSCPOpen(LPFNDLL_VSCPOPEN proc) { m_proc_VSCPOpen = proc; }
+
+    LPFNDLL_VSCPCLOSE getProcVSCPClose(void) const { return m_proc_VSCPClose; }
+    void setProcVSCPClose(LPFNDLL_VSCPCLOSE proc) { m_proc_VSCPClose = proc; }
+
+    LPFNDLL_VSCPWRITE getProcVSCPWrite(void) const { return m_proc_VSCPWrite; }
+    void setProcVSCPWrite(LPFNDLL_VSCPWRITE proc) { m_proc_VSCPWrite = proc; }
+
+    LPFNDLL_VSCPREAD getProcVSCPRead(void) const { return m_proc_VSCPRead; }
+    void setProcVSCPRead(LPFNDLL_VSCPREAD proc) { m_proc_VSCPRead = proc; }
+
+    LPFNDLL_VSCPGETVERSION getProcVSCPGetVersion(void) const
+    {
+        return m_proc_VSCPGetVersion;
+    }
+    void setProcVSCPGetVersion(LPFNDLL_VSCPGETVERSION proc)
+    {
+        m_proc_VSCPGetVersion = proc;
+    }
+
+    pthread_t getThreadLevel1Receive(void) const { return m_threadLevel1Receive; }
+    void setThreadLevel1Receive(pthread_t thread)
+    {
+        m_threadLevel1Receive = thread;
+    }
+
+    pthread_t getThreadLevel1Write(void) const { return m_threadLevel1Write; }
+    void setThreadLevel1Write(pthread_t thread) { m_threadLevel1Write = thread; }
+
+    pthread_t getThreadLevel2Receive(void) const { return m_threadLevel2Receive; }
+    void setThreadLevel2Receive(pthread_t thread)
+    {
+        m_threadLevel2Receive = thread;
+    }
+
+    pthread_t getThreadLevel2Write(void) const { return m_threadLevel2Write; }
+    void setThreadLevel2Write(pthread_t thread) { m_threadLevel2Write = thread; }
+
+  private:
     // Name of device
     std::string m_strName;
 
-    // Device configuration string for Level I drivers.
-    // Oath to XML config file for level II drivers.
-    std::string m_strParameter;
+    /*!
+        Level I:    Device configuration string.
+        Level II:   Path to XML/JSON config file.
+    */
+    std::string m_strConfiguration;
+
+    // Device flags (from config)
+    uint32_t m_flags;
 
     // Driver DLL/DL path
     std::string m_strPath;
@@ -192,10 +570,6 @@ class CDeviceItem
     */
     cguid m_drvGuid;
 
-    // Worker thread for device
-    pthread_t m_deviceThreadHandle;
-    pthread_mutex_t m_mutexdeviceThread;
-
     // Device flags for CANAL DLL open
     uint32_t m_DeviceFlags;
 
@@ -215,8 +589,9 @@ class CDeviceItem
     // Handle for dll/dl driver interface
     long m_openHandle;
 
-    // Level III driver pid
-    long m_pid;
+    // Worker thread for device
+    pthread_t m_deviceThreadHandle;
+    pthread_mutex_t m_mutexdeviceThread;
 
     // ------------------------------------------------------------------------
     //                     Start of driver worker thread data
@@ -226,22 +601,23 @@ class CDeviceItem
     CControlObject* m_pObj;
 
     // Holder for CANAL receive thread
-    pthread_t m_level1ReceiveThread;
+    pthread_t m_threadLevel1Receive;
 
     // Holder for CANAL write thread
-    pthread_t m_level1WriteThread;
+    pthread_t m_threadLevel1Write;
 
     // Holder for VSCP Level II receive thread
-    pthread_t m_level2ReceiveThread;
+    pthread_t m_threadLevel2Receive;
 
     // Holder for VSCP Level II write thread
-    pthread_t m_level2WriteThread;
+    pthread_t m_threadLevel2Write;
 
     // ------------------------------------------------------------------------
     //                     End of driver worker thread data
     // ------------------------------------------------------------------------
 
     // Level I (CANAL) driver methods
+
     LPFNDLL_CANALOPEN m_proc_CanalOpen;
     LPFNDLL_CANALCLOSE m_proc_CanalClose;
     LPFNDLL_CANALGETLEVEL m_proc_CanalGetLevel;
@@ -268,9 +644,6 @@ class CDeviceItem
     LPFNDLL_VSCPWRITE m_proc_VSCPWrite;
     LPFNDLL_VSCPREAD m_proc_VSCPRead;
     LPFNDLL_VSCPGETVERSION m_proc_VSCPGetVersion;
-
-    // Level III
-    std::string m_pathExecutable;
 };
 
 /*!
@@ -285,13 +658,12 @@ class CDeviceItem
     @author Ake Hedman and contributors, the VSCP project
     @date 2000-2026
     @version 1.0
-    @copyright Copyright (C) 2000-2026 Ake Hedman and contributors, the VSCP project
+    @copyright Copyright (C) 2000-2026 Ake Hedman and contributors, the VSCP
+   project
     @license MIT License
 */
 
-
-class CDeviceList
-{
+class CDeviceList {
   public:
     CDeviceList();
     virtual ~CDeviceList();
@@ -299,7 +671,7 @@ class CDeviceList
     /*!
         Add one driver item
         @param strName Driver name
-        @param strParameters Driver configuration string
+        @param m_strConfiguration Driver configuration string
         @param flags Driver flags
         @param guid Interface GUID
         @param level Mark as Level I or Level II driver
@@ -308,7 +680,7 @@ class CDeviceList
         @return True is returned if the driver was successfully added.
     */
     bool addItem(const std::string& strName,
-                 const std::string& strParameters,
+                 const std::string& m_strConfiguration,
                  const std::string& strPath,
                  uint32_t flags,
                  const cguid& guid,

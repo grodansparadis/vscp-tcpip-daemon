@@ -180,9 +180,8 @@ typedef struct {
 // ----------------------------------------------------------------------------
 
 /*!
-    This class implement the server code for handling individual TCP/IP client
-   connections.
-
+    @brief This class implements the server code for handling individual TCP/IP client
+    connections.
 */
 
 class CTcpipSrv {

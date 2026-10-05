@@ -89,49 +89,45 @@ Driver3Process::OnTerminate(int pid, int status)
 
 CDeviceItem::CDeviceItem()
 {
-    m_bQuit   = false;
+    setQuit(false);
     m_bEnable = false; // Default is that driver should not be started
     m_bActive = true;  // Not paused
 
     m_translation = NO_TRANSLATION; // Default is no translation
 
     m_strName.clear();      // No Device Name
-    m_strParameter.clear(); // No Parameters
+    m_strConfiguration.clear(); // No Parameters
     m_strPath.clear();      // No path
     m_DeviceFlags = 0;      // Default: No flags.
     m_driverLevel = 0;      // Standard Canal messages is the default
 
     // VSCP Level I
-    m_proc_CanalOpen            = NULL;
-    m_proc_CanalClose           = NULL;
-    m_proc_CanalGetLevel        = NULL;
-    m_proc_CanalSend            = NULL;
-    m_proc_CanalDataAvailable   = NULL;
-    m_proc_CanalReceive         = NULL;
-    m_proc_CanalGetStatus       = NULL;
-    m_proc_CanalGetStatistics   = NULL;
-    m_proc_CanalSetFilter       = NULL;
-    m_proc_CanalSetMask         = NULL;
-    m_proc_CanalSetBaudrate     = NULL;
-    m_proc_CanalGetVersion      = NULL;
-    m_proc_CanalGetDllVersion   = NULL;
-    m_proc_CanalGetVendorString = NULL;
+    setProcCanalOpen(nullptr);
+    setProcCanalClose(nullptr);
+    setProcCanalGetLevel(nullptr);
+    setProcCanalSend(nullptr);
+    setProcCanalDataAvailable(nullptr);
+    setProcCanalReceive(nullptr);
+    setProcCanalGetStatus(nullptr);
+    setProcCanalGetStatistics(nullptr);
+    setProcCanalSetFilter(nullptr);
+    setProcCanalSetMask(nullptr);
+    setProcCanalSetBaudrate(nullptr);
+    setProcCanalGetVersion(nullptr);
+    setProcCanalGetDllVersion(nullptr);
+    setProcCanalGetVendorString(nullptr);
 
     // Generation 2
-    m_proc_CanalBlockingSend    = NULL;
-    m_proc_CanalBlockingReceive = NULL;
-    m_proc_CanalGetdriverInfo   = NULL;
+    setProcCanalBlockingSend(nullptr);
+    setProcCanalBlockingReceive(nullptr);
+    setProcCanalGetDriverInfo(nullptr);
 
     // VSCP Level II
-    m_proc_VSCPOpen       = NULL;
-    m_proc_VSCPClose      = NULL;
-    m_proc_VSCPWrite      = NULL;
-    m_proc_VSCPRead       = NULL;
-    m_proc_VSCPGetVersion = NULL;
-    m_proc_VSCPGetVersion = NULL;
-
-    // VSCP Level III
-    m_pid = 0;
+    setProcVSCPOpen(nullptr);
+    setProcVSCPClose(nullptr);
+    setProcVSCPWrite(nullptr);
+    setProcVSCPRead(nullptr);
+    setProcVSCPGetVersion(nullptr);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -161,7 +157,7 @@ CDeviceItem::getAsString(void)
     str += m_bActive ? "true," : "false,";
     str += m_strName + ",";
     str += m_strPath + ",";
-    str += m_strParameter + ",";
+    str += m_strConfiguration + ",";
     str += vscp_str_format("%d,%ul,", (int)m_driverLevel, m_DeviceFlags);
     str += m_interface_guid.getAsString() + ",";
     str += vscp_str_format("%04X", m_translation);
@@ -209,7 +205,7 @@ bool
 CDeviceItem::stopDriver()
 {
     if (m_bEnable) {
-        m_bQuit = true;
+        setQuit(true);
         spdlog::info("Driver {}: Driver asked to stop operation.",
                      m_strName.c_str());
 
@@ -289,7 +285,7 @@ CDeviceList::~CDeviceList(void)
 
 bool
 CDeviceList::addItem(const std::string& strName,
-                     const std::string& strParameter,
+                     const std::string& m_strConfiguration,
                      const std::string& strPath,
                      uint32_t flags,
                      const cguid& guid,
@@ -308,17 +304,17 @@ CDeviceList::addItem(const std::string& strName,
 
             m_devItemList.push_back(pDeviceItem);
 
-            pDeviceItem->m_bEnable = bEnable;
+            pDeviceItem->setEnabled(bEnable);
 
-            pDeviceItem->m_driverLevel    = level;
-            pDeviceItem->m_strName        = strName;
-            pDeviceItem->m_strParameter   = strParameter;
-            pDeviceItem->m_strPath        = strPath;
-            pDeviceItem->m_interface_guid = guid;
-            pDeviceItem->m_translation    = translation;
+            pDeviceItem->setLevel(level);
+            pDeviceItem->setName(strName);
+            pDeviceItem->setConfigurationString(m_strConfiguration);
+            pDeviceItem->setPath(strPath);
+            pDeviceItem->setInterfaceGUID(guid);
+            pDeviceItem->setTranslation(translation);
 
             // Set buffer sizes and flags
-            pDeviceItem->m_DeviceFlags = flags;
+            pDeviceItem->setFlags(flags);
         }
         else {
             spdlog::error(
@@ -357,7 +353,7 @@ CDeviceList::getDeviceItemFromGUID(cguid& guid)
     std::deque<CDeviceItem*>::iterator iter;
     for (iter = m_devItemList.begin(); iter != m_devItemList.end(); ++iter) {
         CDeviceItem* pItem = *iter;
-        if (pItem->m_interface_guid == guid) {
+        if (pItem->getInterfaceGUID() == guid) {
             returnItem = pItem;
             break;
         }
@@ -378,8 +374,8 @@ CDeviceList::getDeviceItemFromClientId(uint32_t id)
     std::deque<CDeviceItem*>::iterator iter;
     for (iter = m_devItemList.begin(); iter != m_devItemList.end(); ++iter) {
         CDeviceItem* pItem = *iter;
-        if ((NULL != pItem->m_pClientItem) &&
-            (pItem->m_pClientItem->m_clientID == id)) {
+        if ((NULL != pItem->getClientItem()) &&
+            (pItem->getClientItem()->getClientID() == id)) {
             returnItem = pItem;
             break;
         }
@@ -400,7 +396,7 @@ CDeviceList::getDeviceItemFromName(std::string& name)
     std::deque<CDeviceItem*>::iterator iter;
     for (iter = m_devItemList.begin(); iter != m_devItemList.end(); ++iter) {
         CDeviceItem* pItem = *iter;
-        if ((NULL != pItem->m_pClientItem) && (pItem->m_strName == name)) {
+        if ((NULL != pItem->getClientItem()) && (pItem->getName() == name)) {
             returnItem = pItem;
             break;
         }
@@ -443,38 +439,38 @@ CDeviceList::getCountDrivers(uint8_t type, bool bOnlyActive)
         CDeviceItem* pItem = *iter;
         if (NULL != pItem) {
             if (bOnlyActive) {
-                if (pItem->m_bEnable) {
+                if (pItem->isEnabled()) {
                     switch (type) {
                         case 0:
                             count++;
                             break;
 
                         case VSCP_DRIVER_LEVEL1:
-                            if (pItem->m_driverLevel)
+                            if (pItem->getLevel())
                                 count++;
                             break;
 
                         case VSCP_DRIVER_LEVEL2:
-                            if (pItem->m_driverLevel)
+                            if (pItem->getLevel())
                                 count++;
                             break;
                     }
                 }
             }
             else {
-                if (pItem->m_bEnable) {
+                if (pItem->isEnabled()) {
                     switch (type) {
                         case 0:
                             count++;
                             break;
 
                         case VSCP_DRIVER_LEVEL1:
-                            if (pItem->m_driverLevel)
+                            if (pItem->getLevel())
                                 count++;
                             break;
 
                         case VSCP_DRIVER_LEVEL2:
-                            if (pItem->m_driverLevel)
+                            if (pItem->getLevel())
                                 count++;
                             break;
                     }

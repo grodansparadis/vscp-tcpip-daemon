@@ -51,7 +51,12 @@ class CControlObject;
 struct mg_connection;
 
 /*!
-    Client Item
+    @brief Client Item representing a connected client in the system.
+    A client has a device name, input queue, and is associated with a specific interface type.
+    The class provides methods to manage the client's connection, interface type, and input queue.
+    All clients has a unique client ID and may have specific permissions and capabilities based on their interface type.
+    The class also defines various constants and enumerations for client IDs, levels, and interface types.
+    A user is always associated with a client item.
 */
 
 class CClientItem {
@@ -121,21 +126,20 @@ class CClientItem {
     */
     std::string getDeviceName(void) { return m_strDeviceName; };
 
-    /*!
-        Get input queue list
-    */
-    std::deque<vscpEvent*> getClientInputQueue(void)
-    {
-        return m_clientInputQueue;
-    };
-
     /// Clear input queue
     void clearClientInputQueue(void);
 
     /// @brief Get the size of the client input queue
     /// @param  None
     /// @return Size of the client input queue
-    size_t getClientInputQueueSize(void) { return m_clientInputQueue.size(); };
+    size_t getClientInputQueueSize(void);
+
+    /*!
+        Wait for an event to be added to the client input queue.
+        @param timeoutMs Maximum time to wait in milliseconds
+        @return 0 when signaled, -1 on timeout or error
+    */
+    int waitForInputQueueEvent(uint32_t timeoutMs);
 
     /*!
         Get event from the client input queue
@@ -236,6 +240,24 @@ class CClientItem {
     */
     CLIENT_ITEM_INTERFACE_TYPE getInterfaceType(void) { return m_type; };
 
+    /// Set client flags
+    void setFlags(uint32_t flags) { m_flags = flags; };
+
+    /// Get client flags
+    uint32_t getFlags(void) { return m_flags; };
+
+    /// Set the maximum number of events in the client input queue (zero means unlimited)
+    void setMaxItemsInClientInputQueue(uint32_t maxItems)
+    {
+        m_maxItemsInClientInputQueue = maxItems;
+    };
+
+    /// Get the maximum number of events in the client input queue
+    uint32_t getMaxItemsInClientInputQueue(void)
+    {
+        return m_maxItemsInClientInputQueue;
+    };
+
     /*!
         Set the interface GUID
         @param guid Interface GUID to set
@@ -305,7 +327,12 @@ class CClientItem {
         Get the date and time when the client was started
         @return Date and time when the client was started
     */
-    vscpdatetime getDateUtcStarted(void) { return m_dtutc; };
+    vscpdatetime getDateTimeStarted(void) { return m_dtutc; };
+
+    /*!
+        Set the date and time when the client was started to the current UTC time
+    */
+    void setDateTimeStartedNow(void) { m_dtutc.setUTCNow(); };
 
     /*!
         Get the session ID for this client
@@ -330,6 +357,12 @@ class CClientItem {
     {
         m_statistics = statistics;
     };
+
+    /// Get the time when the receive loop was last active
+    time_t getReceiveLoopTimestamp(void) { return m_timeRcvLoop; };
+
+    /// Set the time when the receive loop was last active
+    void setReceiveLoopTimestamp(time_t timestamp) { m_timeRcvLoop = timestamp; };
 
   private:
     /// Pointer to control object
@@ -384,6 +417,9 @@ class CClientItem {
     /// Client ID for this client item
     uint16_t m_clientID;
 
+    /// Client flags
+    uint32_t m_flags;
+
     /// Filter/mask for VSCP
     vscpEventFilter m_filter;
 
@@ -436,7 +472,7 @@ class CClientItem {
     long m_clientActivity;
 
     /// RCVLOOP clock (UTC time for last sent "+OK")
-    uint64_t m_timeRcvLoop;
+    time_t m_timeRcvLoop;
 
     /// Session id
     char m_sid[33];
@@ -466,6 +502,14 @@ class CClientItem {
 };
 
 // ----------------------------------------------------------------------------
+
+/*!
+    @brief Client list class representing a collection of connected clients in the system.
+
+    The CClientList class provides methods to add, remove, and retrieve clients
+    based on their ID, ordinal, or GUID. It also allows querying the current
+    number of connected clients and retrieving all interfaces as a string.
+*/
 
 class CClientList {
 
@@ -573,26 +617,52 @@ class CClientList {
     bool sendEventAllClients(const vscpEvent* pEvent, uint32_t excludeID = 0);
 
     /*!
+        Add an event to the client output queue if capacity is available.
+        @param pEvent Event to enqueue; ownership transfers on success
+        @param maxSize Maximum queue size; zero prevents enqueueing
+        @return True if the event was queued
+    */
+    bool enqueueReceiveEvent(vscpEvent* pEvent, size_t maxSize);
+
+    /// Get the client output queue size.
+    size_t getOutputQueueSize(void);
+
+    /*!
+        Get an event from the client output queue.
+        @param remove Remove the event from the queue when true
+        @return Queue-front event, or nullptr if the queue is empty
+    */
+    vscpEvent* getEventFromOutputQueue(bool remove);
+
+    /// Wait for an event on the client output queue.
+    int waitForOutputQueueEvent(uint32_t timeoutMs);
+
+    /// Signal that the client output queue should be processed.
+    void notifyOutputQueueEvent(void);
+
+    /*!
         Get the size of the client list
         @return Number of clients in the list
     */
     size_t size(void) { return m_itemList.size(); }
 
   private:
+    void clearOutputQueue(void);
+
     // *********************************************************************
     //                         CLIENT OUTPUT QUEUE
     // *********************************************************************
 
     /*!
-       Event object to indicate that there is an event in the client output
+       Event object to indicate that there is an event in the client main receive
        queue.
      */
-    sem_t m_semClientOutputQueue;
+    sem_t m_semClientMainReceiveQueue;
 
     /*!
-        Mutex for Level II message send queue
+        Mutex for the client main receive queue
      */
-    pthread_mutex_t m_mutex_ClientOutputQueue;
+    pthread_mutex_t m_mutex_ClientMainReceiveQueue;
 
     /*!
         Semaphore that is signaled when workerthread
@@ -604,10 +674,10 @@ class CClientList {
         Receive queue
 
         All events received by clients are placed in this queue before being
-       processed. Events are normally processed by the server but also they are
-       distributed to the appropriate clients.
+        processed. Events are consumed by the server but also they are
+        distributed to the appropriate clients.
      */
-    std::deque<vscpEvent*> m_clientOutputQueue;
+    std::deque<vscpEvent*> m_clientMainReceiveQueue;
 
     // *********************************************************************
     //                         CLIENT ITEM LIST

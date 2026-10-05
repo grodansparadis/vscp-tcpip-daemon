@@ -111,7 +111,7 @@ include(FetchContent)
 FetchContent_Declare(
   vscp
   GIT_REPOSITORY https://github.com/grodansparadis/vscp.git
-  GIT_TAG 702571630f2eae19ca581d291896500495d3cd1f
+  GIT_TAG c3d4b22ceb1abfc12a16d6f19549645df71227b6
 )
 FetchContent_MakeAvailable(vscp)
 

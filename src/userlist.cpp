@@ -37,7 +37,6 @@
 #include <canal-macro.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syslog.h>
 
 #include "userlist.h"
 #include <controlobject.h>
@@ -63,11 +62,10 @@ extern CControlObject* gpobj;
     const std::string stored = hash_password(pw);
     std::printf("hash:   %s\n", stored.c_str());
     std::printf("good:   %s\n", verify_password(stored, pw) ? "ok" : "FAIL");
-    std::printf("bad:    %s\n", verify_password(stored, "wrong") ? "FAIL" : "rejected");
+    std::printf("bad:    %s\n", verify_password(stored, "wrong") ? "FAIL" :
+   "rejected");
 
 */
-
-
 
 // Tune these to your server. MODERATE = ~256 MiB RAM, ~0.7 s on a typical CPU.
 // INTERACTIVE = 64 MiB, ~0.1 s (the OWASP-style minimum is roughly this or
@@ -121,38 +119,38 @@ needs_rehash(const std::string& stored_hash)
 // Step 2 (at login): see login() below.
 // ---------------------------------------------------------------------------
 
-struct UserRecord {
-    std::string hash;
-    bool legacy_wrapped; // true = hash is argon2id(md5_hex_of_password)
-};
+// struct UserRecord {
+//     std::string hash;
+//     bool legacy_wrapped; // true = hash is argon2id(md5_hex_of_password)
+// };
 
-// Provide your own MD5 hex function only for the legacy path
-// (e.g. the one your server already uses).
-std::string
-md5_hex(const std::string& s);
+// // Provide your own MD5 hex function only for the legacy path
+// // (e.g. the one your server already uses).
+// std::string
+// md5_hex(const std::string& s);
 
-bool
-login(UserRecord& user, const std::string& password)
-{
-    if (user.legacy_wrapped) {
-        if (!verify_password(user.hash, md5_hex(password)))
-            return false;
-        // Success: upgrade to a plain Argon2id hash of the real password.
-        user.hash           = hash_password(password);
-        user.legacy_wrapped = false;
-        // ...persist user to the database here...
-        return true;
-    }
+// bool
+// login(UserRecord& user, const std::string& password)
+// {
+//     if (user.legacy_wrapped) {
+//         if (!verify_password(user.hash, md5_hex(password)))
+//             return false;
+//         // Success: upgrade to a plain Argon2id hash of the real password.
+//         user.hash           = hash_password(password);
+//         user.legacy_wrapped = false;
+//         // ...persist user to the database here...
+//         return true;
+//     }
 
-    if (!verify_password(user.hash, password))
-        return false;
+//     if (!verify_password(user.hash, password))
+//         return false;
 
-    if (needs_rehash(user.hash)) {
-        user.hash = hash_password(password);
-        // ...persist user to the database here...
-    }
-    return true;
-}
+//     if (needs_rehash(user.hash)) {
+//         user.hash = hash_password(password);
+//         // ...persist user to the database here...
+//     }
+//     return true;
+// }
 
 // ----------------------------------------------------------------------------
 
@@ -195,18 +193,18 @@ CUserItem::~CUserItem(void)
 void
 CUserItem::fixName(void)
 {
-    vscp_trim(m_user);
+    vscp_trim(m_username);
 
     // Works only for ASCII names. Should be fixed so
     // UTF8 names can be used TODO
-    for (size_t i = 0; i < m_user.length(); i++) {
-        switch ((const char)m_user[i]) {
+    for (size_t i = 0; i < m_username.length(); i++) {
+        switch ((const char)m_username[i]) {
             case ';':
             case '\'':
             case '\"':
             case ',':
             case ' ':
-                m_user[i] = '_';
+                m_username[i] = '_';
                 break;
         }
     }
@@ -216,9 +214,10 @@ CUserItem::fixName(void)
 // validatePassword
 //
 
-bool CUserItem::validatePassword(const std::string& password_hash)
+bool
+CUserItem::validatePassword(const std::string& password_hash)
 {
-    // TODO: Implement password hash validation using Argon2 
+    // TODO: Implement password hash validation using Argon2
     return false;
 }
 
@@ -773,30 +772,34 @@ CUserItem::isUserAllowedToSendEvent(const uint32_t vscp_class,
     std::string str;
 
     // If empty all events allowed
-    if (m_listAllowedEvents.empty())
+    if (m_listAllowedEvents.empty()) {
         return true;
+    }
 
     // test wildcard *.*
     str = "*:*";
     for (i = 0; i < m_listAllowedEvents.size(); i++) {
-        if (m_listAllowedEvents[i] == str)
+        if (m_listAllowedEvents[i] == str) {
             return true;
+        }
     }
 
     str = vscp_str_format("%04X:%04X", vscp_class, vscp_type);
     for (i = 0; i < m_listAllowedEvents.size(); i++) {
-        if (m_listAllowedEvents[i] == str)
+        if (m_listAllowedEvents[i] == str) {
             return true;
+        }
     }
 
     // test wildcard class.*
     str = vscp_str_format("%04X:*", vscp_class);
     for (i = 0; i < m_listAllowedEvents.size(); i++) {
-        if (m_listAllowedEvents[i] == str)
+        if (m_listAllowedEvents[i] == str) {
             return true;
+        }
     }
 
-    SYSLOG(LOG_ERR, "isUserAllowedToSendEvent: Not allowed to send event - ");
+    spdlog::error("isUserAllowedToSendEvent: Not allowed to send event - ");
 
     return false;
 }
@@ -871,9 +874,8 @@ CUserList::addSuperUser(const std::string& user,
     // New user item
     CUserItem* pItem = new CUserItem;
     if (NULL == pItem) {
-        SYSLOG(LOG_ERR,
-               "addSuperUser: Failed to delete user - "
-               "User is not defined.");
+        spdlog::error("addSuperUser: Failed to delete user - "
+                      "User is not defined.");
         return false;
     }
 
@@ -893,9 +895,8 @@ CUserList::addSuperUser(const std::string& user,
     strIV     = "5a475c082c80dcdf7f2dfbd976253b24";
     strCrypto = "69b1180d2f4809d39be34e19c750107f";
     if (0 == vscp_hexStr2ByteArray(iv, 16, (const char*)strIV.c_str())) {
-        SYSLOG(LOG_ERR,
-               "[addSuperUser] Authentication: No room "
-               "for iv block. ");
+        spdlog::error("[addSuperUser] Authentication: No room "
+                      "for iv block. ");
         return false; // Not enough room in buffer
     }
 
@@ -903,9 +904,8 @@ CUserList::addSuperUser(const std::string& user,
     if (0 == (len = vscp_hexStr2ByteArray((uint8_t*)secret,
                                           strCrypto.length(),
                                           (const char*)strCrypto.c_str()))) {
-        SYSLOG(LOG_ERR,
-               "[addSuperUser] Authentication: No room "
-               "for crypto block. ");
+        spdlog::error("[addSuperUser] Authentication: No room "
+                      "for crypto block. ");
         return false; // Not enough room in buffer
     }
 
@@ -914,7 +914,7 @@ CUserList::addSuperUser(const std::string& user,
                            (uint8_t*)buf,
                            (uint8_t*)secret,
                            len,
-                           gpobj->m_systemKey,
+                           gpobj->getSystemKey(nullptr),
                            iv);
 
     // std::string str = std::string((const char*)buf);
@@ -974,18 +974,16 @@ CUserList::addUser(const std::string& user,
 
     // Cant add user with name that is already defined.
     if (NULL != m_userhashmap[user]) {
-        SYSLOG(LOG_ERR,
-               "addUser: Failed to add user - "
-               "user is already defined.");
+        spdlog::error("addUser: Failed to add user - "
+                      "user is already defined.");
         return false;
     }
 
     // // New user item
     CUserItem* pItem = new CUserItem;
     if (NULL == pItem) {
-        SYSLOG(LOG_ERR,
-               "addUser: Failed to add user - "
-               "Memory problem (CUserItem).");
+        spdlog::error("addUser: Failed to add user - "
+                      "Memory problem (CUserItem).");
         return false;
     }
 
@@ -1133,9 +1131,8 @@ CUserList::deleteUser(const std::string& user)
 {
     CUserItem* pUser = getUser(user);
     if (NULL == pUser) {
-        SYSLOG(LOG_ERR,
-               "deleteUser: Failed to delete user - "
-               "User is not defined.");
+        spdlog::error("deleteUser: Failed to delete user - "
+                      "User is not defined.");
         return false;
     }
 
@@ -1154,9 +1151,8 @@ CUserList::deleteUser(const long userid)
 {
     CUserItem* pUser = getUser(userid);
     if (NULL == pUser) {
-        SYSLOG(LOG_ERR,
-               "deleteUser: Failed to delete user - "
-               "User is not defined.");
+        spdlog::error("deleteUser: Failed to delete user - "
+                      "User is not defined.");
         return false;
     }
 
@@ -1189,9 +1185,8 @@ CUserList::getUser(const long userid)
         }
     }
 
-    SYSLOG(LOG_ERR,
-           "getUser: Failed to get user - "
-           "User is not found.");
+    spdlog::error("getUser: Failed to get user - "
+                  "User is not found.");
 
     return NULL;
 }
@@ -1201,19 +1196,18 @@ CUserList::getUser(const long userid)
 //
 
 CUserItem*
-CUserList::validateUser(const std::string& user, const std::string& password)
+CUserList::validateUser(const std::string& user, const std::string& passwordhash)
 {
     CUserItem* pUserItem;
 
     pUserItem = m_userhashmap[user];
     if (NULL == pUserItem) {
-        SYSLOG(LOG_ERR,
-               "validateUser: Failed to validate user - "
-               "User is not defined.");
+        spdlog::error("validateUser: Failed to validate user - "
+                      "User is not defined.");
         return NULL;
     }
 
-    if (!vscp - isPasswordValid(pUserItem->getPassword(), password)) {
+    if (!pUserItem->validatePassword(passwordhash)) {
         spdlog::info("validateUser: Failed to validate user - "
                      "Check username/password.");
         return NULL;
@@ -1222,34 +1216,7 @@ CUserList::validateUser(const std::string& user, const std::string& password)
     return pUserItem;
 }
 
-///////////////////////////////////////////////////////////////////////////////
-// validateUserDomain
-//
 
-CUserItem*
-CUserList::validateUserDomain(const std::string& user,
-                              const std::string& md5password)
-{
-    CUserItem* pUserItem;
-
-    pUserItem = m_userhashmap[user];
-    if (NULL == pUserItem) {
-        SYSLOG(LOG_ERR,
-               "validateUserDomain: Failed to validate user - "
-               "User is not defined.");
-        return NULL;
-    }
-
-    // Check password
-    if (pUserItem->getPasswordDomain() != md5password) {
-        SYSLOG(LOG_INFO,
-               "validateUserDomain: Failed to validate user - "
-               "Check username/password.");
-        return NULL;
-    }
-
-    return pUserItem;
-}
 
 ///////////////////////////////////////////////////////////////////////////////
 // getUserAsString
@@ -1265,9 +1232,8 @@ CUserList::getUserAsString(CUserItem* pUserItem, std::string& strUser)
 
     // Check pointer
     if (NULL == pUserItem) {
-        SYSLOG(LOG_ERR,
-               "getUserAsString: Failed to get user - "
-               "IOnvalid user item.");
+        spdlog::error("getUserAsString: Failed to get user - "
+                      "IOnvalid user item.");
         return false;
     }
 

@@ -503,6 +503,18 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
 //
 
 bool
+CControlObject::addClient(CClientItem* pClientItem, uint16_t id)
+{
+    return m_clientList.addClient(pClientItem, id);
+}
+
+bool
+CControlObject::addClient(CClientItem* pClientItem, cguid& guid)
+{
+    return m_clientList.addClient(pClientItem, guid);
+}
+
+bool
 CControlObject::run(void)
 {
     std::deque<CClientItem*>::iterator nodeClient;
@@ -887,14 +899,14 @@ CControlObject::startDeviceWorkerThreads(void)
         if (NULL != pDeviceItem) {
 
             spdlog::debug("Controlobject: [Driver] - Preparing: %s ",
-                          pDeviceItem->m_strName.c_str());
+                          pDeviceItem->getName().c_str());
 
             // Just start if enabled
-            if (!pDeviceItem->m_bEnable)
+            if (!pDeviceItem->isEnabled())
                 continue;
 
             spdlog::debug("Controlobject: [Driver] - Starting: %s ",
-                          pDeviceItem->m_strName.c_str());
+                          pDeviceItem->getName().c_str());
 
             // Start  the driver logic
             pDeviceItem->startDriver(this);
@@ -925,7 +937,7 @@ CControlObject::stopDeviceWorkerThreads(void)
         if (NULL != pDeviceItem) {
 
             spdlog::debug("Controlobject: [Driver] - Stopping: %s ",
-                          pDeviceItem->m_strName.c_str());
+                          pDeviceItem->getName().c_str());
 
             pDeviceItem->stopDriver();
         }
@@ -2091,7 +2103,6 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
 
     return true;
 } // JSON config
-
 
 
 
