@@ -212,11 +212,6 @@ CControlObject::CControlObject()
     m_rootFolder = "/var/lib/vscp/vscpd/";
 
     // Default admin user credentials
-    m_admin_user      = "admin";
-    m_admin_password  = "450ADCE88F2FDBB20F3318B65E53CA4A;"
-                        "06D3311CC2195E80BE4F8EB12931BFEB5C"
-                        "630F6B154B2D644ABE29CEBDBFB545";
-    m_admin_allowfrom = ""; // All access
     m_vscptoken       = "Carpe diem quam minimum credula postero";
     vscp_hexStr2ByteArray(m_systemKey,
                           32,
@@ -387,15 +382,6 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
     spdlog::debug("Using configuration file: %s", strcfgfile.c_str());
 
     //==========================================================================
-    //                           Add admin user
-    //==========================================================================
-
-    m_userList.addSuperUser(m_admin_user,
-                            m_admin_password,
-                            "TODO",
-                            m_admin_allowfrom); // Remotes allows to connect
-
-    //==========================================================================
     //                           Add driver user
     //==========================================================================
 
@@ -403,13 +389,13 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
     char buf[128];
     randPassword pw(4);
 
-    // Level III Driver Username
+    // Level II Driver Username
     memset(buf, 0, sizeof(buf));
     pw.generatePassword(32, buf);
     m_driverUsername = "drv_";
     m_driverUsername += std::string(buf);
 
-    // Level III Driver Password (can't contain ";" character)
+    // Level II Driver Password (can't contain ";" character)
     memset(buf, 0, sizeof(buf));
     pw.generatePassword(32, buf);
     m_driverPassword = buf;
@@ -1332,8 +1318,12 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
     auto get_string = [](const json& node, const char* key, std::string& out) {
         if (node.contains(key) && node[key].is_string()) {
             out = node[key].get<std::string>();
+            spdlog::debug("ReadConfig: Read string setting '{}'.", key);
             return true;
         }
+        spdlog::debug(
+          "ReadConfig: String setting '{}' missing or invalid; default retained.",
+          key);
         return false;
     };
 
@@ -1361,8 +1351,12 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
     auto get_uint = [](const json& node, const char* key, uint32_t& out) {
         if (node.contains(key) && node[key].is_number_integer()) {
             out = node[key].get<uint32_t>();
+            spdlog::debug("ReadConfig: Read integer setting '{}'.", key);
             return true;
         }
+        spdlog::debug(
+          "ReadConfig: Integer setting '{}' missing or invalid; default retained.",
+          key);
         return false;
     };
 
@@ -1923,6 +1917,7 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
     // This is done in the constructor
     if (j.contains("guid") && j["guid"].is_string()) {
         m_guid.getFromString(j["guid"].get<std::string>());
+        spdlog::debug("ReadConfig: Read top-level 'guid'.");
     }
     else {
         spdlog::debug("ReadConfig: 'guid' not found or invalid, using default GUID.");
@@ -1935,12 +1930,23 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
         get_string(g, "servername", m_strServerName);
         if (g.contains("guid") && g["guid"].is_string()) {
             m_guid.getFromString(g["guid"].get<std::string>());
+            spdlog::debug("ReadConfig: Read general 'guid'.");
         }
         if (g.contains("clientbuffersize") &&
             g["clientbuffersize"].is_number_integer()) {
             m_maxItemsInClientReceiveQueue =
               g["clientbuffersize"].get<uint32_t>();
+            spdlog::debug("ReadConfig: Read general 'clientbuffersize' as {}.",
+                          m_maxItemsInClientReceiveQueue);
         }
+        else {
+            spdlog::debug(
+              "ReadConfig: General 'clientbuffersize' missing or invalid; default retained.");
+        }
+    }
+    else {
+        spdlog::debug(
+          "ReadConfig: 'general' object missing or invalid; defaults retained.");
     }
 
     // Security.
@@ -1956,7 +1962,16 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
             vscp_hexStr2ByteArray(m_systemKey,
                                   32,
                                   sec["vscpkey"].get<std::string>().c_str());
+            spdlog::debug("ReadConfig: Read security 'vscpkey'.");
         }
+        else {
+            spdlog::debug(
+              "ReadConfig: Security 'vscpkey' missing or invalid; default retained.");
+        }
+    }
+    else {
+        spdlog::debug(
+          "ReadConfig: 'security' object missing or invalid; defaults retained.");
     }
 
     // TCP/IP section.
@@ -1979,12 +1994,25 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
             get_string(jjj, "name", str);
             m_tcpip_tls_opts.name = mg_str(str.c_str());
         }
+        else {
+            spdlog::debug(
+              "ReadConfig: TCP/IP 'ssl-options' object missing or invalid; defaults retained.");
+        }
+    }
+    else {
+        spdlog::debug(
+          "ReadConfig: 'tcpip' object missing or invalid; defaults retained.");
     }
 
     // Users.
     if (j.contains("remoteuser") && j["remoteuser"].is_array()) {
+        spdlog::debug("ReadConfig: Read 'remoteuser' array with {} entries.",
+                      j["remoteuser"].size());
+
         for (const auto& u : j["remoteuser"]) {
             if (!u.is_object()) {
+                spdlog::debug(
+                  "ReadConfig: Skipping non-object entry in 'remoteuser'.");
                 continue;
             }
 
@@ -1994,20 +2022,23 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
             std::string note;
             std::string privilege;
             std::string allowfrom;
-            std::string allowevent;
+            std::string allowevents;
             std::string filter;
             std::string mask;
+            uint32_t flags = 0;
 
-            get_string(u, "name", name);
+            get_string(u, "username", name);
             get_string(u, "password", password);
             get_string(u, "fullname", fullname);
             get_string(u, "note", note);
             get_string(u, "privilege", privilege);
-            get_string(u, "allowfrom", allowfrom);
-            get_string(u, "allowevent", allowevent);
+            get_string(u, "allowed_remotes", allowfrom);
+            get_string(u, "allowed_events", allowevents);
             get_string(u, "filter", filter);
             get_string(u, "mask", mask);
+            get_uint(u, "flags", flags);
 
+            // Skip users without a name or password.
             if (name.empty() || password.empty()) {
                 continue;
             }
@@ -2029,9 +2060,13 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
                                hasFilter ? &vfilter : NULL,
                                privilege,
                                allowfrom,
-                               allowevent,
-                               0);
+                               allowevents,
+                               flags);
         }
+    }
+    else {
+        spdlog::debug(
+          "ReadConfig: 'remoteuser' array missing or invalid; no users loaded.");
     }
 
     // Drivers.
@@ -2040,8 +2075,13 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
 
         if (drivers.contains("level1") && drivers["level1"].is_array()) {
             for (const auto& drv : drivers["level1"]) {
-                if (!drv.is_object() || !drv.value("enable", false) ||
-                    !drv.contains("name") || !drv.contains("config") ||
+                if (!drv.is_object()) {
+                    continue;
+                }
+                const bool enabled = drv.value("enable", false);
+                spdlog::debug("ReadConfig: Read level I driver 'enable' as {}.",
+                              enabled ? "true" : "false");
+                if (!enabled || !drv.contains("name") || !drv.contains("config") ||
                     !drv.contains("path") || !drv.contains("flags") ||
                     !drv.contains("guid") || !drv.contains("translation")) {
                     continue;
@@ -2052,6 +2092,9 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
 
                 cguid guid;
                 guid.getFromString(drv["guid"].get<std::string>());
+                spdlog::debug(
+                  "ReadConfig: Read level I driver '{}' settings: name, config, path, flags, guid, translation.",
+                  strName);
 
                 if (!m_deviceList.addItem(strName,
                                           drv["config"].get<std::string>(),
@@ -2069,11 +2112,20 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
                 }
             }
         }
+        else {
+            spdlog::debug(
+              "ReadConfig: 'drivers.level1' array missing or invalid.");
+        }
 
         if (drivers.contains("level2") && drivers["level2"].is_array()) {
             for (const auto& drv : drivers["level2"]) {
-                if (!drv.is_object() || !drv.value("enable", false) ||
-                    !drv.contains("name") || !drv.contains("path-config") ||
+                if (!drv.is_object()) {
+                    continue;
+                }
+                const bool enabled = drv.value("enable", false);
+                spdlog::debug("ReadConfig: Read level II driver 'enable' as {}.",
+                              enabled ? "true" : "false");
+                if (!enabled || !drv.contains("name") || !drv.contains("path-config") ||
                     !drv.contains("path-driver") || !drv.contains("guid")) {
                     continue;
                 }
@@ -2083,6 +2135,9 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
 
                 cguid guid;
                 guid.getFromString(drv["guid"].get<std::string>());
+                spdlog::debug(
+                  "ReadConfig: Read level II driver '{}' settings: name, path-config, path-driver, guid.",
+                  strName);
 
                 if (!m_deviceList.addItem(strName,
                                           drv["path-config"].get<std::string>(),
@@ -2099,11 +2154,17 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
                 }
             }
         }
+        else {
+            spdlog::debug(
+              "ReadConfig: 'drivers.level2' array missing or invalid.");
+        }
+    }
+    else {
+        spdlog::debug(
+          "ReadConfig: 'drivers' object missing or invalid; no drivers loaded.");
     }
 
     return true;
 } // JSON config
-
-
 
 

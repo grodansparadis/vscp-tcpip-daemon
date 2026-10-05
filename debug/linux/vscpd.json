@@ -30,17 +30,35 @@
     "udp-port" : 9999
   },
 
-  "users": [
+  "remoteuser": [
     {
       "username": "admin",
-      "_comment_password": "Password is stored hashed using Argon2",
-      "password": "admin",
+      "_comment_password": "Password is stored hashed using Argon2id2",
+      "password": "$argon2id$v=19$m=262144,t=3,p=1$2O++1fRUrt8NwWZjs4quMQ$ne/rslQA26kDEAEYS1MMNKNk9YPQq5EUklW0sBbZnjE",
       "fullname": "admin",
       "_comment_remotes": "List of remote connections for this user",
-      "remotes": [],
+      "flags": 1234,
+      "filter": "",
+      "mask": "",
+      "privilege": "admin",
+      "allowed_remotes": "+192.168.1.0/24",
       "_comment_events": "List of events this user can send",
-      "events": []
+      "allowed_events": "*:*",
+      "note": "This is the admin used for managing the VSCP daemon"
+    },
+    {
+      "username": "vscp",
+      "password": "$argon2id$v=19$m=262144,t=3,p=1$Fl+fNwFt6sw0o04CToENrw$PWr23wCX40Z3bRYpyIv3Z0axSBYerGRyyheOYTfZNXI",
+      "fullname": "vscp",
+      "flags": 4321,
+      "filter": "",
+      "mask": "",
+      "privilege": "user",
+      "allowed_remotes": "+192.168.1.0/24",
+      "allowed_events": "*:*",
+      "note": "This is the standard user for VSCP operations"
     }
+
   ],
 
 

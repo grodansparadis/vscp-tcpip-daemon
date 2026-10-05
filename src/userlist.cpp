@@ -111,47 +111,6 @@ needs_rehash(const std::string& stored_hash)
                                           MEM_LIMIT) != 0;
 }
 
-// ---------------------------------------------------------------------------
-// Migration from MD5 without forcing a password reset.
-//
-// Step 1 (one-off script): for every user, store
-//     hash_password(legacy_md5_hex)   and set legacy_wrapped = true
-// Step 2 (at login): see login() below.
-// ---------------------------------------------------------------------------
-
-// struct UserRecord {
-//     std::string hash;
-//     bool legacy_wrapped; // true = hash is argon2id(md5_hex_of_password)
-// };
-
-// // Provide your own MD5 hex function only for the legacy path
-// // (e.g. the one your server already uses).
-// std::string
-// md5_hex(const std::string& s);
-
-// bool
-// login(UserRecord& user, const std::string& password)
-// {
-//     if (user.legacy_wrapped) {
-//         if (!verify_password(user.hash, md5_hex(password)))
-//             return false;
-//         // Success: upgrade to a plain Argon2id hash of the real password.
-//         user.hash           = hash_password(password);
-//         user.legacy_wrapped = false;
-//         // ...persist user to the database here...
-//         return true;
-//     }
-
-//     if (!verify_password(user.hash, password))
-//         return false;
-
-//     if (needs_rehash(user.hash)) {
-//         user.hash = hash_password(password);
-//         // ...persist user to the database here...
-//     }
-//     return true;
-// }
-
 // ----------------------------------------------------------------------------
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -161,7 +120,7 @@ needs_rehash(const std::string& stored_hash)
 CUserItem::CUserItem(void)
 {
     m_userID = -1; // not initialized
-    m_password.clear();
+    m_passwordhash.clear();
     m_username.clear();
     m_fullname.clear();
     m_note.clear();
@@ -215,10 +174,10 @@ CUserItem::fixName(void)
 //
 
 bool
-CUserItem::validatePassword(const std::string& password_hash)
+CUserItem::validatePassword(const std::string& passwordHash)
 {
     // TODO: Implement password hash validation using Argon2
-    return false;
+    return m_passwordhash == passwordHash;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -853,106 +812,7 @@ CUserList::~CUserList(void)
     m_userhashmap.clear();
 }
 
-///////////////////////////////////////////////////////////////////////////////
-// addUser
-//
 
-bool
-CUserList::addSuperUser(const std::string& user,
-                        const std::string& password,
-                        const std::string& strDomain,
-                        const std::string& allowedRemotes,
-                        uint32_t bFlags)
-{
-    // char buf[512];
-
-    // Cant add user with username that is already defined.
-    if (NULL != m_userhashmap[user]) {
-        return false;
-    }
-
-    // New user item
-    CUserItem* pItem = new CUserItem;
-    if (NULL == pItem) {
-        spdlog::error("addSuperUser: Failed to delete user - "
-                      "User is not defined.");
-        return false;
-    }
-
-    // ----
-
-    char buf[2048], secret[2048];
-    uint8_t iv[16];
-    std::string strIV;
-    std::string strCrypto;
-
-    std::deque<std::string> tokens;
-    vscp_split(tokens, password, ";");
-    strIV = tokens.front();
-    tokens.pop_front();
-    strCrypto = tokens.front();
-
-    strIV     = "5a475c082c80dcdf7f2dfbd976253b24";
-    strCrypto = "69b1180d2f4809d39be34e19c750107f";
-    if (0 == vscp_hexStr2ByteArray(iv, 16, (const char*)strIV.c_str())) {
-        spdlog::error("[addSuperUser] Authentication: No room "
-                      "for iv block. ");
-        return false; // Not enough room in buffer
-    }
-
-    size_t len;
-    if (0 == (len = vscp_hexStr2ByteArray((uint8_t*)secret,
-                                          strCrypto.length(),
-                                          (const char*)strCrypto.c_str()))) {
-        spdlog::error("[addSuperUser] Authentication: No room "
-                      "for crypto block. ");
-        return false; // Not enough room in buffer
-    }
-
-    memset(buf, 0, sizeof(buf));
-    AES_CBC_decrypt_buffer(AES128,
-                           (uint8_t*)buf,
-                           (uint8_t*)secret,
-                           len,
-                           gpobj->getSystemKey(nullptr),
-                           iv);
-
-    // std::string str = std::string((const char*)buf);
-    // std::deque<std::string> tokens;
-    // vscp_split(tokens, str, ":");
-
-    // ----
-
-    pItem->setUserID(0); // Super user is always at id = 0
-
-    std::string driverhash = user;
-    driverhash += ":";
-    driverhash += strDomain;
-    driverhash += ":";
-    driverhash += password;
-
-    memset(buf, 0, sizeof(buf));
-    strncpy(buf, (const char*)driverhash.c_str(), driverhash.length());
-
-    char digest[33];
-    vscp_md5(digest, (const unsigned char*)buf, strlen(buf));
-
-    pItem->setPasswordDomain(std::string(digest));
-
-    pItem->setUserName(user);
-    pItem->fixName();
-    pItem->setPassword(password);
-    pItem->setFullname("Admin user");
-    pItem->setNote("Admin user");
-    pItem->setFilter(NULL);
-    pItem->setUserRightsFromString("admin");
-    pItem->setAllowedRemotesFromString(allowedRemotes);
-
-    // Add to the map
-    m_userhashmap[user] = pItem;
-
-    return true;
-}
 
 ///////////////////////////////////////////////////////////////////////////////
 // addUser
@@ -960,7 +820,7 @@ CUserList::addSuperUser(const std::string& user,
 
 bool
 CUserList::addUser(const std::string& user,
-                   const std::string& password,
+                   const std::string& passwordHash,
                    const std::string& fullname,
                    const std::string& strNote,
                    const std::string& strDomain,
@@ -995,7 +855,7 @@ CUserList::addUser(const std::string& user,
     driverhash += ":";
     driverhash += strDomain;
     driverhash += ":";
-    driverhash += password;
+    driverhash += passwordHash;
 
     memset(buf, 0, sizeof(buf));
     strncpy(buf, (const char*)driverhash.c_str(), driverhash.length());
@@ -1007,13 +867,14 @@ CUserList::addUser(const std::string& user,
 
     pItem->setUserName(user);
     pItem->fixName();
-    pItem->setPassword(password);
+    pItem->setPassword(passwordHash);
     pItem->setFullname(fullname);
     pItem->setNote(strNote);
     pItem->setFilter(pFilter);
     pItem->setUserRightsFromString(userRights);
     pItem->setAllowedRemotesFromString(allowedRemotes);
     pItem->setAllowedEventsFromString(allowedEvents);
+    pItem->setFlags(bFlags);
 
     // Add to the map
     m_userhashmap[user] = pItem;
@@ -1039,7 +900,7 @@ CUserList::addUser(const std::string& strUser,
 {
     std::string strToken;
     std::string user;
-    std::string password;
+    std::string passwordHash;
     std::string fullname;
     std::string strNote;
     vscpEventFilter filter;
@@ -1058,7 +919,7 @@ CUserList::addUser(const std::string& strUser,
 
     // password
     if (!tokens.empty()) {
-        password = tokens.front();
+        passwordHash = tokens.front();
         tokens.pop_front();
     }
 
@@ -1111,15 +972,21 @@ CUserList::addUser(const std::string& strUser,
         }
     }
 
+    // flags
+    if (!tokens.empty()) {
+        bFlags = std::stoul(tokens.front());
+        tokens.pop_front();
+    }
+
     return addUser(user,
-                   password,
+                   passwordHash,
                    fullname,
                    strNote,
-                   strDomain,
                    &filter,
                    userRights,
                    allowedRemotes,
-                   allowedEvents);
+                   allowedEvents,
+                   bFlags);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1196,7 +1063,8 @@ CUserList::getUser(const long userid)
 //
 
 CUserItem*
-CUserList::validateUser(const std::string& user, const std::string& passwordhash)
+CUserList::validateUser(const std::string& user,
+                        const std::string& passwordhash)
 {
     CUserItem* pUserItem;
 
@@ -1216,12 +1084,10 @@ CUserList::validateUser(const std::string& user, const std::string& passwordhash
     return pUserItem;
 }
 
-
-
 ///////////////////////////////////////////////////////////////////////////////
 // getUserAsString
 //
-// userid;name;password;fullname;filter;mask;rights;remotes;events;note
+// userid;name;passwordhash;fullname;filter;mask;rights;remotes;events;note;flags
 //
 
 bool
@@ -1243,7 +1109,7 @@ CUserList::getUserAsString(CUserItem* pUserItem, std::string& strUser)
 ///////////////////////////////////////////////////////////////////////////////
 // getUserAsString
 //
-// userid;name;password;fullname;filter;mask;rights;remotes;events;note
+// userid;name;passwordhash;fullname;filter;mask;rights;remotes;events;note;flags
 //
 
 bool
@@ -1275,7 +1141,7 @@ CUserList::getUserAsString(uint32_t idx, std::string& strUser)
 ///////////////////////////////////////////////////////////////////////////////
 // getAllUsers
 //
-// userid;name;password;fullname;filter;mask;rights;remotes;events;note
+// userid;name;passwordhash;fullname;filter;mask;rights;remotes;events;note;flags
 //
 
 bool

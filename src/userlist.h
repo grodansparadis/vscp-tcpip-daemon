@@ -248,15 +248,6 @@ class CUserItem {
         return (getPassword() == password);
     };
 
-    /*!
-        Check combined password domain for user
-        @param passworddomain Password domain to check
-        @return true If password domain is correct
-    */
-    bool checkPasswordDomain(const std::string& md5password)
-    {
-        return (getPasswordDomain() == md5password);
-    };
 
     // * * * Getters/Setters * * *
 
@@ -269,21 +260,10 @@ class CUserItem {
     void setUserName(const std::string& strUser) { m_username = strUser; };
 
     // Password
-    std::string getPassword(void) { return m_password; };
-    void setPassword(const std::string& strPassword)
+    std::string getPassword(void) { return m_passwordhash; };
+    void setPassword(const std::string& strPasswordhash)
     {
-        m_password = strPassword;
-    };
-
-    // PasswordDomain
-    std::string getPasswordDomain(void)
-    {
-        return vscp_lower(m_md5PasswordDomain);
-    };
-
-    void setPasswordDomain(const std::string& strPassword)
-    {
-        m_md5PasswordDomain = vscp_lower(strPassword);
+        m_passwordhash = strPasswordhash;
     };
 
     // Full name
@@ -496,6 +476,21 @@ class CUserItem {
     */
     void resetAuthentication(void) { m_bAuthenticated = false; };
 
+    /*!
+        Set flags associated with the user
+        @param flags Flags to set for the user
+    */
+    void setFlags(uint32_t flags)
+    {
+        m_flags = flags;
+    };
+
+    /*!
+        Get flags associated with the user
+        @return Flags of the user
+    */
+    uint32_t getFlags(void) { return m_flags; };
+
   protected:
     /*!
       Flag indicating if the user has been authenticated
@@ -510,10 +505,7 @@ class CUserItem {
     std::string m_username;
 
     /// Password
-    std::string m_password;
-
-    /// MD5 of user:domain:password (h1)
-    std::string m_md5PasswordDomain;
+    std::string m_passwordhash;
 
     /// Full name
     std::string m_fullname;
@@ -546,6 +538,11 @@ class CUserItem {
         Filter associated with this user
     */
     vscpEventFilter m_filterVSCP;
+
+    /*!
+        Flags associated with the user
+    */
+    uint32_t m_flags;
 };
 
 /*!
@@ -572,31 +569,12 @@ class CUserList {
     bool loadUsers(void);
 
     /*!
-     * Add the super (admin) user. This can only be the user setup in the
-     * configuration file..
-     * @param user Username for user.
-     * @param password Password.
-     * @param strDomain Authentication domain
-     * @param allowedRemotes of allowed remote locations from which the
-     *          super user is allowed to connect to this system. If empty
-     *          the super user can connect form all remote locations.
-     * @param bFlags
-       @return true on success. false on failure.
-     */
-    bool addSuperUser(const std::string& user,
-                      const std::string& password,
-                      const std::string& strDomain,
-                      const std::string& allowedRemotes = "",
-                      uint32_t bFlags                   = 0);
-
-    /*!
         Add a user to the in memory list. Must saved to database to make
        persistent. The configuration set username is not a valid username.
         @param user Username for user.
-        @param password Password.
+        @param passwordHash Password.
         @param fullname Fullname for user.
         @param strNote An arbitrary note about the user
-        @param strDomain Authentication domain
         @param Pointer to a VSCP filter associated with this user.
         @param userRights list with user rights on the form
        right1,right2,right3.... admin - all rights user - standard user rights
@@ -605,15 +583,13 @@ class CUserList {
        connect. Empty list is no restrictions.
         @param allowedEvents List with allowed events that a remote user is
        allowed to send.
-        @param bSystemUser If true this user is a user that should not be saved
-       to the DB
+        @param bFlags Flags associated with the user.
         @return true on success. false on failure.
     */
     bool addUser(const std::string& user,
-                 const std::string& password,
+                 const std::string& passwordHash,
                  const std::string& fullname,
                  const std::string& strNote,
-                 const std::string& strDomain,
                  const vscpEventFilter* pFilter    = NULL,
                  const std::string& userRights     = "",
                  const std::string& allowedRemotes = "",
@@ -624,11 +600,9 @@ class CUserList {
      * Add user from comma separated string data
      * @param strUser Comma separated list with user information.
      *      name;password;fullname;filtermask;rights;remotes;events;note
-     * @param strDomain Authentication domain
      * @return true on success. false on failure.
      */
     bool addUser(const std::string& strUser,
-                 const std::string& strDomain,
                  bool bUnpackNote = false);
 
     /*!
@@ -666,11 +640,11 @@ class CUserList {
     /*!
         Validate a username/password pair
         @param user Username to test.
-        @param passwordhash Password hash to test
+        @param passwordHash Password hash to test
         @return Pointer to useritem if valid, NULL if not.
     */
     CUserItem* validateUser(const std::string& user,
-                            const std::string& passwordhash);
+                            const std::string& passwordHash);
 
 
     /*!
