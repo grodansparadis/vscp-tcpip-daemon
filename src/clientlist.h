@@ -52,11 +52,12 @@ struct mg_connection;
 
 /*!
     @brief Client Item representing a connected client in the system.
-    A client has a device name, input queue, and is associated with a specific interface type.
-    The class provides methods to manage the client's connection, interface type, and input queue.
-    All clients has a unique client ID and may have specific permissions and capabilities based on their interface type.
-    The class also defines various constants and enumerations for client IDs, levels, and interface types.
-    A user is always associated with a client item.
+    A client has a device name, input queue, and is associated with a specific
+   interface type. The class provides methods to manage the client's connection,
+   interface type, and input queue. All clients has a unique client ID and may
+   have specific permissions and capabilities based on their interface type. The
+   class also defines various constants and enumerations for client IDs, levels,
+   and interface types. A user is always associated with a client item.
 */
 
 class CClientItem {
@@ -68,10 +69,10 @@ class CClientItem {
       0xffff;                                          // Internal daemon worker
     static const uint16_t CLIENT_ID_INTERNAL = 0xfffe; // Internal client
 
-    /*!
-        Maximum default number of items in the client input queue
-    */
-    #define CLIENT_ITEM_MAX_INPUT_QUEUE 20000
+/*!
+    Maximum default number of items in the client input queue
+*/
+#define CLIENT_ITEM_MAX_INPUT_QUEUE 20000
 
     /*!
         VSCP levels
@@ -246,7 +247,8 @@ class CClientItem {
     /// Get client flags
     uint32_t getFlags(void) { return m_flags; };
 
-    /// Set the maximum number of events in the client input queue (zero means unlimited)
+    /// Set the maximum number of events in the client input queue (zero means
+    /// unlimited)
     void setMaxItemsInClientInputQueue(uint32_t maxItems)
     {
         m_maxItemsInClientInputQueue = maxItems;
@@ -276,7 +278,7 @@ class CClientItem {
     void setConnection(struct mg_connection* conn) { m_conn = conn; };
 
     /// get connection
-    struct mg_connection* getConnection(void) { return m_conn; };
+    const struct mg_connection* getConnection(void) const { return m_conn; };
 
     /// Set open state
     void setOpen(bool open) { m_bOpen = open; };
@@ -284,44 +286,7 @@ class CClientItem {
     /// Get open state
     bool isOpen(void) { return m_bOpen; };
 
-    /// Get read buffer
-    std::string& getReadBuffer(void) { return m_readBuffer; };
-
-    /// Set read buffer
-    void setReadBuffer(const std::string& buffer) { m_readBuffer = buffer; };
-
-    /// Clear read buffer
-    void clearReadBuffer(void) { m_readBuffer.clear(); };
-
-    // add read buffer content to the current read buffer
-    void addToReadBuffer(const std::string& data) { m_readBuffer += data; };
-
-    /// Get the current command being processed
-    std::string& getCurrentCommand(void) { return m_currentCommand; };
-
-    /// Set the current command being processed
-    void setCurrentCommand(const std::string& cmd) { m_currentCommand = cmd; };
-
-    /// Get last command
-    std::string& getLastCommand(void) { return m_lastCommand; };
-
-    /// Set last command
-    void setLastCommand(const std::string& cmd) { m_lastCommand = cmd; };
-
-    /// Get token
-    std::string& getToken(void) { return m_currentToken; };
-
-    /// Set token
-    void setToken(const std::string& token) { m_currentToken = token; };
-
-    /*!
-     Check if the command line start with the command
-     The command is checked case insensitive
-     @param cmd The command to look for.
-     @param bFix The command string have the command removed.
-     @return true if command is found
-  */
-    bool CommandStartsWith(const std::string& cmd, bool bFix = true);
+    
 
     /*!
         Get the date and time when the client was started
@@ -330,7 +295,8 @@ class CClientItem {
     vscpdatetime getDateTimeStarted(void) { return m_dtutc; };
 
     /*!
-        Set the date and time when the client was started to the current UTC time
+        Set the date and time when the client was started to the current UTC
+       time
     */
     void setDateTimeStartedNow(void) { m_dtutc.setUTCNow(); };
 
@@ -362,7 +328,15 @@ class CClientItem {
     time_t getReceiveLoopTimestamp(void) { return m_timeRcvLoop; };
 
     /// Set the time when the receive loop was last active
-    void setReceiveLoopTimestamp(time_t timestamp) { m_timeRcvLoop = timestamp; };
+    void setReceiveLoopTimestamp(time_t timestamp)
+    {
+        m_timeRcvLoop = timestamp;
+    };
+
+    /// Set connected status
+    void setConnected(bool connected) { m_bConnected = connected; };
+
+
 
   private:
     /// Pointer to control object
@@ -485,26 +459,14 @@ class CClientItem {
     */
     CUserItem* m_pUserItem;
 
-    /*!
-        Buffer for storing incoming data from the client.
-    */
-    std::string m_readBuffer;
-
-    /// Last command executed
-    std::string m_lastCommand;
-
-    /// Current command
-    std::string m_currentCommand;
-
-    /// Current token is the first space separated
-    /// item in the command string
-    std::string m_currentToken;
+    
 };
 
 // ----------------------------------------------------------------------------
 
 /*!
-    @brief Client list class representing a collection of connected clients in the system.
+    @brief Client list class representing a collection of connected clients in
+   the system.
 
     The CClientList class provides methods to add, remove, and retrieve clients
     based on their ID, ordinal, or GUID. It also allows querying the current
@@ -562,21 +524,28 @@ class CClientList {
         @param id Numeric id for the client
         @return A pointer to a clientitem on success or NULL on failure.
     */
-    CClientItem* getClientFromId(uint16_t id);
+    const CClientItem* getClientFromId(uint16_t id);
 
     /*!
         Get client form ordinal
         @param id Numeric ordinal for the client
         @return A pointer to a clientitem on success or NULL on failure.
     */
-    CClientItem* getClientFromOrdinal(uint16_t ordinal);
+    const CClientItem* getClientFromOrdinal(uint16_t ordinal);
 
     /*!
         Get Client from GUID
         @param guid Guid for the client
         @return A pointer to a cientitem on success or NULL on failure.
     */
-    CClientItem* getClientFromGUID(cguid& guid);
+    const CClientItem* getClientFromGUID(cguid& guid);
+
+    /*!
+        Get client item from connection.
+        @param connectionId The ID of the connection.
+        @return Pointer to the client item, or nullptr if not found.
+    */
+    const CClientItem* getClientFromConnection(const struct mg_connection* pConnection);
 
     /*!
         Get current number of clients
@@ -646,16 +615,38 @@ class CClientList {
     */
     size_t size(void) { return m_itemList.size(); }
 
-  private:
+    /*!
+        Clear the client output queue.
+    */
     void clearOutputQueue(void);
 
+    /*!
+        lock mutex for the client main receive queue.
+    */
+    void lockClientMainReceiveQueue(void);
+
+    /*!
+        Unlock mutex for the client main receive queue.
+    */
+    void unlockClientMainReceiveQueue(void);
+
+    /*!
+        waitEventInMainReceiveQueue
+
+        @param timeoutMs Maximum time to wait for an event in milliseconds. 
+        @return True if there is an event waiting in the main receive queue,
+       false otherwise (timeout or error).
+    */
+    bool waitEventInMainReceiveQueue(uint32_t timeoutMs);
+
+  private:
     // *********************************************************************
     //                         CLIENT OUTPUT QUEUE
     // *********************************************************************
 
     /*!
-       Event object to indicate that there is an event in the client main receive
-       queue.
+       Semaphore that indicates that there is an event in the client main
+       receive queue.
      */
     sem_t m_semClientMainReceiveQueue;
 
@@ -666,7 +657,8 @@ class CClientList {
 
     /*!
         Semaphore that is signaled when workerthread
-        have send an incoming event to all clients
+        have send an incoming event that should go to
+        all clients
     */
     sem_t m_semSentToAllClients;
 

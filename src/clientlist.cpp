@@ -95,7 +95,6 @@ const char* interface_description[] = { "Unknown (you should not see this).",
 
 class CControlObject;
 
-
 ///////////////////////////////////////////////////////////////////////////////
 // CClientItem
 //
@@ -347,32 +346,7 @@ CClientItem::clearInputQueue(void)
     pthread_mutex_unlock(&m_mutexClientInputQueue);
 }
 
-///////////////////////////////////////////////////////////////////////////////
-// CommandStartWith
-//
 
-bool
-CClientItem::CommandStartsWith(const std::string& cmd, bool bFix)
-{
-    if (!vscp_startsWith(vscp_upper(m_currentCommand), vscp_upper(cmd))) {
-        return false;
-    }
-
-    // If asked to do so remove the command.
-    if (bFix) {
-        if (m_currentCommand.length() - cmd.length()) {
-            m_currentCommand =
-              vscp_str_right(m_currentCommand,
-                             m_currentCommand.length() - cmd.length() - 1);
-        }
-        else {
-            m_currentCommand.clear();
-        }
-        vscp_trim(m_currentCommand);
-    }
-
-    return true;
-}
 
 // ----------------------------------------------------------------------------
 
@@ -415,7 +389,7 @@ CClientList::~CClientList()
     removeAllClients();
     pthread_mutex_destroy(&m_mutexClientItemList);
 
-     if (0 != sem_destroy(&m_semClientMainReceiveQueue)) {
+    if (0 != sem_destroy(&m_semClientMainReceiveQueue)) {
         spdlog::error("Unable to destroy m_semClientMainReceiveQueue");
     }
 
@@ -432,7 +406,6 @@ CClientList::~CClientList()
 ///////////////////////////////////////////////////////////////////////////////
 // enqueueReceiveEvent
 //
-
 
 bool
 CClientList::enqueueReceiveEvent(vscpEvent* pEvent, size_t maxSize)
@@ -686,7 +659,7 @@ CClientList::removeAllClients()
 // getClientFromId
 //
 
-CClientItem*
+const CClientItem*
 CClientList::getClientFromId(uint16_t id)
 {
     std::deque<CClientItem*>::iterator it;
@@ -708,7 +681,7 @@ CClientList::getClientFromId(uint16_t id)
 // getClientFromOrdinal
 //
 
-CClientItem*
+const CClientItem*
 CClientList::getClientFromOrdinal(uint16_t ordinal)
 {
     if (!m_itemList.size()) {
@@ -726,7 +699,7 @@ CClientList::getClientFromOrdinal(uint16_t ordinal)
 // getClientFromGUID
 //
 
-CClientItem*
+const CClientItem*
 CClientList::getClientFromGUID(cguid& guid)
 {
     std::deque<CClientItem*>::iterator it;
@@ -736,6 +709,28 @@ CClientList::getClientFromGUID(cguid& guid)
 
         CClientItem* pItem = *it;
         if (pItem->getInterfaceGUID() == guid) {
+            returnItem = pItem;
+            break;
+        }
+    }
+
+    return returnItem;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// getClientFromConnection
+//
+
+const CClientItem*
+CClientList::getClientFromConnection(const struct mg_connection* pConnection)
+{
+    std::deque<CClientItem*>::iterator it;
+    const CClientItem* returnItem = NULL;
+
+    for (it = m_itemList.begin(); it != m_itemList.end(); ++it) {
+
+        const CClientItem* pItem = *it;
+        if (pItem->getConnection() == pConnection) {
             returnItem = pItem;
             break;
         }
@@ -789,6 +784,28 @@ CClientList::getClient(uint16_t n, std::string& client)
 
     client = pClient->getClientItemAsString();
 
+    return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// waitEventInMainReceiveQueue
+//
+
+bool
+CClientList::waitEventInMainReceiveQueue(uint32_t timeoutMs)
+{
+    int rv;
+    rv = vscp_sem_wait(&m_semClientMainReceiveQueue, timeoutMs);
+    if ((-1 == rv)) {
+        if (errno == ETIMEDOUT) {
+            return false;
+        }
+        else {
+            spdlog::error("Error waiting for main receive queue semaphore: {}",
+                          strerror(errno));
+            return false;
+        }
+    }
     return true;
 }
 
@@ -867,6 +884,9 @@ CClientList::sendEventAllClients(const vscpEvent* pEvent, uint32_t excludeID)
         }
     }
     pthread_mutex_unlock(&m_mutexClientItemList);
+
+    // Tell main thread that there are work to do
+    sem_post(&m_semSentToAllClients);
 
     return true;
 }

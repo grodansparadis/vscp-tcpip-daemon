@@ -46,7 +46,7 @@
 #define MSG_OK            "+OK - Success.\r\n"
 #define MSG_GOODBY        "+OK - Connection closed by client.\r\n"
 #define MSG_GOODBY2       "+OK - Connection closed.\r\n"
-#define MSG_USENAME_OK    "+OK - User name accepted, password please\r\n"
+#define MSG_USERNAME_OK    "+OK - User name accepted, password please\r\n"
 #define MSG_PASSWORD_OK   "+OK - Ready to work.\r\n"
 #define MSG_QUEUE_CLEARED "+OK - All events cleared.\r\n"
 #define MSG_RECEIVE_LOOP                                                       \
@@ -128,67 +128,18 @@ typedef struct {
     uint8_t m_securityLevel; // Security level for command (0-15)
 } structCommand;
 
-/*!
-    This class implement the listen thread for
-    the vscpd connections on the TCP interface
-*/
-
-// class tcpipListenThreadObj {
-
-//   public:
-//     /// Constructor
-//     tcpipListenThreadObj(CControlObject* pobj = NULL);
-
-//     /// Destructor
-//     ~tcpipListenThreadObj();
-
-//     /*!
-//         Set listening port
-//         Examples for IPv4: 80, 443s, 127.0.0.1:3128, 192.0.2.3:8080s
-//         Examples for IPv6: [::]:80, [::1]:80
-//     */
-//     void setListeningPort(const std::string& str) { m_strListeningPort = str;
-//     };
-
-//     /*!
-//         Getter/setter for control object
-//     */
-//     void setControlObjectPointer(CControlObject* pobj) { m_pCtrlObj = pobj; };
-//     CControlObject* getControlObject(void) { return m_pCtrlObj; };
-
-//     // This mutex protects the clientlist
-//     pthread_mutex_t m_mutexTcpClientList;
-
-//     // List with active tcp/ip clients
-//     std::list<tcpipClientObj*> m_tcpip_clientList;
-
-//     // Listening port
-//     std::string m_strListeningPort;
-
-//     // Settings for the tcp/ip server
-//     server_context m_srvctx;
-
-//     // Counter for client id's
-//     unsigned long m_idCounter;
-
-//     int m_nStopTcpIpSrv;
-
-//     // Pointer to the mother of all things
-//     CControlObject* m_pCtrlObj;
-// };
-
 // ----------------------------------------------------------------------------
 
 /*!
-    @brief This class implements the server code for handling individual TCP/IP client
-    connections.
+    @brief This class implements the server code for handling individual TCP/IP
+   client connections.
 */
 
 class CTcpipSrv {
 
   public:
     /// Constructor
-    CTcpipSrv(CControlObject* obj);
+    CTcpipSrv(CControlObject* obj = nullptr);
 
     /// Destructor
     ~CTcpipSrv();
@@ -233,7 +184,8 @@ class CTcpipSrv {
         @param strCommand The command string to handle.
         @return Result of command handling.
     */
-    int commandHandler(struct mg_connection* conn, std::string& strCommand);
+    int commandHandler(struct mg_connection* conn,
+                       const std::string& strCommand);
 
     /*!
         Check if a user has been verified
@@ -257,7 +209,8 @@ class CTcpipSrv {
         @param conn Pointer to the client connection.
         @return void.
 
-        @note This function handles sending an event from the client to the server.
+        @note This function handles sending an event from the client to the
+       server.
     */
     void handleClientSend(struct mg_connection* conn);
 
@@ -267,7 +220,8 @@ class CTcpipSrv {
         @param conn Pointer to the client connection.
         @return void.
 
-        @note This function handles receiving an event from the server to the client.
+        @note This function handles receiving an event from the server to the
+       client.
     */
     void handleClientReceive(struct mg_connection* conn);
 
@@ -277,7 +231,8 @@ class CTcpipSrv {
        Default.
         @return True on success/false on failure.
     */
-    bool sendOneEventFromQueue(struct mg_connection* conn, bool bStatusMsg = true);
+    bool sendOneEventFromQueue(struct mg_connection* conn,
+                               bool bStatusMsg = true);
 
     /*!
         Client DataAvailable
@@ -406,16 +361,101 @@ class CTcpipSrv {
 
     /*!
      * Handle client measurement
-       
+
        @param conn Pointer to the client connection.
      */
     void handleClientMeasurement(struct mg_connection* conn);
+
+    /*!
+        Stop the TCP/IP server.
+
+        This function sets the run flag to false, signaling the server to stop
+        its operations. It should be called when the server needs to be
+        gracefully terminated.
+
+        All worker threads will be terminated to ensure a clean shutdown.
+    */
+    void stopServer(void) { m_bRun = false; };
+
+    /*!
+        Check if the server is no longer running.
+
+        @return true if the server has been stopped, false otherwise.
+    */
+    bool isWorking(void) { return m_bRun; };
+
+    /*!
+        Get the current command for the client connection.
+
+        @return The current command string.
+    */
+    std::string& getCurrentCommand() { return m_currentCommand; };
+
+    /*!
+        Set the current command for the client connection.
+
+        @param cmd The command string to set as the current command.
+    */
+    void setCurrentCommand(const std::string& cmd) { m_currentCommand = cmd; vscp_trim(m_currentCommand); };
+
+    /*!
+        Get the last command processed for the client connection.
+
+        @return The last command string.
+    */
+    std::string& getLastCommand() { return m_lastCommand; };
+
+    /*!
+        Set the last command processed for the client connection.
+
+        @param cmd The command string to set as the last command.
+    */
+    void setLastCommand(const std::string& cmd) { m_lastCommand = cmd; };
+
+    /*!
+        Check if the current command starts with the specified prefix.
+
+        @param cmd The command prefix to check.
+        @param bFix If true, remove the prefix from the current command.
+        @return true if the current command starts with the specified prefix, false
+        otherwise.
+    */
+    bool commandStartsWith(const std::string& cmd, bool bFix = false);
+
+    // ----------------------------------------------------------------------------
+
+    /// Getters/setters
+
+    /*!
+        Get the interface address for the TCP/IP connection.
+        @return The address of the interface.
+    */
+    std::string getInterfaceAddress() const { return m_interfaceAddress; }
+
+    /*!
+        Set interface address
+        Examples for IPv4: 80, 443s, 127.0.0.1:3128, 192.0.2.3:8080s
+        Examples for IPv6: [::]:80, [::1]:80
+    */
+    void setInterfaceAddress(const std::string& str)
+    {
+        m_interfaceAddress = str;
+    };
+
+    /*!
+        Get the TLS options for the TCP/IP server instance.
+
+        @return Reference to the TLS options structure.
+    */
+    mg_tls_opts& getTlsOpts() { return m_tcpip_tls_opts; }
 
     /*!
         Getter/setter for control object
     */
     void setControlObjectPointer(CControlObject* pobj) { m_pCtrlObj = pobj; };
     CControlObject* getControlObject(void) { return m_pCtrlObj; };
+
+    /*!
 
   private:
     // --- Member variables ---
@@ -433,10 +473,54 @@ class CTcpipSrv {
     /// @brief Run baby run flag
     bool m_bRun;
 
+    /*!
+        Interface used for TCP/IP connection  (only one)
+        Examples for IPv4: 80, 127.0.0.1:9598,
+            192.0.2.3:9598,
+            tcp://192.0.2.3:9599,
+            ssl://192.0.2.3:9598.
+            tls://192.0.2.3:9598
+        Examples for IPv6: [::]:9598,
+            [::1]:9598,
+            tcp://[::1]:9598,
+            tcp://[::1]:9598,
+            ssl://[::1]:9598,
+            tls://[::1]:9598
+    */
+    std::string m_interfaceAddress;
+
+    /*!
+        tcp/ip SSL settings
+
+        ca - Certificate Authority, an mg_str. Used to verify the certificate
+       that the other end sends to us. If NULL, then server authentication for
+       clients and client authentication for servers are disabled.
+       If ca is set but cert is NULL, then only server authentication is
+       performed.
+
+       cert - Our own
+        certificate; an mg_str. If NULL, then we don't authenticate ourselves to
+       the other peer.
+
+
+       key - Our own private key; an mg_str. Sometimes, a
+       certificate and its key are bundled in a single PEM file, in which case
+       the values for cert and key could be the same
+
+       name - Server name; an
+       mg_str. If not empty, enable server name verification.
+
+        NOTE: if both ca and cert are set, then two-way (mutual) TLS
+       authentication is enabled, both sides authenticate each other. Usually,
+       for one-way (server) TLS authentication, server connections set both key
+       and cert, whilst clients only ca and/or possibly name.
+    */
+    mg_tls_opts m_tcpip_tls_opts;
+
     // All input is added to the receive buf. as it is
     // received. Commands are then fetched from this buffer
     // as we go
-    std::string m_strResponse;
+    //std::string m_strResponse;
 
     // Saved return value for last sockettcp operation
     size_t m_rv;
@@ -444,8 +528,15 @@ class CTcpipSrv {
     // Flag for receive loop active
     bool m_bReceiveLoop;
 
-    // List of old commands
-    std::deque<std::string> m_commandArray;
+    /*!
+        The current command being processed for the client connection.
+    */
+    std::string m_currentCommand;
+
+    /*!
+        The last command processed for the client connection.
+    */
+    std::string m_lastCommand;
 
     // /*!
     //     @brief Map of client items indexed by their unique ID.

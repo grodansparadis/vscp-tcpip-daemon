@@ -177,7 +177,8 @@ bool
 CUserItem::validatePassword(const std::string& passwordHash)
 {
     // TODO: Implement password hash validation using Argon2
-    return m_passwordhash == passwordHash;
+    //return m_passwordhash == passwordHash;
+    return verify_password(m_passwordhash.c_str(), passwordHash.c_str()) == 0;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -823,7 +824,6 @@ CUserList::addUser(const std::string& user,
                    const std::string& passwordHash,
                    const std::string& fullname,
                    const std::string& strNote,
-                   const std::string& strDomain,
                    const vscpEventFilter* pFilter,
                    const std::string& userRights,
                    const std::string& allowedRemotes,
@@ -849,21 +849,6 @@ CUserList::addUser(const std::string& user,
 
     pItem->setUserID(m_cntLocaluser);
     m_cntLocaluser++; // Update local user id counter
-
-    // MD5 Token
-    std::string driverhash = user;
-    driverhash += ":";
-    driverhash += strDomain;
-    driverhash += ":";
-    driverhash += passwordHash;
-
-    memset(buf, 0, sizeof(buf));
-    strncpy(buf, (const char*)driverhash.c_str(), driverhash.length());
-
-    char digest[33];
-    vscp_md5(digest, (const unsigned char*)buf, strlen(buf));
-
-    pItem->setPasswordDomain(std::string(digest));
 
     pItem->setUserName(user);
     pItem->fixName();
@@ -895,7 +880,6 @@ CUserList::addUser(const std::string& user,
 
 bool
 CUserList::addUser(const std::string& strUser,
-                   const std::string& strDomain,
                    bool bUnpackNote)
 {
     std::string strToken;
@@ -973,12 +957,13 @@ CUserList::addUser(const std::string& strUser,
     }
 
     // flags
+    uint32_t bFlags = 0;
     if (!tokens.empty()) {
         bFlags = std::stoul(tokens.front());
         tokens.pop_front();
     }
 
-    return addUser(user,
+    if (!addUser(user,
                    passwordHash,
                    fullname,
                    strNote,
@@ -986,7 +971,12 @@ CUserList::addUser(const std::string& strUser,
                    userRights,
                    allowedRemotes,
                    allowedEvents,
-                   bFlags);
+                   bFlags)) {
+        spdlog::error("addUser: Failed to add user '{}'.", user);
+        return false;
+    }
+
+    return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -122,11 +122,12 @@ createFolderStuct(std::string& rootFolder); // from vscpd.cpp
 
 void*
 clientMsgWorkerThread(void* userdata); // this
-// void*
-// tcpipListenThread(void* pData); // tcpipsev.cpp
 
-static void
-tcpip_event_handler(struct mg_connection* conn, int ev, void* ev_data);
+void*
+tcpipWorkerThread(void* pdata); // tcpipsrv.cpp
+
+// static void
+// tcpip_event_handler(struct mg_connection* conn, int ev, void* ev_data);
 
 ///////////////////////////////////////////////////////////////////////////////
 // log_to_spdlog
@@ -204,7 +205,7 @@ CControlObject::CControlObject()
     m_bQuit_clientMsgWorkerThread =
       false; // true for clientWorkerThread termination
 
-   if (0 != pthread_mutex_init(&m_mutex_DeviceList, NULL)) {
+    if (0 != pthread_mutex_init(&m_mutex_DeviceList, NULL)) {
         spdlog::error("Unable to init m_mutex_DeviceList");
         return;
     }
@@ -212,7 +213,7 @@ CControlObject::CControlObject()
     m_rootFolder = "/var/lib/vscp/vscpd/";
 
     // Default admin user credentials
-    m_vscptoken       = "Carpe diem quam minimum credula postero";
+    m_vscptoken = "Carpe diem quam minimum credula postero";
     vscp_hexStr2ByteArray(m_systemKey,
                           32,
                           "A4A86F7D7E119BA3F0CD06881E371B989B"
@@ -224,12 +225,8 @@ CControlObject::CControlObject()
     // Nill the GUID
     m_guid.clear();
 
-    // Default TCP/IP interface settings
-    m_interfaceAddress = "tcp://localhost:9598";
-
-    // No TLS by default
-    memset(&m_tcpip_tls_opts, 0, sizeof(m_tcpip_tls_opts));
-
+    // Share the control object with the TCP/IP server instance
+    m_tcpipSrv.setControlObjectPointer(this);
 
     // Logging defaults
     m_bEnableFileLog   = false;
@@ -260,21 +257,6 @@ CControlObject::CControlObject()
     //     spdlog::error( "Failed to initialize webserver subsystem.");
     // }
 
-    struct mg_mgr mgr; // Event manager
-    // mg_mgr_init(&mgr); // Init manager
-
-    // mg_http_listen(&mgr,
-    //                "http://0.0.0.0:8000",
-    //                fn,
-    //                NULL); // Setup HTTP listener
-    // mg_http_listen(&mgr,
-    //                "https://0.0.0.0:8443",
-    //                fn,
-    //                NULL);        // Setup HTTPS listener
-    // for (;;) {                   // Infinite event loop
-    //     mg_mgr_poll(&mgr, 1000); // Process all connections
-    // }
-
     // Initialize the CRC
     crcInit();
 }
@@ -287,10 +269,6 @@ CControlObject::~CControlObject()
 {
 
     spdlog::debug("Cleaning up");
-
-    
-
-   
 
     if (0 != pthread_mutex_destroy(&m_mutex_DeviceList)) {
         spdlog::error("Unable to destroy m_mutex_DeviceList");
@@ -312,7 +290,7 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
     std::string str;
 
     // Sodium init
-    if (sodium_init() < 0) {  // call once at startup
+    if (sodium_init() < 0) { // call once at startup
         std::fprintf(stderr, "libsodium init failed\n");
         return false;
     }
@@ -407,11 +385,10 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
                        drvhash,                     // salt;hash
                        "System added driver user.", // full name
                        "System added driver user.", // note
-                       "TODO",
-                       NULL,
-                       "driver",
-                       "+127.0.0.0/24", // Only local
-                       "*:*",           // All events
+                       nullptr,                     // Pointer to filter
+                       "driver",                    // user rights
+                       "+127.0.0.0/24",             // Only local
+                       "*:*",                       // All events
                        0);
 
     // Get GUID
@@ -447,21 +424,10 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
         return FALSE;
     }
 
-    // Start webserver and websockets
-    // IMPORTANT!!!!!!!!
-    // Must be started before the tcp/ip server as
-    // ssl initializarion is done here
-    try {
-        // start_webserver();
-    }
-    catch (...) {
-        spdlog::error("Exception when starting web server");
-        return FALSE;
-    }
 
-    // Start TCP/IP interface
+    // Start TCP/IP server
     try {
-        startTcpipSrvThread();
+        startTcpipWorkerThread();
     }
     catch (...) {
         spdlog::error("Exception when starting tcp/ip server");
@@ -480,8 +446,6 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
     return true;
 }
 
-
-
 /////////////////////////////////////////////////////////////////////////////
 // run - Program main loop
 //
@@ -489,23 +453,12 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
 //
 
 bool
-CControlObject::addClient(CClientItem* pClientItem, uint16_t id)
-{
-    return m_clientList.addClient(pClientItem, id);
-}
-
-bool
-CControlObject::addClient(CClientItem* pClientItem, cguid& guid)
-{
-    return m_clientList.addClient(pClientItem, guid);
-}
-
-bool
 CControlObject::run(void)
 {
     std::deque<CClientItem*>::iterator nodeClient;
 
-    // We need to create a clientItem for ourself and add this object to the list
+    // We need to create a clientItem for internal use and add it to the
+    // client list
     CClientItem* pClientItem = new CClientItem;
     if (NULL == pClientItem) {
         spdlog::error("Unable to allocate Client item, Ending.");
@@ -514,26 +467,24 @@ CControlObject::run(void)
 
     // This is an active client
     pClientItem->setOpen(true);
-    pClientItem->setInterfaceType(CClientItem::CLIENT_ITEM_INTERFACE_TYPE_CLIENT_INTERNAL);
+    pClientItem->setInterfaceType(
+      CClientItem::CLIENT_ITEM_INTERFACE_TYPE_CLIENT_INTERNAL);
     pClientItem->setDeviceName("Internal Server Client.|Started at " +
                                vscpdatetime::Now().getISODateTime());
 
     // Add the client to the Client List (protected (mutex) in addClient)
     if (!m_clientList.addClient(pClientItem, CClientItem::CLIENT_ID_INTERNAL)) {
         // Failed to add client
-        delete pClientItem;
         spdlog::error("ControlObject: Failed to add internal client.");
         delete pClientItem;
         return false;
     }
 
-    spdlog::debug("Mainloop starting");
+    spdlog::debug("Entering main loop");
 
 #ifdef WITH_SYSTEMD
     sd_notify(0, "READY=1");
 #endif
-
-    
 
     //-------------------------------------------------------------------------
     //                            MAIN - LOOP
@@ -558,30 +509,41 @@ CControlObject::run(void)
             }
         }
 
-        // Wait for event
-        // if ((-1 == vscp_sem_wait(&m_semSentToAllClients, 10)) &&
+        // Wait for semaphore indicating events have been sent to all clients
+        int rv = m_clientList.waitForOutputQueueEvent(100);
+        if (rv == -1) {
+            if (errno == ETIMEDOUT) {
+                continue;
+            }
+            spdlog::error("Error waiting for output queue event: {}",
+                          strerror(errno));
+            break;
+        }
+        // if ((-1 == vscp_sem_wait(&m_clientList.m_semSentToAllClients, 10)) &&
         //     errno == ETIMEDOUT) {
         //     continue;
         // }
 
-        //mg_mgr_poll(&mgr, 100); // Infinite event loop, blocks for upto 100ms
-                                // unless there is network activity
-
-        // Send events to websocket clients
-        // websock_post_incomingEvents();
+        
 
         //----------------------------------------------------------------------
         //                         Event received here
         //                   from one of the incoming source
         //----------------------------------------------------------------------
 
-        // vscpEvent* pev = pClientItem->getEventFromClientInputQueue(true);
-        // if (NULL == pev) {
-        //     continue;
-        // }
-        // // Process the received event here
-        // // TODO
-        // vscp_deleteEvent_v2(&pev);
+        vscpEvent* pev = pClientItem->getEventFromClientInputQueue(true);
+        if (NULL == pev) {
+            continue;
+        }
+        
+        // Process the received event here
+        // TODO
+
+
+        vscp_deleteEvent_v2(&pev);
+
+        // mg_mgr_poll(&mgr, 100); // Infinite event loop, blocks for upto 100ms
+        //  unless there is network activity
 
     } // while
 
@@ -595,11 +557,35 @@ CControlObject::run(void)
     return true;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// addClient
+//
+// Add a client to the control object's client list using an ID.
+//
+
+bool
+CControlObject::addClient(CClientItem* pClientItem, uint16_t id)
+{
+    return m_clientList.addClient(pClientItem, id);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// addClient
+//
+// Add a client to the control object's client list using a GUID.
+//
+
+bool
+CControlObject::addClient(CClientItem* pClientItem, cguid& guid)
+{
+    return m_clientList.addClient(pClientItem, guid);
+}
+
 /////////////////////////////////////////////////////////////////////////////
 // automation
 
 bool
-CControlObject::doAutomation(CClientItem* pClientItem) 
+CControlObject::doAutomation(CClientItem* pClientItem)
 {
     vscpEventEx ex;
 
@@ -758,19 +744,19 @@ CControlObject::cleanup(void)
         // stop_webserver();
     }
     catch (...) {
-        spdlog::error("REST: Exception occurred when stoping web server");
+        spdlog::error("cleanup: Exception occurred when stoping web server");
     }
 
     spdlog::debug("ControlObject: cleanup - Stopping TCP/IP worker thread...");
 
     try {
-        stopTcpipSrvThread();
+        stopTcpipWorkerThread();
     }
     catch (...) {
-        spdlog::error("REST: Exception occurred when stoping tcp/ip server");
+        spdlog::error("cleanup: Exception occurred when stoping tcp/ip server");
     }
 
-    spdlog::debug("Controlobject: ControlObject: Cleanup done.");
+    spdlog::debug("Controlobject:  Cleanup done.");
 
     return true;
 }
@@ -797,6 +783,8 @@ CControlObject::startClientMsgWorkerThread(void)
     return true;
 }
 
+
+
 /////////////////////////////////////////////////////////////////////////////
 // stopClientMsgWorkerThread
 //
@@ -805,62 +793,49 @@ bool
 CControlObject::stopClientMsgWorkerThread(void)
 {
     // Request therad to terminate
-    m_bQuit_clientMsgWorkerThread = true;
+    setclientWorkerThreadQuit();
     pthread_join(m_clientMsgWorkerThread, NULL);
 
     return true;
 }
 
 /////////////////////////////////////////////////////////////////////////////
-// startTcpWorkerThread
+// startTcpipWorkerThread
 //
 
 bool
-CControlObject::startTcpipSrvThread(void)
+CControlObject::startTcpipWorkerThread(void)
 {
-    // spdlog::debug("Controlobject: Starting TCP/IP interface...");
+    spdlog::debug("Controlobject: Starting TCP/IP interface...");
 
-    // // Create the tcp/ip server data object
-    // m_ptcpipSrvObject = (tcpipListenThreadObj*)new
-    // tcpipListenThreadObj(this); if (NULL == m_ptcpipSrvObject) {
-    //     spdlog::error("Controlobject: Failed to allocate storage for
-    //     tcp/ip.");
-    // }
-
-    // // Set the port to listen for connections on
-    // m_ptcpipSrvObject->setListeningPort(m_interfaceAddress);
-
-    // if (pthread_create(&m_tcpipListenThread,
-    //                    NULL,
-    //                    tcpipListenThread,
-    //                    m_ptcpipSrvObject)) {
-    //     delete m_ptcpipSrvObject;
-    //     m_ptcpipSrvObject = NULL;
-    //     spdlog::error(
-    //       "Controlobject: Unable to start the tcp/ip listen thread.");
-    //     return false;
-    // }
+    if (pthread_create(&m_tcpipWorkerThread,
+                       NULL,
+                       tcpipWorkerThread,
+                       &m_tcpipSrv)) {
+        spdlog::error(
+          "Controlobject: Unable to start the tcp/ip worker thread.");
+        return false;
+    }
 
     return true;
 }
 
 /////////////////////////////////////////////////////////////////////////////
-// stopTcpWorkerThread
+// stopTcpipWorkerThread
 //
 
 bool
-CControlObject::stopTcpipSrvThread(void)
+CControlObject::stopTcpipWorkerThread(void)
 {
     // Tell the thread it's time to quit
-    // m_ptcpipSrvObject->m_nStopTcpIpSrv = VSCP_TCPIP_SRV_STOP;
+    m_tcpipSrv.stopServer();
 
-    // spdlog::debug("Controlobject: Terminating TCP thread.");
+    spdlog::debug("Controlobject: Terminating TCP/IP worker thread.");
 
-    // pthread_join(m_tcpipListenThread, NULL);
-    // delete m_ptcpipSrvObject;
-    // m_ptcpipSrvObject = NULL;
+    pthread_join(m_tcpipWorkerThread, NULL);
 
-    // spdlog::debug("Controlobject: Terminated TCP thread.");
+
+    spdlog::debug("Controlobject: Terminated TCP thread.");
 
     return true;
 }
@@ -1042,8 +1017,6 @@ CControlObject::getVscpCapabilities(uint8_t* pCapability)
 
     return true;
 }
-
-
 
 //////////////////////////////////////////////////////////////////////////////
 // addKnowNode
@@ -1321,9 +1294,9 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
             spdlog::debug("ReadConfig: Read string setting '{}'.", key);
             return true;
         }
-        spdlog::debug(
-          "ReadConfig: String setting '{}' missing or invalid; default retained.",
-          key);
+        spdlog::debug("ReadConfig: String setting '{}' missing or invalid; "
+                      "default retained.",
+                      key);
         return false;
     };
 
@@ -1354,9 +1327,9 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
             spdlog::debug("ReadConfig: Read integer setting '{}'.", key);
             return true;
         }
-        spdlog::debug(
-          "ReadConfig: Integer setting '{}' missing or invalid; default retained.",
-          key);
+        spdlog::debug("ReadConfig: Integer setting '{}' missing or invalid; "
+                      "default retained.",
+                      key);
         return false;
     };
 
@@ -1920,7 +1893,8 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
         spdlog::debug("ReadConfig: Read top-level 'guid'.");
     }
     else {
-        spdlog::debug("ReadConfig: 'guid' not found or invalid, using default GUID.");
+        spdlog::debug(
+          "ReadConfig: 'guid' not found or invalid, using default GUID.");
     }
 
     // Optional legacy/general object support.
@@ -1940,13 +1914,13 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
                           m_maxItemsInClientReceiveQueue);
         }
         else {
-            spdlog::debug(
-              "ReadConfig: General 'clientbuffersize' missing or invalid; default retained.");
+            spdlog::debug("ReadConfig: General 'clientbuffersize' missing or "
+                          "invalid; default retained.");
         }
     }
     else {
-        spdlog::debug(
-          "ReadConfig: 'general' object missing or invalid; defaults retained.");
+        spdlog::debug("ReadConfig: 'general' object missing or invalid; "
+                      "defaults retained.");
     }
 
     // Security.
@@ -1965,38 +1939,40 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
             spdlog::debug("ReadConfig: Read security 'vscpkey'.");
         }
         else {
-            spdlog::debug(
-              "ReadConfig: Security 'vscpkey' missing or invalid; default retained.");
+            spdlog::debug("ReadConfig: Security 'vscpkey' missing or invalid; "
+                          "default retained.");
         }
     }
     else {
-        spdlog::debug(
-          "ReadConfig: 'security' object missing or invalid; defaults retained.");
+        spdlog::debug("ReadConfig: 'security' object missing or invalid; "
+                      "defaults retained.");
     }
 
     // TCP/IP section.
     if (j.contains("tcpip") && j["tcpip"].is_object()) {
         const json& jj = j["tcpip"];
-        bool b        = false;
-        uint32_t n    = 0;
-
-        get_string(jj, "interface", m_interfaceAddress);
+        bool b         = false;
+        uint32_t n     = 0;
+        
+        std::string addr;
+        get_string(jj, "interface-address", addr);
+        m_tcpipSrv.setInterfaceAddress(addr);
 
         if (jj.contains("ssl-options") && jj["ssl-options"].is_object()) {
             const json& jjj = jj["ssl-options"];
             std::string str;
             get_string(jjj, "cafile", str);
-            m_tcpip_tls_opts.ca = mg_str(str.c_str());
+            m_tcpipSrv.getTlsOpts().ca = mg_str(str.c_str());
             get_string(jjj, "certfile", str);
-            m_tcpip_tls_opts.cert = mg_str(str.c_str());
+            m_tcpipSrv.getTlsOpts().cert = mg_str(str.c_str());
             get_string(jjj, "keyfile", str);
-            m_tcpip_tls_opts.key = mg_str(str.c_str());
+            m_tcpipSrv.getTlsOpts().key = mg_str(str.c_str());
             get_string(jjj, "name", str);
-            m_tcpip_tls_opts.name = mg_str(str.c_str());
+            m_tcpipSrv.getTlsOpts().name = mg_str(str.c_str());
         }
         else {
-            spdlog::debug(
-              "ReadConfig: TCP/IP 'ssl-options' object missing or invalid; defaults retained.");
+            spdlog::debug("ReadConfig: TCP/IP 'ssl-options' object missing or "
+                          "invalid; defaults retained.");
         }
     }
     else {
@@ -2016,7 +1992,7 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
                 continue;
             }
 
-            std::string name;
+            std::string username;
             std::string password;
             std::string fullname;
             std::string note;
@@ -2027,7 +2003,7 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
             std::string mask;
             uint32_t flags = 0;
 
-            get_string(u, "username", name);
+            get_string(u, "username", username);
             get_string(u, "password", password);
             get_string(u, "fullname", fullname);
             get_string(u, "note", note);
@@ -2039,7 +2015,7 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
             get_uint(u, "flags", flags);
 
             // Skip users without a name or password.
-            if (name.empty() || password.empty()) {
+            if (username.empty() || password.empty()) {
                 continue;
             }
 
@@ -2052,11 +2028,10 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
                             vscp_readMaskFromString(&vfilter, mask);
             }
 
-            m_userList.addUser(name,
+            m_userList.addUser(username,
                                password,
                                fullname,
                                note,
-                               "",
                                hasFilter ? &vfilter : NULL,
                                privilege,
                                allowfrom,
@@ -2065,8 +2040,8 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
         }
     }
     else {
-        spdlog::debug(
-          "ReadConfig: 'remoteuser' array missing or invalid; no users loaded.");
+        spdlog::debug("ReadConfig: 'remoteuser' array missing or invalid; no "
+                      "users loaded.");
     }
 
     // Drivers.
@@ -2081,9 +2056,10 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
                 const bool enabled = drv.value("enable", false);
                 spdlog::debug("ReadConfig: Read level I driver 'enable' as {}.",
                               enabled ? "true" : "false");
-                if (!enabled || !drv.contains("name") || !drv.contains("config") ||
-                    !drv.contains("path") || !drv.contains("flags") ||
-                    !drv.contains("guid") || !drv.contains("translation")) {
+                if (!enabled || !drv.contains("name") ||
+                    !drv.contains("config") || !drv.contains("path") ||
+                    !drv.contains("flags") || !drv.contains("guid") ||
+                    !drv.contains("translation")) {
                     continue;
                 }
 
@@ -2092,9 +2068,9 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
 
                 cguid guid;
                 guid.getFromString(drv["guid"].get<std::string>());
-                spdlog::debug(
-                  "ReadConfig: Read level I driver '{}' settings: name, config, path, flags, guid, translation.",
-                  strName);
+                spdlog::debug("ReadConfig: Read level I driver '{}' settings: "
+                              "name, config, path, flags, guid, translation.",
+                              strName);
 
                 if (!m_deviceList.addItem(strName,
                                           drv["config"].get<std::string>(),
@@ -2123,9 +2099,11 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
                     continue;
                 }
                 const bool enabled = drv.value("enable", false);
-                spdlog::debug("ReadConfig: Read level II driver 'enable' as {}.",
-                              enabled ? "true" : "false");
-                if (!enabled || !drv.contains("name") || !drv.contains("path-config") ||
+                spdlog::debug(
+                  "ReadConfig: Read level II driver 'enable' as {}.",
+                  enabled ? "true" : "false");
+                if (!enabled || !drv.contains("name") ||
+                    !drv.contains("path-config") ||
                     !drv.contains("path-driver") || !drv.contains("guid")) {
                     continue;
                 }
@@ -2135,9 +2113,9 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
 
                 cguid guid;
                 guid.getFromString(drv["guid"].get<std::string>());
-                spdlog::debug(
-                  "ReadConfig: Read level II driver '{}' settings: name, path-config, path-driver, guid.",
-                  strName);
+                spdlog::debug("ReadConfig: Read level II driver '{}' settings: "
+                              "name, path-config, path-driver, guid.",
+                              strName);
 
                 if (!m_deviceList.addItem(strName,
                                           drv["path-config"].get<std::string>(),
@@ -2160,11 +2138,60 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
         }
     }
     else {
-        spdlog::debug(
-          "ReadConfig: 'drivers' object missing or invalid; no drivers loaded.");
+        spdlog::debug("ReadConfig: 'drivers' object missing or invalid; no "
+                      "drivers loaded.");
     }
 
     return true;
 } // JSON config
 
+///////////////////////////////////////////////////////////////////////////////
+//                              Worker threads
+///////////////////////////////////////////////////////////////////////////////
 
+///////////////////////////////////////////////////////////////////////////////
+// clientMsgWorkerThread
+//
+// Is there any messages to send from Level II clients. Send it/them to all
+// devices/clients except for itself.
+//
+
+void*
+clientMsgWorkerThread(void* userdata)
+{
+    std::list<vscpEvent*>::iterator it;
+    vscpEvent* pev = NULL;
+
+    // Must be a valid control object pointer
+    CControlObject* pObj = (CControlObject*)userdata;
+    if (NULL == pObj) {
+        spdlog::error("clientMsgWorkerThread: Invalid control object pointer. "
+                      "Terminating clientMsgWorkerThread");
+        return NULL;
+    }
+
+    // Work on until told to quit
+    while (!pObj->shouldClientWorkerThreadQuit()) {
+
+        // Wait for event
+        if (!pObj->getClientList().waitEventInMainReceiveQueue(100)) {
+            continue;
+        }
+
+        // Get event
+        if (NULL ==
+            (pev = pObj->getClientList().getEventFromOutputQueue(true))) {
+            spdlog::error("clientMsgWorkerThread: No event in output queue (semaphore sinaled it was triggered but queue was empty).");
+            continue;
+        }
+
+        // Send event to all Level II clients (not to ourselves)
+        pObj->getClientList().sendEventAllClients(pev, pev->obid);
+
+        // Delete the event - we are done with it
+        vscp_deleteEvent_v2(&pev);
+
+    } // while
+
+    return NULL;
+}

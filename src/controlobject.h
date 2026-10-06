@@ -195,13 +195,13 @@ class CControlObject {
         Starting TCP/IP worker thread
         @return true on success
      */
-    bool startTcpipSrvThread(void);
+    bool startTcpipWorkerThread(void);
 
     /*!
         Stop the TCP/IP worker thread
         @return true on success
      */
-    bool stopTcpipSrvThread(void);
+    bool stopTcpipWorkerThread(void);
 
     /*!
         Starting Client worker thread
@@ -246,12 +246,6 @@ class CControlObject {
     */
     void addKnownNode(cguid& guid, cguid& ifguid, std::string& name);
 
-    /*!
-        Remove a new client from the client list
-
-        @param pClientItem Pointer to client that should be added.
-     */
-    //void removeClient(CClientItem* pClientItem);
 
     /*!
         Get device address for primary ehernet adapter
@@ -261,7 +255,8 @@ class CControlObject {
     bool getGuidFromMacAddress(cguid& guid);
 
     /*!
-        Get the first IP address computer is known under and convert it to a GUID.
+        Get the first IP address computer is known under and convert it to a
+       GUID.
 
         @param pGUID Pointer to GUID class
      */
@@ -273,8 +268,6 @@ class CControlObject {
         @return Returns true on success false on failure.
      */
     bool readConfiguration(const std::string& strcfgfile);
-
-    
 
     /*!
      * Check if a driver name is free to us
@@ -295,7 +288,6 @@ class CControlObject {
      * @return Pointer to the 32 byte key
      */
     uint8_t* getSystemKey(uint8_t* pKey);
-
 
     /*!
      * Get MD5 of system key (vscptoken)
@@ -322,27 +314,6 @@ class CControlObject {
     //**************************************************************************
 
     /*!
-        Set the interface address for the TCP/IP connection.
-        @param interfaceAddress The address of the interface.
-    */
-    void setInterfaceAddress(const std::string& interfaceAddress)
-    {
-        m_interfaceAddress = interfaceAddress;
-    }
-
-    /*!
-        Get the interface address for the TCP/IP connection.
-        @return The address of the interface.
-    */
-    std::string getInterfaceAddress() const { return m_interfaceAddress; }
-
-    /// @brief  Get the TLS options for the TCP/IP interface.
-    /// @param  None
-    /// @return Reference to the TLS options structure.
-    mg_tls_opts& getTlsOptions(void) { return m_tcpip_tls_opts; }
-
-
-    /*!
         Get client list
         @return Reference to the map of client items.
     */
@@ -353,13 +324,7 @@ class CControlObject {
         return m_maxItemsInClientReceiveQueue;
     }
 
-    // Get client form connection
-    /*!
-        Get client item from connection.
-        @param connectionId The ID of the connection.
-        @return Pointer to the client item, or nullptr if not found.
-    */
-    const CClientItem* getClientFromConnection(struct mg_connection* pConnection);
+   
 
     /*!
         Add a client item to the client list.
@@ -378,6 +343,26 @@ class CControlObject {
         @return Reference to the user list.
     */
     CUserList getUserList() { return m_userList; }
+
+    /*!
+        Stop the client worker thread.
+    */
+    void setclientWorkerThreadQuit() { m_bQuit_clientMsgWorkerThread = true; }
+
+    /*!
+        Should clientWorkerThread quit.
+        @return True if the clientWorkerThread should quit, false otherwise.
+    */
+    bool shouldClientWorkerThreadQuit() const
+    {
+        return m_bQuit_clientMsgWorkerThread;
+    }
+
+    /*!
+        Get the TCP/IP server object.
+        @return Reference to the TCP/IP server object.
+    */
+    CTcpipSrv& getTcpipSrv() { return m_tcpipSrv; }
 
   private:
     // This is the root folder for the VSCP daemon, it will look for
@@ -434,48 +419,14 @@ class CControlObject {
     /////////////////////////////////////////////////////////
 
     /*!
-        Interface used for TCP/IP connection  (only one)
-        Examples for IPv4: 80, 127.0.0.1:9598,
-            192.0.2.3:9598,
-            tcp://192.0.2.3:9599,
-            ssl://192.0.2.3:9598.
-            tls://192.0.2.3:9598
-        Examples for IPv6: [::]:9598,
-            [::1]:9598,
-            tcp://[::1]:9598,
-            tcp://[::1]:9598,
-            ssl://[::1]:9598,
-            tls://[::1]:9598
+        The TCP/IP server object for handling tcp/ip connections.
     */
-    std::string m_interfaceAddress;
+    CTcpipSrv m_tcpipSrv;
 
     /*!
-        tcp/ip SSL settings
-
-        ca - Certificate Authority, an mg_str. Used to verify the certificate
-       that the other end sends to us. If NULL, then server authentication for
-       clients and client authentication for servers are disabled.
-       If ca is set but cert is NULL, then only server authentication is
-       performed.
-
-       cert - Our own
-        certificate; an mg_str. If NULL, then we don't authenticate ourselves to
-       the other peer.
-
-
-       key - Our own private key; an mg_str. Sometimes, a
-       certificate and its key are bundled in a single PEM file, in which case
-       the values for cert and key could be the same
-
-       name - Server name; an
-       mg_str. If not empty, enable server name verification.
-
-        NOTE: if both ca and cert are set, then two-way (mutual) TLS
-       authentication is enabled, both sides authenticate each other. Usually,
-       for one-way (server) TLS authentication, server connections set both key
-       and cert, whilst clients only ca and/or possibly name.
+        The TCP/IP worker thread for handling tcp/ip connections.
     */
-    mg_tls_opts m_tcpip_tls_opts;
+    pthread_t m_tcpipWorkerThread;
 
     //**************************************************************************
     //                                DATABASE
@@ -555,7 +506,7 @@ class CControlObject {
     pthread_mutex_t m_mutex_deviceList;
 
     // Automation Object
-    //CAutomation m_automation;
+    // CAutomation m_automation;
 
     /// @brief Username for drivers (CClientItem)
     std::string m_driverUsername;
@@ -579,19 +530,16 @@ class CControlObject {
 
     // The list of users allowed to connect
     CUserList m_userList; // deque
-    //pthread_mutex_t m_mutex_UserList;
+    // pthread_mutex_t m_mutex_UserList;
 
     // *************************************************************************
     //                      Output queue for clients
     // *************************************************************************
 
-
     /*!
         Maximum number of items in receive queue for clients (ClientBufferSize)
      */
     uint32_t m_maxItemsInClientReceiveQueue;
-
-    
 
     //**************************************************************************
     //                          Threads
