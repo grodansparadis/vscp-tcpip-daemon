@@ -58,6 +58,9 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
+#ifdef WIN32
+#include <nb30.h>
+#endif
 #ifdef WITH_SYSTEMD
 #include <systemd/sd-daemon.h>
 #endif
@@ -1043,6 +1046,7 @@ CControlObject::getGuidFromMacAddress(cguid& guid)
     NCB Ncb;
     UCHAR uRetCode;
     LANA_ENUM lenum;
+    ASTAT Adapter;
     int i;
 
     // Clear the GUID

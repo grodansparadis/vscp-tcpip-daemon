@@ -282,7 +282,8 @@ if(WIN32)
         PRIVATE
             _CRT_SECURE_NO_WARNINGS
             _WINSOCK_DEPRECATED_NO_WARNINGS
-            WIN32_LEAN_AND_MEAN)
+            WIN32_LEAN_AND_MEAN
+            NOMINMAX)
 endif()
 
 if(UNIX AND NOT APPLE)
