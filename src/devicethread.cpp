@@ -35,7 +35,9 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#ifndef WIN32
 #include <sys/wait.h>
+#endif
 #include <syslog.h>
 #include <unistd.h>
 

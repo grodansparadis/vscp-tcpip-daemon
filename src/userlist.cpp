@@ -37,6 +37,9 @@
 #include <canal-macro.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef WIN32
+#include <strings.h>
+#endif
 
 #include "userlist.h"
 #include <controlobject.h>

@@ -52,6 +52,7 @@
 #include <vscp.h>
 
 #include <atomic>
+#include <algorithm>
 #include <map>
 #include <set>
 
@@ -73,12 +74,7 @@ using namespace kainjow::mustache;
 #endif
 
 #ifndef VSCPMAX
-#define VSCPMAX(a, b)                                                          \
-    ({                                                                         \
-        __typeof__(a) _a = (a);                                                \
-        __typeof__(b) _b = (b);                                                \
-        _a > _b ? _a : _b;                                                     \
-    })
+#define VSCPMAX(a, b) std::max((a), (b))
 #endif
 
 #define VSCP_MAX_DEVICES 1024 // abs. max. is 0xffff
@@ -102,12 +98,7 @@ class TCPListenThread;
 #endif
 
 #ifndef VSCPMAX
-#define VSCPMAX(a, b)                                                          \
-    ({                                                                         \
-        __typeof__(a) _a = (a);                                                \
-        __typeof__(b) _b = (b);                                                \
-        _a > _b ? _a : _b;                                                     \
-    })
+#define VSCPMAX(a, b) std::max((a), (b))
 #endif
 
 #define MAX_ITEMS_RECEIVE_QUEUE        1021

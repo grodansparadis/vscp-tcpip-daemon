@@ -185,6 +185,12 @@ set(VSCPD_SOURCES
     "${mongoose_SOURCE_DIR}/mongoose.c"
 )
 
+if(WIN32)
+    list(APPEND VSCPD_SOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/win32helpers/getopt.c"
+    )
+endif()
+
 # ---- Build the vscpd executable ----
 add_executable(vscpd ${VSCPD_SOURCES})
 set_target_properties(vscpd PROPERTIES OUTPUT_NAME "vscpd")
@@ -415,6 +421,10 @@ set(CPACK_PACKAGE_HOMEPAGE_URL     "https://www.vscp.org")
 set(CPACK_RESOURCE_FILE_LICENSE    "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 set(CPACK_RESOURCE_FILE_README     "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
 set(CPACK_STRIP_FILES              ON)
+
+if(UNIX AND NOT APPLE)
+    set(CPACK_SET_DESTDIR ON)
+endif()
 
 # ---- TGZ / ZIP (universal source-archive fallbacks) ----
 set(CPACK_SOURCE_IGNORE_FILES

@@ -41,8 +41,8 @@ static char sccsid[] = "@(#)getopt.c	8.3 (Berkeley) 4/27/95";
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#include "getopt.h"
 
-#define __P(x) x
 #define _DIAGASSERT(x) assert(x)
 
 #ifdef __weak_alias
@@ -56,12 +56,11 @@ int	opterr = 1,		/* if error message should be printed */
 	optreset;		/* reset getopt */
 char	*optarg;		/* argument associated with option */
 
-static char * _progname __P((char *));
-int getopt_internal __P((int, char * const *, const char *));
+static char * _progname(char *);
+int getopt_internal(int, char * const *, const char *);
 
 static char *
-_progname(nargv0)
-	char * nargv0;
+_progname(char *nargv0)
 {
 	char * tmp;
 
@@ -84,10 +83,7 @@ _progname(nargv0)
  *	Parse argc/argv argument vector.
  */
 int
-getopt(nargc, nargv, ostr)
-	int nargc;
-	char * const nargv[];
-	const char *ostr;
+getopt(int nargc, char * const nargv[], const char *ostr)
 {
 	static char *__progname = 0;
 	static char *place = EMSG;		/* option letter processing */
@@ -150,4 +146,3 @@ getopt(nargc, nargv, ostr)
 	}
 	return (optopt);			/* dump back option letter */
 }
-

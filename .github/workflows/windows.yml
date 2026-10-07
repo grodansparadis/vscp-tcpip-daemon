@@ -1,9 +1,12 @@
 name: Windows CI
 
 on:
-  # The current CMake Windows target still mixes POSIX-only sources with
-  # a VSCP submodule entrypoint that expects a different controlobject API.
-  # Keep this workflow manual until the Windows build is ported.
+  push:
+    branches: [ master, main ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ master, main ]
   workflow_dispatch:
 
 jobs:
@@ -20,7 +23,7 @@ jobs:
 
       - name: Install packages via vcpkg
         run: |
-          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install openssl expat zlib curl mosquitto dlfcn-win32 --triplet x64-windows
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install openssl expat zlib curl mosquitto dlfcn-win32 libsodium sqlite3 pthreads --triplet x64-windows
         shell: pwsh
 
       - name: Configure (CMake)

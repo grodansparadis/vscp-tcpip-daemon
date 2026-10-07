@@ -13,7 +13,7 @@
 set -e
 
 NAME=tcpip-vscpd
-DAEMON=/usr/sbin/tcpip-vscpd
+DAEMON=/usr/sbin/vscpd
 PIDFILE=/var/run/vscpd.pid
 CONFIG=/etc/vscp/vscpd.json
 
