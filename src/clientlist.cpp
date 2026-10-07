@@ -372,7 +372,11 @@ compareClientItems(const uint16_t element1, const uint16_t element2)
 
 CClientList::CClientList()
 {
+#ifdef WIN32
+    m_semClientMainReceiveQueue = CreateSemaphore(NULL, 0, 0x7fffffff, NULL);
+#else
     sem_init(&m_semClientMainReceiveQueue, 0, 0);
+#endif
     sem_init(&m_semSentToAllClients, 0, 0);
     pthread_mutex_init(&m_mutex_ClientMainReceiveQueue, NULL);
     pthread_mutex_init(&m_mutexClientItemList, NULL);
@@ -389,9 +393,13 @@ CClientList::~CClientList()
     removeAllClients();
     pthread_mutex_destroy(&m_mutexClientItemList);
 
+#ifdef WIN32
+    CloseHandle(m_semClientMainReceiveQueue);
+#else
     if (0 != sem_destroy(&m_semClientMainReceiveQueue)) {
         spdlog::error("Unable to destroy m_semClientMainReceiveQueue");
     }
+#endif
 
     if (0 != sem_destroy(&m_semSentToAllClients)) {
         spdlog::error("Unable to destroy m_semSentToAllClients");
@@ -477,7 +485,11 @@ CClientList::waitForOutputQueueEvent(uint32_t timeoutMs)
 void
 CClientList::notifyOutputQueueEvent(void)
 {
+#ifdef WIN32
+    if (!ReleaseSemaphore(m_semClientMainReceiveQueue, 1, NULL)) {
+#else
     if (0 != sem_post(&m_semClientMainReceiveQueue)) {
+#endif
         spdlog::error("Unable to signal the client main receive queue");
     }
 }
@@ -795,7 +807,7 @@ bool
 CClientList::waitEventInMainReceiveQueue(uint32_t timeoutMs)
 {
     int rv;
-    rv = vscp_sem_wait(&m_semClientMainReceiveQueue, timeoutMs);
+    rv = waitForOutputQueueEvent(timeoutMs);
     if ((-1 == rv)) {
         if (errno == ETIMEDOUT) {
             return false;

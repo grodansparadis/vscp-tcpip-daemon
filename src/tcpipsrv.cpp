@@ -65,6 +65,8 @@
 #include "tcpipsrv.h"
 #include "version.h"
 
+extern CControlObject* gpobj;
+
 #if defined(__linux__)
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE

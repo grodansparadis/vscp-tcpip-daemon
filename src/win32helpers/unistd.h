@@ -5,6 +5,7 @@
 #include <windows.h>
 #include <direct.h>
 #include <io.h>
+#include <time.h>
 
 #ifdef sleep
 #undef sleep
@@ -15,6 +16,10 @@
 
 #define chdir _chdir
 #define unlink _unlink
+
+#ifdef sleep
+#undef sleep
+#endif
 
 static inline unsigned int
 vscp_sleep(unsigned int seconds)
