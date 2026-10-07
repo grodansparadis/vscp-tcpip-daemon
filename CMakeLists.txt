@@ -185,6 +185,12 @@ set(VSCPD_SOURCES
     "${mongoose_SOURCE_DIR}/mongoose.c"
 )
 
+if(WIN32)
+    list(APPEND VSCPD_SOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/win32helpers/getopt.c"
+    )
+endif()
+
 # ---- Build the vscpd executable ----
 add_executable(vscpd ${VSCPD_SOURCES})
 set_target_properties(vscpd PROPERTIES OUTPUT_NAME "vscpd")

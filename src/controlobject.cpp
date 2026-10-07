@@ -44,14 +44,16 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <pthread.h>
-#include <pwd.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef WIN32
+#include <pwd.h>
 #include <sys/ioctl.h>
 #include <sys/msg.h>
+#endif
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
