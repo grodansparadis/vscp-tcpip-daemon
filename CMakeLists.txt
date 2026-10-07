@@ -228,6 +228,7 @@ if(WIN32)
             "${CMAKE_CURRENT_SOURCE_DIR}/src/win32helpers"
             "${vscp_SOURCE_DIR}/src/vscp/common/win32helpers"
             "${vscp_SOURCE_DIR}/src/common"
+            "${vscp_SOURCE_DIR}/src/common/windows"
             "${vscp_SOURCE_DIR}/src/vscp/common"
             "${EXPAT_INCLUDE_DIRS}"
             "${MOSQUITTO_INCLUDE_DIRS}"
