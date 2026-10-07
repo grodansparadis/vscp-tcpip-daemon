@@ -371,10 +371,6 @@ endif()
 # Man pages (Linux/macOS only)
 if(UNIX)
     install(FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/man/vscpd.8"
-        DESTINATION "${CMAKE_INSTALL_MANDIR}/man8"
-    )
-    install(FILES
         "${CMAKE_CURRENT_SOURCE_DIR}/man/vscp-mkpasswd.1"
         "${CMAKE_CURRENT_SOURCE_DIR}/man/vscpcmd.1"
         DESTINATION "${CMAKE_INSTALL_MANDIR}/man1"
