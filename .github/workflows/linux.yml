@@ -28,6 +28,7 @@ jobs:
             cmake ninja-build pkg-config \
             libssl-dev libexpat1-dev zlib1g-dev \
             libcurl4-openssl-dev \
+            libsodium-dev \
             libmosquitto-dev libsystemd-dev \
             rpm
 
