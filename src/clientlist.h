@@ -648,7 +648,11 @@ class CClientList {
        Semaphore that indicates that there is an event in the client main
        receive queue.
      */
+#ifdef WIN32
+    HANDLE m_semClientMainReceiveQueue;
+#else
     sem_t m_semClientMainReceiveQueue;
+#endif
 
     /*!
         Mutex for the client main receive queue

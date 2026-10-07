@@ -1046,7 +1046,10 @@ CControlObject::getGuidFromMacAddress(cguid& guid)
     NCB Ncb;
     UCHAR uRetCode;
     LANA_ENUM lenum;
-    ASTAT Adapter;
+    struct ASTAT {
+        ADAPTER_STATUS adapt;
+        NAME_BUFFER NameBuff[30];
+    } Adapter;
     int i;
 
     // Clear the GUID
