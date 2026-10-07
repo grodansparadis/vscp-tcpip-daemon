@@ -356,7 +356,7 @@ else()
         DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}/vscp"
     )
     install(PROGRAMS
-        "${CMAKE_CURRENT_SOURCE_DIR}/install/unix/vscpd.init"
+        "${CMAKE_CURRENT_SOURCE_DIR}/install/unix/tcpip-vscpd.init"
         DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}/init.d"
         RENAME vscpd
     )
@@ -364,11 +364,6 @@ endif()
 
 # Man pages (Linux/macOS only)
 if(UNIX)
-    install(FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/man/vscpd.8"
-        "${CMAKE_CURRENT_SOURCE_DIR}/man/uvscpd.8"
-        DESTINATION "${CMAKE_INSTALL_MANDIR}/man8"
-    )
     install(FILES
         "${CMAKE_CURRENT_SOURCE_DIR}/man/vscp-mkpasswd.1"
         "${CMAKE_CURRENT_SOURCE_DIR}/man/vscpcmd.1"

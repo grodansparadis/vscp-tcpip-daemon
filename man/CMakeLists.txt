@@ -33,7 +33,14 @@ if (${PANDOCCOMMAND_FOUND})
   add_custom_target(man ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/vscpd.8)
 endif()
 
-install(
-  FILES ${CMAKE_CURRENT_BINARY_DIR}/vscpd.8
-  DESTINATION ${CMAKE_INSTALL_MANDIR}/man8
-)
+if(PANDOCCOMMAND_FOUND)
+  install(
+    FILES ${CMAKE_CURRENT_BINARY_DIR}/vscpd.8
+    DESTINATION ${CMAKE_INSTALL_MANDIR}/man8
+  )
+else()
+  install(
+    FILES ${CMAKE_CURRENT_SOURCE_DIR}/vscpd.8
+    DESTINATION ${CMAKE_INSTALL_MANDIR}/man8
+  )
+endif()
