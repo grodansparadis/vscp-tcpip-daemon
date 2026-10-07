@@ -22,19 +22,16 @@
 #endif
 
 static inline unsigned int
-vscp_sleep(unsigned int seconds)
+sleep(unsigned int seconds)
 {
     Sleep(seconds * 1000U);
     return 0;
 }
 
 static inline int
-vscp_usleep(unsigned int microseconds)
+usleep(unsigned int microseconds)
 {
     Sleep((microseconds + 999U) / 1000U);
     return 0;
 }
-
-#define sleep vscp_sleep
-#define usleep vscp_usleep
 #endif
