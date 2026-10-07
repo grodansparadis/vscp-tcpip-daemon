@@ -2595,7 +2595,13 @@ CTcpipSrv::handleClientRestart(struct mg_connection* conn)
     write(conn, MSG_OK, strlen(MSG_OK));
 
     sleep(1);
+#ifdef WIN32
+    if (m_pCtrlObj) {
+        m_pCtrlObj->m_bQuit = true;
+    }
+#else
     kill(getpid(), SIGUSR2);
+#endif
 
     return;
 }
@@ -2640,7 +2646,13 @@ CTcpipSrv::handleClientShutdown(struct mg_connection* conn)
     write(conn, MSG_GOODBY, strlen(MSG_GOODBY));
     sleep(1);
 
+#ifdef WIN32
+    if (m_pCtrlObj) {
+        m_pCtrlObj->m_bQuit = true;
+    }
+#else
     kill(getpid(), SIGUSR1);
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
