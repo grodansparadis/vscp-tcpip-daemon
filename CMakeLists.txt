@@ -108,12 +108,27 @@ endif()
 
 include(FetchContent)
 
+set(VSCP_FETCH_CONTENT_OPTIONS)
+if(NOT CMAKE_VERSION VERSION_LESS "3.18")
+  list(APPEND VSCP_FETCH_CONTENT_OPTIONS SOURCE_SUBDIR "__vscp_sources_only__")
+endif()
+
 FetchContent_Declare(
   vscp
   GIT_REPOSITORY https://github.com/grodansparadis/vscp.git
   GIT_TAG c3d4b22ceb1abfc12a16d6f19549645df71227b6
+  ${VSCP_FETCH_CONTENT_OPTIONS}
 )
-FetchContent_MakeAvailable(vscp)
+# Download the VSCP sources without adding its standalone library targets to
+# this build. The daemon compiles only the VSCP source files listed below.
+if(CMAKE_VERSION VERSION_LESS "3.18")
+  FetchContent_GetProperties(vscp)
+  if(NOT vscp_POPULATED)
+    FetchContent_Populate(vscp)
+  endif()
+else()
+  FetchContent_MakeAvailable(vscp)
+endif()
 
 # FetchContent_Declare(
 #   vscp_firmware

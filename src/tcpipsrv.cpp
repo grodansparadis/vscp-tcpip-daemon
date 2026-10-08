@@ -2451,6 +2451,8 @@ CTcpipSrv::handleClientPassword(struct mg_connection* conn)
 
     spdlog::error("{}", strErr.c_str());
 
+    pUserItem->setAuthenticated(true);
+
     //pClientItem->setUserItem(nullptr);
     write(conn, MSG_OK, strlen(MSG_OK));
 

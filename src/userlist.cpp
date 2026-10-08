@@ -26,6 +26,9 @@
 // SOFTWARE.
 //
 
+
+
+
 #ifdef __GNUG__
 // #pragma implementation
 #endif
@@ -129,7 +132,7 @@ CUserItem::CUserItem(void)
     m_note.clear();
     m_listAllowedRemotes.clear();
     m_listAllowedEvents.clear();
-    m_bAuthenticated = false;
+    setAuthenticated(false);
 
     // Accept all events
     vscp_clearVSCPFilter(&m_filterVSCP);

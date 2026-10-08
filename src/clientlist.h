@@ -21,6 +21,15 @@
 // Boston, MA 02111-1307, USA.
 //
 
+/*!
+    @brief Functionality for managing connected clients in the VSCP system.
+    This includes handling client connections, managing input queues, and associating clients with specific interface types.
+    It provides an interface for sending and receiving VSCP events, managing client sessions, and enforcing access control based on client capabilities.
+    The object is owned by the application ControlObject which holds users and clients.
+
+    The object is owned by the application ControlObject which holds users and clients
+*/
+
 #if !defined(CLIENTLIST_H__B0190EE5_E0E8_497F_92A0_A8616296AF3E__INCLUDED_)
 #define CLIENTLIST_H__B0190EE5_E0E8_497F_92A0_A8616296AF3E__INCLUDED_
 

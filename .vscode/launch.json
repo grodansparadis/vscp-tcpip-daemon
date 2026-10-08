@@ -8,7 +8,7 @@
         "name": "(gdb) vscpd",
         "type": "cppdbg",
         "request": "launch",
-        "program": "/home/akhe/development/VSCP/vscp-tcpip-daemon/build/bin/vscpd",
+        "program": "${workspaceFolder}/build/bin/vscpd",
         "args": [
           "-s",
           "-c/home/akhe/development/VSCP/vscp-tcpip-daemon/debug/linux/vscpd.json"
@@ -34,7 +34,7 @@
         "name": "(gdb) vscpd w/ UDP debug",
         "type": "cppdbg",
         "request": "launch",
-        "program": "/home/akhe/development/VSCP/vscp-tcpip-daemon/build/vscpd",
+        "program": "${workspaceFolder}/build/bin/vscpd",
         "args": [
           "-s",
           "-c/home/akhe/development/VSCP/vscp-tcpip-daemon/debug/linux/vscpd.json"
@@ -71,7 +71,7 @@
         "name": "(gdb) vscpd test with /etc/...",
         "type": "cppdbg",
         "request": "launch",
-        "program": "/home/akhe/development/VSCP/vscp-tcpip-daemon/build/vscpd",
+        "program": "${workspaceFolder}/build/bin/vscpd",
         "args": [
           "-s",
           "-c/etc/vscp/vscpd.json"
@@ -108,7 +108,7 @@
         "name": "(gdb) vscp w/ automation driver",
         "type": "cppdbg",
         "request": "launch",
-        "program": "/home/akhe/development/VSCP/vscp-tcpip-daemon/build/vscpd",
+        "program": "${workspaceFolder}/build/bin/vscpd",
         "args": [
           "-s",
           "-c/home/akhe/development/VSCP/vscp-tcpip-daemonl2drv-automation/debug/linux/vscpd.json"
@@ -138,7 +138,7 @@
             "ignoreFailures": true
           }
         ],
-        "preLaunchTask": "build all",
+        "preLaunchTask": "build vscpd",
         "miDebuggerPath": "/usr/bin/gdb"
       },
       {
@@ -195,7 +195,7 @@
             "ignoreFailures": true
           }
         ],
-        "preLaunchTask": "build all",
+        "preLaunchTask": "build vscphelper unittest",
         "miDebuggerPath": "/usr/bin/gdb"
       },
       {

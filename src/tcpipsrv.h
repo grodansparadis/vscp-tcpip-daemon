@@ -26,6 +26,17 @@
 // SOFTWARE.
 //
 
+/*!
+    @brief Functionality for the VSCP TCP/IP server
+    This includes managing client connections, handling commands, and
+   facilitating communication over TCP/IP. It provides an interface for sending
+   and receiving VSCP events, managing user sessions, and enforcing access
+   control based on user privileges.
+
+    The object is owned by the application ControlObject which holds users and
+   clients
+*/
+
 #if !defined(VSCP_TCPIPSRV_H__INCLUDED_)
 #define VSCP_TCPIPSRV_H__INCLUDED_
 
@@ -46,7 +57,7 @@
 #define MSG_OK            "+OK - Success.\r\n"
 #define MSG_GOODBY        "+OK - Connection closed by client.\r\n"
 #define MSG_GOODBY2       "+OK - Connection closed.\r\n"
-#define MSG_USERNAME_OK    "+OK - User name accepted, password please\r\n"
+#define MSG_USERNAME_OK   "+OK - User name accepted, password please\r\n"
 #define MSG_PASSWORD_OK   "+OK - Ready to work.\r\n"
 #define MSG_QUEUE_CLEARED "+OK - All events cleared.\r\n"
 #define MSG_RECEIVE_LOOP                                                       \
@@ -396,7 +407,11 @@ class CTcpipSrv {
 
         @param cmd The command string to set as the current command.
     */
-    void setCurrentCommand(const std::string& cmd) { m_currentCommand = cmd; vscp_trim(m_currentCommand); };
+    void setCurrentCommand(const std::string& cmd)
+    {
+        m_currentCommand = cmd;
+        vscp_trim(m_currentCommand);
+    };
 
     /*!
         Get the last command processed for the client connection.
@@ -417,8 +432,8 @@ class CTcpipSrv {
 
         @param cmd The command prefix to check.
         @param bFix If true, remove the prefix from the current command.
-        @return true if the current command starts with the specified prefix, false
-        otherwise.
+        @return true if the current command starts with the specified prefix,
+       false otherwise.
     */
     bool commandStartsWith(const std::string& cmd, bool bFix = false);
 
@@ -520,7 +535,7 @@ class CTcpipSrv {
     // All input is added to the receive buf. as it is
     // received. Commands are then fetched from this buffer
     // as we go
-    //std::string m_strResponse;
+    // std::string m_strResponse;
 
     // Saved return value for last sockettcp operation
     size_t m_rv;

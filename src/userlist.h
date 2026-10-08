@@ -26,6 +26,17 @@
 // SOFTWARE.
 //
 
+/*!
+    @brief Functionality for user handling and authentication
+    This includes managing user rights, authentication, and group memberships.
+    It provides an interface for adding, removing, and modifying users and groups.
+    It also handles password hashing and verification for secure authentication.
+    It ensures that only authorized users can perform specific actions based on their assigned rights.
+    It defines default rights for different user roles such as admin, user, and driver.
+
+    The object is owned by the application ControlObject which holds users and clients
+*/
+
 #if !defined(USERLIST__INCLUDED_)
 #define USERLIST__INCLUDED_
 
