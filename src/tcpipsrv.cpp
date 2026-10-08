@@ -2598,7 +2598,9 @@ CTcpipSrv::handleClientRestart(struct mg_connection* conn)
 
     sleep(1);
 #ifdef WIN32
-    gpobj->m_bQuit = true;
+    if (m_pCtrlObj) {
+        m_pCtrlObj->m_bQuit = true;
+    }
 #else
     kill(getpid(), SIGUSR2);
 #endif
@@ -2647,7 +2649,9 @@ CTcpipSrv::handleClientShutdown(struct mg_connection* conn)
     sleep(1);
 
 #ifdef WIN32
-    gpobj->m_bQuit = true;
+    if (m_pCtrlObj) {
+        m_pCtrlObj->m_bQuit = true;
+    }
 #else
     kill(getpid(), SIGUSR1);
 #endif

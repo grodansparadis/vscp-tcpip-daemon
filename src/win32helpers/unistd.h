@@ -7,6 +7,13 @@
 #include <io.h>
 #include <time.h>
 
+#ifdef sleep
+#undef sleep
+#endif
+#ifdef usleep
+#undef usleep
+#endif
+
 #define chdir _chdir
 #define unlink _unlink
 
@@ -26,16 +33,5 @@ usleep(unsigned int microseconds)
 {
     Sleep((microseconds + 999U) / 1000U);
     return 0;
-}
-
-#ifndef CLOCK_REALTIME
-#define CLOCK_REALTIME TIME_UTC
-#endif
-
-static inline int
-clock_gettime(int clock_id, struct timespec* ts)
-{
-    (void)clock_id;
-    return timespec_get(ts, TIME_UTC) == TIME_UTC ? 0 : -1;
 }
 #endif

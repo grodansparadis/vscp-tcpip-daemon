@@ -496,18 +496,18 @@ CControlObject::run(void)
     //-------------------------------------------------------------------------
 
     struct timespec now, old_now;
-    clock_gettime(CLOCK_REALTIME, &old_now);
+    timespec_get(&old_now, TIME_UTC);
     old_now.tv_sec -= 60; // Do firts send right away
 
     while (!m_bQuit) {
 
-        clock_gettime(CLOCK_REALTIME, &now);
+        timespec_get(&now, TIME_UTC);
 
         // We send heartbeat every minute
         if ((now.tv_sec - old_now.tv_sec) > 60) {
 
             // Save time
-            clock_gettime(CLOCK_REALTIME, &old_now);
+            timespec_get(&old_now, TIME_UTC);
 
             if (!doAutomation(pClientItem)) {
                 spdlog::error("Failed to send automation events!");
