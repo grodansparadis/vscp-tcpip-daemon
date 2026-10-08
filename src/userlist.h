@@ -410,8 +410,9 @@ class CUserItem {
     */
     void setFilter(const vscpEventFilter* pFilter)
     {
-        if (NULL != pFilter)
-            memcpy(&m_filterVSCP, pFilter, sizeof(vscpEventFilter));
+        if (NULL != pFilter) {
+            m_filterVSCP = *pFilter;
+        }
     };
 
     /*!
@@ -572,6 +573,9 @@ class CUserList {
 
     /// Destructor
     virtual ~CUserList(void);
+
+    CUserList(const CUserList&) = delete;
+    CUserList& operator=(const CUserList&) = delete;
 
     /*!
      * Load users from database

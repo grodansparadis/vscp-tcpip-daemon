@@ -333,7 +333,8 @@ class CControlObject {
         Get the user list.
         @return Reference to the user list.
     */
-    CUserList getUserList() { return m_userList; }
+    CUserList& getUserList() { return m_userList; }
+    const CUserList& getUserList() const { return m_userList; }
 
     /*!
         Stop the client worker thread.

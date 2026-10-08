@@ -128,6 +128,7 @@ CUserItem::CUserItem(void)
     m_userID = -1; // not initialized
     m_passwordhash.clear();
     m_username.clear();
+
     m_fullname.clear();
     m_note.clear();
     m_listAllowedRemotes.clear();
@@ -139,6 +140,7 @@ CUserItem::CUserItem(void)
 
     // No user rights
     m_userRights = 0x00000000;
+    m_flags      = 0;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -495,6 +497,10 @@ CUserItem::addAllowedEvent(const std::string& strEvent)
 
     vscp_trim(str);
 
+    if (str.empty()) {
+        return false;
+    }
+
     // We want to store in standard for "%04X:%04X" so we
     // need to extract the values or wildcards
     if ("*:*" == str) {
@@ -503,7 +509,7 @@ CUserItem::addAllowedEvent(const std::string& strEvent)
     }
 
     // Left wildcard
-    if ('*' == strEvent[0]) {
+    if ('*' == str[0]) {
         str       = vscp_str_right(str, str.length() - 2);
         vscp_type = vscp_readStringValue(str);
         str       = vscp_str_format("*:%04X", vscp_type);
@@ -894,6 +900,7 @@ CUserList::addUser(const std::string& strUser,
     std::string fullname;
     std::string strNote;
     vscpEventFilter filter;
+    vscp_clearVSCPFilter(&filter);
     std::string userRights;
     std::string allowedRemotes;
     std::string allowedEvents;
