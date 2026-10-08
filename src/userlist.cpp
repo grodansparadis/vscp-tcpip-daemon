@@ -35,6 +35,7 @@
 
 #include <deque>
 #include <map>
+#include <mutex>
 #include <string>
 
 #include <canal-macro.h>
@@ -809,6 +810,7 @@ CUserList::~CUserList(void)
 
     m_grouphashmap.clear();
 
+    std::unique_lock<std::shared_mutex> lock(m_userMutex);
     m_userhashmap.clear();
 }
 
