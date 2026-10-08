@@ -137,7 +137,7 @@ CClientItem::CClientItem()
     // Nil status (all fields set to zero)
     memset(&m_status, 0, sizeof(m_status));
 
-    m_pUserItem = NULL; // No user connected to this client yet
+    m_userItem.reset(); // No user connected to this client yet
 }
 
 CClientItem::CClientItem(CControlObject* pControl,

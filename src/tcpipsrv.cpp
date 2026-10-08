@@ -299,7 +299,7 @@ CTcpipSrv::commandHandler(struct mg_connection* conn,
     CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
 
     // Get user item (can be NULL if not logged in)
-    CUserItem* pUserItem = pClientItem->getUserItem();
+    auto pUserItem = pClientItem->getUserItem();
 
     // Must be connected
     if (!pClientItem->isConnected()) {
@@ -1242,7 +1242,7 @@ CTcpipSrv::isVerified(struct mg_connection* conn)
     }
 
     // Get user item (can be NULL if not logged in)
-    CUserItem* pUserItem = pClientItem->getUserItem();
+    auto pUserItem = pClientItem->getUserItem();
 
     // Must be accredited to do this
     if ((nullptr == pUserItem) || !pClientItem->isAuthenticated()) {
@@ -1278,7 +1278,7 @@ CTcpipSrv::handleClientSend(struct mg_connection* conn)
     CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
 
     // Get user item (can be NULL if not logged in)
-    CUserItem* pUserItem = pClientItem->getUserItem();
+    auto pUserItem = pClientItem->getUserItem();
 
     // Must be connected
     if (!pClientItem->isConnected()) {
@@ -1617,7 +1617,7 @@ CTcpipSrv::handleClientReceive(struct mg_connection* conn)
     CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
 
     // Get user item (can be NULL if not logged in)
-    CUserItem* pUserItem = pClientItem->getUserItem();
+    auto pUserItem = pClientItem->getUserItem();
 
     // Must be connected
     if (!pClientItem->isConnected()) {
@@ -1743,7 +1743,7 @@ CTcpipSrv::handleClientDataAvailable(struct mg_connection* conn)
     CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
 
     // Get user item (can be NULL if not logged in)
-    CUserItem* pUserItem = pClientItem->getUserItem();
+    auto pUserItem = pClientItem->getUserItem();
 
     // Must be connected
     if (!pClientItem->isConnected()) {
@@ -1791,7 +1791,7 @@ CTcpipSrv::handleClientClearInputQueue(struct mg_connection* conn)
     CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
 
     // Get user item (can be NULL if not logged in)
-    CUserItem* pUserItem = pClientItem->getUserItem();
+    auto pUserItem = pClientItem->getUserItem();
 
     // Must be connected
     if (!pClientItem->isConnected()) {
@@ -1838,7 +1838,7 @@ CTcpipSrv::handleClientGetStatistics(struct mg_connection* conn)
     CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
 
     // Get user item (can be NULL if not logged in)
-    CUserItem* pUserItem = pClientItem->getUserItem();
+    auto pUserItem = pClientItem->getUserItem();
 
     // Must be connected
     if (!pClientItem->isConnected()) {
@@ -1894,7 +1894,7 @@ CTcpipSrv::handleClientGetStatus(struct mg_connection* conn)
     CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
 
     // Get user item (can be NULL if not logged in)
-    CUserItem* pUserItem = pClientItem->getUserItem();
+    auto pUserItem = pClientItem->getUserItem();
 
     // Must be connected
     if (!pClientItem->isConnected()) {
@@ -1946,7 +1946,7 @@ CTcpipSrv::handleClientGetChannelID(struct mg_connection* conn)
     CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
 
     // Get user item (can be NULL if not logged in)
-    CUserItem* pUserItem = pClientItem->getUserItem();
+    auto pUserItem = pClientItem->getUserItem();
 
     // Must be connected
     if (!pClientItem->isConnected()) {
@@ -1995,7 +1995,7 @@ CTcpipSrv::handleClientSetChannelGUID(struct mg_connection* conn)
     CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
 
     // Get user item (can be NULL if not logged in)
-    CUserItem* pUserItem = pClientItem->getUserItem();
+    auto pUserItem = pClientItem->getUserItem();
 
     // Must be connected
     if (!pClientItem->isConnected()) {
@@ -2043,7 +2043,7 @@ CTcpipSrv::handleClientGetChannelGUID(struct mg_connection* conn)
     CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
 
     // Get user item (can be NULL if not logged in)
-    CUserItem* pUserItem = pClientItem->getUserItem();
+    auto pUserItem = pClientItem->getUserItem();
 
     // Must be connected
     if (!pClientItem->isConnected()) {
@@ -2132,7 +2132,7 @@ CTcpipSrv::handleClientSetFilter(struct mg_connection* conn)
     CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
 
     // Get user item (can be NULL if not logged in)
-    CUserItem* pUserItem = pClientItem->getUserItem();
+    auto pUserItem = pClientItem->getUserItem();
 
     // Must be connected
     if (!pClientItem->isConnected()) {
@@ -2225,7 +2225,7 @@ CTcpipSrv::handleClientSetMask(struct mg_connection* conn)
     CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
 
     // Get user item (can be NULL if not logged in)
-    CUserItem* pUserItem = pClientItem->getUserItem();
+    auto pUserItem = pClientItem->getUserItem();
 
     // Must be connected
     if (!pClientItem->isConnected()) {
@@ -2329,7 +2329,7 @@ CTcpipSrv::handleClientUser(struct mg_connection* conn)
         return;
     }
 
-    CUserItem* pUserItem =
+    auto pUserItem =
       m_pCtrlObj->getUserList().getUser(getCurrentCommand().c_str());
     if (nullptr == pUserItem) {
         write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
@@ -2362,7 +2362,7 @@ CTcpipSrv::handleClientPassword(struct mg_connection* conn)
     CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
 
     // Get user item (can be nullptr if not logged in)
-    CUserItem* pUserItem = pClientItem->getUserItem();
+    auto pUserItem = pClientItem->getUserItem();
     if (nullptr == pUserItem) {
         spdlog::info("Must enter username before password.");
         write(conn, MSG_NEED_USERNAME, strlen(MSG_NEED_USERNAME));
@@ -2633,7 +2633,7 @@ CTcpipSrv::handleClientShutdown(struct mg_connection* conn)
     CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
 
     // Get user item (can be NULL if not logged in)
-    CUserItem* pUserItem = pClientItem->getUserItem();
+    auto pUserItem = pClientItem->getUserItem();
 
     // Must be connected
     if (!pClientItem->isConnected()) {

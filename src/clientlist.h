@@ -216,17 +216,18 @@ class CClientItem {
 
     /*!
         Get user item
-        @return User item
+        @return Shared pointer to the selected user, or nullptr if it was
+                deleted or no user is selected
     */
-    CUserItem* getUserItem(void) { return m_pUserItem; };
+    CUserItemPtr getUserItem(void) const { return m_userItem.lock(); };
 
     /*!
         Set user item
-        @param pUserItem User item to set
+        @param pUserItem Shared pointer to the user to select
     */
-    void setUserItem(CUserItem* pUserItem)
+    void setUserItem(const CUserItemPtr& pUserItem)
     {
-        m_pUserItem       = pUserItem;
+        m_userItem        = pUserItem;
         m_bAuthenticated = false;
     };
 
@@ -486,12 +487,10 @@ class CClientItem {
     char m_sid[33];
 
     /*!
-        Pointer to the logged-in user
-        This pointer is set when a username is entered. It is removed if the
-       authentication fails. If authentication is successfull the pointer
-       remains valid until client logges out or clodes connection.
+        Weak reference to the selected user. The user registry owns the user,
+        so deleting the registry entry invalidates connected clients safely.
     */
-    CUserItem* m_pUserItem;
+    std::weak_ptr<CUserItem> m_userItem;
 
     
 };

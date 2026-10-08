@@ -47,6 +47,8 @@
 
 #include <iostream>
 #include <map>
+#include <memory>
+#include <shared_mutex>
 
 // User rights bit array
 // "admin" has all rights.
@@ -532,6 +534,8 @@ class CUserItem {
     uint32_t m_flags;
 };
 
+using CUserItemPtr = std::shared_ptr<CUserItem>;
+
 /*!
     @brief User list class representing a collection of users in the system.
 
@@ -614,34 +618,34 @@ class CUserList {
     /*!
         Get user
         @param user Username
-        @return Pointer to user if available else NULL
+        @return Shared pointer to the user, or nullptr if unavailable
     */
-    CUserItem* getUser(const std::string& user);
+    CUserItemPtr getUser(const std::string& user);
 
     /*!
         Get user
         @param luserid Index for user in database.
                 link_to_user == 0 is admin user
                 -1 == unknown user
-        @return Pointer to user if available else NULL
+        @return Shared pointer to the user, or nullptr if unavailable
     */
-    CUserItem* getUser(const long userid);
+    CUserItemPtr getUser(const long userid);
 
     /*!
         Validate a username/password pair
         @param user Username to test.
         @param passwordHash Password hash to test
-        @return Pointer to useritem if valid, NULL if not.
+        @return Shared pointer to the user if valid, nullptr otherwise
     */
-    CUserItem* validateUser(const std::string& user,
-                            const std::string& passwordHash);
+    CUserItemPtr validateUser(const std::string& user,
+                              const std::string& passwordHash);
 
 
     /*!
      * Get number of users on the system
      * @return number of users.
      */
-    uint32_t getUserCount(void) { return m_userhashmap.size(); };
+    uint32_t getUserCount(void) const;
 
     /*!
      * Get user info as string
@@ -652,7 +656,7 @@ class CUserList {
      * @param strUser String that will receive information
      * @return true on success.
      */
-    bool getUserAsString(CUserItem* pUserItem, std::string& strUser);
+    bool getUserAsString(const CUserItemPtr& pUserItem, std::string& strUser);
 
     /*!
      * Get user information on string form from user index
@@ -683,24 +687,23 @@ class CUserList {
     /*!
      * Get user item from ordinal in user array
      * @param idx Index into user array.
-     * @return A pointer to the useritem at that position or NULL if no item is
-     *          at that position.
+     * @return Shared pointer to the user at that position, or nullptr if no
+     *         item is at that position
      */
-    CUserItem* getUserItemFromOrdinal(uint32_t idx);
+    CUserItemPtr getUserItemFromOrdinal(uint32_t idx);
 
     /*!
      * Get user item from username
      * @param name Username of the user.
-     * @return A pointer to the useritem with the given username or NULL if no
-     * such user exists.
+     * @return Shared pointer to the named user, or nullptr if it does not exist
      */
-    CUserItem* getUserFromName(const std::string& name);
+    CUserItemPtr getUserFromName(const std::string& name);
 
   protected:
     /*!
         hash with user items
     */
-    std::map<std::string, CUserItem*> m_userhashmap;
+    std::map<std::string, CUserItemPtr> m_userhashmap;
 
     /*!
         hash with group items
@@ -708,6 +711,7 @@ class CUserList {
     std::map<std::string, CGroupItem*> m_grouphashmap;
 
   private:
+    mutable std::shared_mutex m_userMutex;
     unsigned short m_cntLocaluser; // Counter for local user id's
 };
 

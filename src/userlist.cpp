@@ -809,19 +809,14 @@ CUserList::~CUserList(void)
 
     m_grouphashmap.clear();
 
-    {
-        for (std::map<std::string, CUserItem*>::iterator it =
-               m_userhashmap.begin();
-             it != m_userhashmap.end();
-             ++it) {
-            CUserItem* pItem = it->second;
-            if (NULL != pItem) {
-                delete pItem;
-            }
-        }
-    }
-
     m_userhashmap.clear();
+}
+
+uint32_t
+CUserList::getUserCount(void) const
+{
+    std::shared_lock<std::shared_mutex> lock(m_userMutex);
+    return static_cast<uint32_t>(m_userhashmap.size());
 }
 
 
@@ -841,22 +836,16 @@ CUserList::addUser(const std::string& user,
                    const std::string& allowedEvents,
                    uint32_t bFlags)
 {
-    char buf[512];
+    std::unique_lock<std::shared_mutex> lock(m_userMutex);
 
     // Cant add user with name that is already defined.
-    if (NULL != m_userhashmap[user]) {
+    if (m_userhashmap.find(user) != m_userhashmap.end()) {
         spdlog::error("addUser: Failed to add user - "
                       "user is already defined.");
         return false;
     }
 
-    // // New user item
-    CUserItem* pItem = new CUserItem;
-    if (NULL == pItem) {
-        spdlog::error("addUser: Failed to add user - "
-                      "Memory problem (CUserItem).");
-        return false;
-    }
+    auto pItem = std::make_shared<CUserItem>();
 
     pItem->setUserID(m_cntLocaluser);
     m_cntLocaluser++; // Update local user id counter
@@ -873,7 +862,7 @@ CUserList::addUser(const std::string& user,
     pItem->setFlags(bFlags);
 
     // Add to the map
-    m_userhashmap[user] = pItem;
+    m_userhashmap.emplace(user, pItem);
 
     // Set filter filter
     if (NULL != pFilter) {
@@ -998,16 +987,15 @@ CUserList::addUser(const std::string& strUser,
 bool
 CUserList::deleteUser(const std::string& user)
 {
-    CUserItem* pUser = getUser(user);
-    if (NULL == pUser) {
+    std::unique_lock<std::shared_mutex> lock(m_userMutex);
+    auto it = m_userhashmap.find(user);
+    if (it == m_userhashmap.end()) {
         spdlog::error("deleteUser: Failed to delete user - "
                       "User is not defined.");
         return false;
     }
 
-    // Remove also from internal table
-    m_userhashmap.erase(user);
-
+    m_userhashmap.erase(it);
     return true;
 }
 
@@ -1018,39 +1006,42 @@ CUserList::deleteUser(const std::string& user)
 bool
 CUserList::deleteUser(const long userid)
 {
-    CUserItem* pUser = getUser(userid);
-    if (NULL == pUser) {
-        spdlog::error("deleteUser: Failed to delete user - "
-                      "User is not defined.");
-        return false;
+    std::unique_lock<std::shared_mutex> lock(m_userMutex);
+    for (auto it = m_userhashmap.begin(); it != m_userhashmap.end(); ++it) {
+        if (userid == it->second->getUserID()) {
+            m_userhashmap.erase(it);
+            return true;
+        }
     }
 
-    return deleteUser(pUser->getUserName());
+    spdlog::error("deleteUser: Failed to delete user - "
+                  "User is not defined.");
+    return false;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // getUser
 //
 
-CUserItem*
+CUserItemPtr
 CUserList::getUser(const std::string& user)
 {
-    return m_userhashmap[user];
+    std::shared_lock<std::shared_mutex> lock(m_userMutex);
+    auto it = m_userhashmap.find(user);
+    return (it == m_userhashmap.end()) ? nullptr : it->second;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // getUser
 //
 
-CUserItem*
+CUserItemPtr
 CUserList::getUser(const long userid)
 {
-    std::map<std::string, CUserItem*>::iterator it;
-    for (it = m_userhashmap.begin(); it != m_userhashmap.end(); ++it) {
-        std::string key      = it->first;
-        CUserItem* pUserItem = it->second;
-        if (userid == pUserItem->getUserID()) {
-            return pUserItem;
+    std::shared_lock<std::shared_mutex> lock(m_userMutex);
+    for (const auto& entry : m_userhashmap) {
+        if (userid == entry.second->getUserID()) {
+            return entry.second;
         }
     }
 
@@ -1064,14 +1055,12 @@ CUserList::getUser(const long userid)
 // validateUser
 //
 
-CUserItem*
+CUserItemPtr
 CUserList::validateUser(const std::string& user,
                         const std::string& passwordhash)
 {
-    CUserItem* pUserItem;
-
-    pUserItem = m_userhashmap[user];
-    if (NULL == pUserItem) {
+    auto pUserItem = getUser(user);
+    if (!pUserItem) {
         spdlog::error("validateUser: Failed to validate user - "
                       "User is not defined.");
         return NULL;
@@ -1093,7 +1082,8 @@ CUserList::validateUser(const std::string& user,
 //
 
 bool
-CUserList::getUserAsString(CUserItem* pUserItem, std::string& strUser)
+CUserList::getUserAsString(const CUserItemPtr& pUserItem,
+                           std::string& strUser)
 {
     std::string str;
     strUser.clear();
@@ -1117,21 +1107,12 @@ CUserList::getUserAsString(CUserItem* pUserItem, std::string& strUser)
 bool
 CUserList::getUserAsString(uint32_t idx, std::string& strUser)
 {
-    std::string str;
+    std::shared_lock<std::shared_mutex> lock(m_userMutex);
     uint32_t i = 0;
 
-    std::map<std::string, CUserItem*>::iterator it;
-    for (it = m_userhashmap.begin(); it != m_userhashmap.end(); ++it) {
-
+    for (const auto& entry : m_userhashmap) {
         if (i == idx) {
-            std::string key      = it->first;
-            CUserItem* pUserItem = it->second;
-            if (getUserAsString(pUserItem, strUser)) {
-                return true;
-            }
-            else {
-                return false;
-            }
+            return getUserAsString(entry.second, strUser);
         }
 
         i++;
@@ -1149,14 +1130,12 @@ CUserList::getUserAsString(uint32_t idx, std::string& strUser)
 bool
 CUserList::getAllUsers(std::string& strAllusers)
 {
+    std::shared_lock<std::shared_mutex> lock(m_userMutex);
     std::string str;
     strAllusers.clear();
 
-    std::map<std::string, CUserItem*>::iterator it;
-    for (it = m_userhashmap.begin(); it != m_userhashmap.end(); ++it) {
-        std::string key      = it->first;
-        CUserItem* pUserItem = it->second;
-        if (getUserAsString(pUserItem, str)) {
+    for (const auto& entry : m_userhashmap) {
+        if (getUserAsString(entry.second, str)) {
             strAllusers += str;
             strAllusers += "\r\n";
         }
@@ -1172,13 +1151,9 @@ CUserList::getAllUsers(std::string& strAllusers)
 bool
 CUserList::getAllUsers(std::deque<std::string>& arrayUsers)
 {
-    std::string str;
-
-    std::map<std::string, CUserItem*>::iterator it;
-    for (it = m_userhashmap.begin(); it != m_userhashmap.end(); ++it) {
-        std::string key = it->first;
-        // CUserItem* pUserItem = it->second;
-        arrayUsers.push_back(key);
+    std::shared_lock<std::shared_mutex> lock(m_userMutex);
+    for (const auto& entry : m_userhashmap) {
+        arrayUsers.push_back(entry.first);
     }
 
     return true;
@@ -1188,38 +1163,29 @@ CUserList::getAllUsers(std::deque<std::string>& arrayUsers)
 // getUserItemFromOrdinal
 //
 
-CUserItem*
+CUserItemPtr
 CUserList::getUserItemFromOrdinal(uint32_t idx)
 {
-    std::string str;
+    std::shared_lock<std::shared_mutex> lock(m_userMutex);
     uint32_t i = 0;
 
-    std::map<std::string, CUserItem*>::iterator it;
-    for (it = m_userhashmap.begin(); it != m_userhashmap.end(); ++it) {
-
+    for (const auto& entry : m_userhashmap) {
         if (i == idx) {
-            std::string key      = it->first;
-            CUserItem* pUserItem = it->second;
-            return pUserItem;
+            return entry.second;
         }
 
         i++;
     }
 
-    return NULL;
+    return nullptr;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // getUserFromName
 //
 
-CUserItem*
+CUserItemPtr
 CUserList::getUserFromName(const std::string& name)
 {
-    std::map<std::string, CUserItem*>::iterator it;
-    it = m_userhashmap.find(name);
-    if (it != m_userhashmap.end()) {
-        return it->second;
-    }
-    return NULL;
+    return getUser(name);
 }
