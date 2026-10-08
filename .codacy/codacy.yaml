@@ -1,5 +1,4 @@
 runtimes:
     - python@3.11.11
 tools:
-    - pylint@4.0.5
     - opengrep@1.26.0

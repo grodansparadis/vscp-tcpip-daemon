@@ -109,6 +109,7 @@ CClientItem::CClientItem()
     m_pCtrlObj                   = NULL;
     m_conn                       = NULL;
     m_bConnected                 = false;
+    m_bAuthenticated             = false;
 
     m_dtutc = vscpdatetime::UTCNow();
 

@@ -1245,7 +1245,7 @@ CTcpipSrv::isVerified(struct mg_connection* conn)
     CUserItem* pUserItem = pClientItem->getUserItem();
 
     // Must be accredited to do this
-    if ((nullptr == pUserItem) || !pUserItem->isAuthenticated()) {
+    if ((nullptr == pUserItem) || !pClientItem->isAuthenticated()) {
         write(conn, MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
         return false;
     }
@@ -1295,7 +1295,7 @@ CTcpipSrv::handleClientSend(struct mg_connection* conn)
     }
 
     // Must be accredited to do this
-    if ((nullptr == pUserItem) || !pUserItem->isAuthenticated()) {
+    if ((nullptr == pUserItem) || !pClientItem->isAuthenticated()) {
         write(conn, MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
         return;
     }
@@ -1626,7 +1626,7 @@ CTcpipSrv::handleClientReceive(struct mg_connection* conn)
     }
 
     // Must be accredited to do this
-    if ((nullptr == pUserItem) || !pUserItem->isAuthenticated()) {
+    if ((nullptr == pUserItem) || !pClientItem->isAuthenticated()) {
         write(conn, MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
         return;
     }
@@ -1753,7 +1753,7 @@ CTcpipSrv::handleClientDataAvailable(struct mg_connection* conn)
     }
 
     // Must be accredited to do this
-    if ((nullptr == pUserItem) || !pUserItem->isAuthenticated()) {
+    if ((nullptr == pUserItem) || !pClientItem->isAuthenticated()) {
         spdlog::debug(
           "handleClientDataAvailable: Client is not authenticated.");
         write(conn, MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
@@ -1801,7 +1801,7 @@ CTcpipSrv::handleClientClearInputQueue(struct mg_connection* conn)
     }
 
     // Must be accredited to do this
-    if (!pUserItem->isAuthenticated()) {
+    if (!pClientItem->isAuthenticated()) {
         spdlog::debug(
           "handleClientClearInputQueue: Client is not authenticated.");
         write(conn, MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
@@ -1848,7 +1848,7 @@ CTcpipSrv::handleClientGetStatistics(struct mg_connection* conn)
     }
 
     // Must be accredited to do this
-    if ((nullptr == pUserItem) || !pUserItem->isAuthenticated()) {
+    if ((nullptr == pUserItem) || !pClientItem->isAuthenticated()) {
         spdlog::debug(
           "handleClientGetStatistics: Client is not authenticated.");
         write(conn, MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
@@ -1904,7 +1904,7 @@ CTcpipSrv::handleClientGetStatus(struct mg_connection* conn)
     }
 
     // Must be accredited to do this
-    if ((nullptr == pUserItem) || !pUserItem->isAuthenticated()) {
+    if ((nullptr == pUserItem) || !pClientItem->isAuthenticated()) {
         spdlog::debug("handleClientGetStatus: Client is not authenticated.");
         write(conn, MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
         return;
@@ -1956,7 +1956,7 @@ CTcpipSrv::handleClientGetChannelID(struct mg_connection* conn)
     }
 
     // Must be accredited to do this
-    if ((nullptr == pUserItem) || !pUserItem->isAuthenticated()) {
+    if ((nullptr == pUserItem) || !pClientItem->isAuthenticated()) {
         spdlog::debug("handleClientGetChannelID: Client is not authenticated.");
         write(conn, MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
         return;
@@ -2005,7 +2005,7 @@ CTcpipSrv::handleClientSetChannelGUID(struct mg_connection* conn)
     }
 
     // Must be accredited to do this
-    if ((nullptr == pUserItem) || !pUserItem->isAuthenticated()) {
+    if ((nullptr == pUserItem) || !pClientItem->isAuthenticated()) {
         spdlog::error(
           "handleClientSetChannelGUID: Client is not authenticated.");
         write(conn, MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
@@ -2053,7 +2053,7 @@ CTcpipSrv::handleClientGetChannelGUID(struct mg_connection* conn)
     }
 
     // Must be accredited to do this
-    if ((nullptr == pUserItem) || !pUserItem->isAuthenticated()) {
+    if ((nullptr == pUserItem) || !pClientItem->isAuthenticated()) {
         spdlog::error(
           "handleClientGetChannelGUID: Client is not authenticated.");
         write(conn, MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
@@ -2142,7 +2142,7 @@ CTcpipSrv::handleClientSetFilter(struct mg_connection* conn)
     }
 
     // Must be accredited to do this
-    if ((nullptr == pUserItem) || !pUserItem->isAuthenticated()) {
+    if ((nullptr == pUserItem) || !pClientItem->isAuthenticated()) {
         spdlog::error("handleClientSetFilter: Client is not authenticated.");
         write(conn, MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
         return;
@@ -2235,7 +2235,7 @@ CTcpipSrv::handleClientSetMask(struct mg_connection* conn)
     }
 
     // Must be accredited to do this
-    if ((nullptr == pUserItem) || !pUserItem->isAuthenticated()) {
+    if ((nullptr == pUserItem) || !pClientItem->isAuthenticated()) {
         spdlog::error("handleClientSetMask: Client is not authenticated.");
         write(conn, MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
         return;
@@ -2323,7 +2323,7 @@ CTcpipSrv::handleClientUser(struct mg_connection* conn)
 
     // If authenticatd user is already set, just return OK.
     if ((nullptr != pClientItem->getUserItem()) &&
-        pClientItem->getUserItem()->isAuthenticated()) {
+        pClientItem->isAuthenticated()) {
         spdlog::info("User is already authenticated.");
         write(conn, MSG_OK, strlen(MSG_OK));
         return;
@@ -2453,7 +2453,7 @@ CTcpipSrv::handleClientPassword(struct mg_connection* conn)
 
     spdlog::error("{}", strErr.c_str());
 
-    pUserItem->setAuthenticated(true);
+    pClientItem->setAuthenticated(true);
 
     //pClientItem->setUserItem(nullptr);
     write(conn, MSG_OK, strlen(MSG_OK));
@@ -2643,7 +2643,7 @@ CTcpipSrv::handleClientShutdown(struct mg_connection* conn)
 
     spdlog::info("tcp/ip client requested shutdown!!!");
 
-    if ((nullptr == pUserItem) || !pUserItem->isAuthenticated()) {
+    if ((nullptr == pUserItem) || !pClientItem->isAuthenticated()) {
         write(conn, MSG_OK, strlen(MSG_OK));
     }
 

@@ -469,26 +469,6 @@ class CUserItem {
     bool getAsMap(std::map<std::string, std::string>& mapUser);
 
     /*!
-      Check if the user is authenticated
-      @return true if the user is authenticated, false otherwise
-  */
-    bool isAuthenticated(void) { return m_bAuthenticated; };
-
-    /*!
-        Set the authentication status of the user
-        @param authenticated true if the user is authenticated, false otherwise
-    */
-    void setAuthenticated(bool authenticated)
-    {
-        m_bAuthenticated = authenticated;
-    };
-
-    /*!
-        Reset the authentication status of the user
-    */
-    void resetAuthentication(void) { m_bAuthenticated = false; };
-
-    /*!
         Set flags associated with the user
         @param flags Flags to set for the user
     */
@@ -504,11 +484,6 @@ class CUserItem {
     uint32_t getFlags(void) { return m_flags; };
 
   protected:
-    /*!
-      Flag indicating if the user has been authenticated
-    */
-    bool m_bAuthenticated;
-
     // System assigned ID for user (-1 -  for system users (not in DB), 0 for
     // admin user )
     long m_userID;

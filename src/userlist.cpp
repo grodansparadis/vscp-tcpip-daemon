@@ -133,7 +133,6 @@ CUserItem::CUserItem(void)
     m_note.clear();
     m_listAllowedRemotes.clear();
     m_listAllowedEvents.clear();
-    setAuthenticated(false);
 
     // Accept all events
     vscp_clearVSCPFilter(&m_filterVSCP);

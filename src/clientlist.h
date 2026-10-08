@@ -224,7 +224,29 @@ class CClientItem {
         Set user item
         @param pUserItem User item to set
     */
-    void setUserItem(CUserItem* pUserItem) { m_pUserItem = pUserItem; };
+    void setUserItem(CUserItem* pUserItem)
+    {
+        m_pUserItem       = pUserItem;
+        m_bAuthenticated = false;
+    };
+
+    /*!
+        Check whether this client has authenticated its selected user.
+        @return true if authenticated, false otherwise
+    */
+    bool isAuthenticated(void) const { return m_bAuthenticated; };
+
+    /*!
+        Set this client's authentication status.
+        @param authenticated true if authenticated, false otherwise
+    */
+    void setAuthenticated(bool authenticated)
+    {
+        m_bAuthenticated = authenticated;
+    };
+
+    /// Reset this client's authentication status.
+    void resetAuthentication(void) { m_bAuthenticated = false; };
 
     /*!
       Get filter for VSCP events
@@ -396,6 +418,9 @@ class CClientItem {
 
     /// @brief Indicates if the client is currently connected.
     bool m_bConnected;
+
+    /// Indicates whether this client has authenticated its selected user.
+    bool m_bAuthenticated;
 
     /// Client ID for this client item
     uint16_t m_clientID;
