@@ -86,6 +86,7 @@ find_package(OpenSSL REQUIRED)
 find_package(SQLite3 REQUIRED)
 if(WIN32)
     find_package(unofficial-sodium CONFIG REQUIRED)
+    find_package(dlfcn-win32 CONFIG REQUIRED)
     set(VSCPD_SODIUM_TARGET unofficial-sodium::sodium)
 else()
     find_package(PkgConfig REQUIRED)
@@ -243,6 +244,7 @@ if(WIN32)
             "${CMAKE_CURRENT_SOURCE_DIR}/src/win32helpers"
             "${vscp_SOURCE_DIR}/src/vscp/common/win32helpers"
             "${vscp_SOURCE_DIR}/src/common"
+            "${vscp_SOURCE_DIR}/src/common/windows"
             "${vscp_SOURCE_DIR}/src/vscp/common"
             "${EXPAT_INCLUDE_DIRS}"
             "${MOSQUITTO_INCLUDE_DIRS}"
@@ -288,6 +290,7 @@ if(WIN32)
     endif()
 
     target_link_libraries(vscpd PRIVATE netapi32)
+    target_link_libraries(vscpd PRIVATE dlfcn-win32::dl)
 
     if(MSVC)
         target_compile_options(vscpd PRIVATE /utf-8)
@@ -297,6 +300,7 @@ if(WIN32)
         PRIVATE
             _CRT_SECURE_NO_WARNINGS
             _WINSOCK_DEPRECATED_NO_WARNINGS
+            NOMINMAX
             WIN32_LEAN_AND_MEAN)
 endif()
 
@@ -385,6 +389,10 @@ endif()
 
 # Man pages (Linux/macOS only)
 if(UNIX)
+    install(FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/man/vscpd.8"
+        DESTINATION "${CMAKE_INSTALL_MANDIR}/man8"
+    )
     install(FILES
         "${CMAKE_CURRENT_SOURCE_DIR}/man/vscp-mkpasswd.1"
         "${CMAKE_CURRENT_SOURCE_DIR}/man/vscpcmd.1"

@@ -65,6 +65,8 @@
 #include "tcpipsrv.h"
 #include "version.h"
 
+extern CControlObject* gpobj;
+
 #if defined(__linux__)
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
@@ -2597,7 +2599,13 @@ CTcpipSrv::handleClientRestart(struct mg_connection* conn)
     write(conn, MSG_OK, strlen(MSG_OK));
 
     sleep(1);
+#ifdef WIN32
+    if (m_pCtrlObj) {
+        m_pCtrlObj->m_bQuit = true;
+    }
+#else
     kill(getpid(), SIGUSR2);
+#endif
 
     return;
 }
@@ -2642,7 +2650,13 @@ CTcpipSrv::handleClientShutdown(struct mg_connection* conn)
     write(conn, MSG_GOODBY, strlen(MSG_GOODBY));
     sleep(1);
 
+#ifdef WIN32
+    if (m_pCtrlObj) {
+        m_pCtrlObj->m_bQuit = true;
+    }
+#else
     kill(getpid(), SIGUSR1);
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////

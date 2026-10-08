@@ -58,6 +58,9 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
+#ifdef WIN32
+#include <nb30.h>
+#endif
 #ifdef WITH_SYSTEMD
 #include <systemd/sd-daemon.h>
 #endif
@@ -493,18 +496,18 @@ CControlObject::run(void)
     //-------------------------------------------------------------------------
 
     struct timespec now, old_now;
-    clock_gettime(CLOCK_REALTIME, &old_now);
+    timespec_get(&old_now, TIME_UTC);
     old_now.tv_sec -= 60; // Do firts send right away
 
     while (!m_bQuit) {
 
-        clock_gettime(CLOCK_REALTIME, &now);
+        timespec_get(&now, TIME_UTC);
 
         // We send heartbeat every minute
         if ((now.tv_sec - old_now.tv_sec) > 60) {
 
             // Save time
-            clock_gettime(CLOCK_REALTIME, &old_now);
+            timespec_get(&old_now, TIME_UTC);
 
             if (!doAutomation(pClientItem)) {
                 spdlog::error("Failed to send automation events!");
@@ -1043,6 +1046,10 @@ CControlObject::getGuidFromMacAddress(cguid& guid)
     NCB Ncb;
     UCHAR uRetCode;
     LANA_ENUM lenum;
+    struct ASTAT {
+        ADAPTER_STATUS adapt;
+        NAME_BUFFER NameBuff[30];
+    } Adapter;
     int i;
 
     // Clear the GUID
