@@ -294,11 +294,31 @@ class CControlObject {
     bool createFolderStructure(void);
 
     /*!
+        Send an event to a specific client.
+        @param pClientItem Pointer to the client item to send the event to.
+        @param pev Pointer to the event to send.
+        @return True on success, false on failure.
+    */
+    bool
+    sendEvent(CClientItem* pClientItem, vscpEvent* pev);
+
+    /*!
+        Send an extended event to a specific client.
+        @param pClientItem Pointer to the client item to send the event to.
+        @param pex Pointer to the extended event to send.
+        @return True on success, false on failure.
+    */
+    bool
+    sendEvent(CClientItem* pClientItem, vscpEventEx* pex);
+
+    /*!
         Perform automation tasks for the given client.
         @param pClientItem Client for which to perform automation.
         @return True on success, false on failure.
     */
     bool doAutomation(CClientItem* pClientItem);
+
+    
 
     //**************************************************************************
     //                            Getters and setters

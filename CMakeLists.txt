@@ -113,15 +113,22 @@ set(VSCP_FETCH_CONTENT_OPTIONS)
 if(NOT CMAKE_VERSION VERSION_LESS "3.18")
   list(APPEND VSCP_FETCH_CONTENT_OPTIONS SOURCE_SUBDIR "__vscp_sources_only__")
 endif()
+if(NOT CMAKE_VERSION VERSION_LESS "3.24")
+  list(APPEND VSCP_FETCH_CONTENT_OPTIONS DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+endif()
 
 FetchContent_Declare(
   vscp
-  GIT_REPOSITORY https://github.com/grodansparadis/vscp.git
-  GIT_TAG c3d4b22ceb1abfc12a16d6f19549645df71227b6
+  # Only a handful of VSCP source files are compiled directly into vscpd, so
+  # there is no need to clone the repository. A pinned source tarball avoids
+  # fetching ~1.2GB of git history plus ~400MB of submodules that this project
+  # never uses.
+  URL https://codeload.github.com/grodansparadis/vscp/tar.gz/6b76083bc75a759bfa19a568aabad2ff41cda5bc
+  URL_HASH SHA256=63595c85fd7350b42069d7528fb8801f333ddbdee432393121adb7d5f6d93fdf
   ${VSCP_FETCH_CONTENT_OPTIONS}
 )
-# Download the VSCP sources without adding its standalone library targets to
-# this build. The daemon compiles only the VSCP source files listed below.
+# Make the VSCP sources available without adding its standalone library targets
+# to this build. The daemon compiles only the VSCP source files listed below.
 if(CMAKE_VERSION VERSION_LESS "3.18")
   FetchContent_GetProperties(vscp)
   if(NOT vscp_POPULATED)
@@ -130,13 +137,6 @@ if(CMAKE_VERSION VERSION_LESS "3.18")
 else()
   FetchContent_MakeAvailable(vscp)
 endif()
-
-# FetchContent_Declare(
-#   vscp_firmware
-#   GIT_REPOSITORY https://github.com/grodansparadis/vscp-firmware.git
-#   GIT_TAG v1.7.0
-# )
-# FetchContent_MakeAvailable(vscp_firmware)
 
 FetchContent_Declare(
     mongoose
@@ -316,7 +316,13 @@ if(UNIX AND NOT APPLE)
 endif()
 
 if(VSCPD_BUILD_MANPAGES AND UNIX)
-    add_subdirectory(man)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/man/CMakeLists.txt")
+        add_subdirectory(man)
+    else()
+        message(WARNING
+            "VSCPD_BUILD_MANPAGES is enabled, but man/CMakeLists.txt is missing; "
+            "skipping man-page generation.")
+    endif()
 endif()
 
 

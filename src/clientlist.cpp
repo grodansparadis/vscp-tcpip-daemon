@@ -101,27 +101,26 @@ class CControlObject;
 
 CClientItem::CClientItem()
 {
-    m_status.channel_status      = 0;
-    m_clientID                   = 0;
-    m_flags                      = 0;
-    m_type                       = CLIENT_ITEM_INTERFACE_TYPE_NONE;
-    m_maxItemsInClientInputQueue = CLIENT_ITEM_MAX_INPUT_QUEUE;
-    m_pCtrlObj                   = NULL;
-    m_conn                       = NULL;
-    m_bConnected                 = false;
-    m_bAuthenticated             = false;
+    m_status.channel_status = 0;
+    m_clientID              = 0;
+    m_flags                 = 0;
+    m_type                  = CLIENT_ITEM_INTERFACE_TYPE_NONE;
+    m_pCtrlObj              = NULL;
+    m_conn                  = NULL;
+    m_bConnected            = false;
+    m_bAuthenticated        = false;
 
     m_dtutc = vscpdatetime::UTCNow();
 
     // Create semaphores for the client input queue and event send
 #ifdef WIN32
-    m_semClientInputQueue = CreateSemaphore(NULL, 0, 100, NULL);
-    m_hEventSend          = CreateSemaphore(NULL, 0, 100, NULL);
+    m_semSendQueue = CreateSemaphore(NULL, 0, 100, NULL);
+    m_hEventSend   = CreateSemaphore(NULL, 0, 100, NULL);
 #else
-    sem_init(&m_semClientInputQueue, 0, 0);
+    sem_init(&m_semSendQueue, 0, 0);
     sem_init(&m_hEventSend, 0, 0);
 #endif
-    pthread_mutex_init(&m_mutexClientInputQueue, NULL);
+    pthread_mutex_init(&m_mutexSendQueue, NULL);
 
     /*!
         Initialize the GUID to nil (all zeros)
@@ -157,17 +156,17 @@ CClientItem::CClientItem(CControlObject* pControl,
 CClientItem::~CClientItem()
 {
     // Clear the input queue
-    clearInputQueue();
+    clearSendQueue();
 
 #ifdef WIN32
     CloseHandle(m_hEventSend);
-    CloseHandle(m_semClientInputQueue);
+    CloseHandle(m_semSendQueue);
 #else
     sem_destroy(&m_hEventSend);
-    sem_destroy(&m_semClientInputQueue);
+    sem_destroy(&m_semSendQueue);
 #endif
 
-    pthread_mutex_destroy(&m_mutexClientInputQueue);
+    pthread_mutex_destroy(&m_mutexSendQueue);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -181,64 +180,69 @@ CClientItem::isConnected(void)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// clearClientInputQueue
+// clearSendQueue
+//
+
+// void
+// CClientItem::clearSendQueue(void)
+// {
+//     pthread_mutex_lock(&m_mutexSendQueue);
+//     // Remove and delete all events in the queue
+//     while (!m_clientInputQueue.empty()) {
+//         vscpEvent* pEvent = m_clientInputQueue.front();
+//         m_clientInputQueue.pop_front();
+//         if (NULL != pEvent) {
+//             vscp_deleteEvent(pEvent);
+//         }
+//     }
+//     pthread_mutex_unlock(&m_mutexSendQueue);
+// }
+
+///////////////////////////////////////////////////////////////////////////////
+// clearSendQueue
 //
 
 void
-CClientItem::clearClientInputQueue(void)
+CClientItem::clearSendQueue(void)
 {
-    pthread_mutex_lock(&m_mutexClientInputQueue);
-    // Remove and delete all events in the queue
-    while (!m_clientInputQueue.empty()) {
-        vscpEvent* pEvent = m_clientInputQueue.front();
-        m_clientInputQueue.pop_front();
-        if (NULL != pEvent) {
-            vscp_deleteEvent(pEvent);
-        }
+    // Lock the send queue mutex before clearing the queue
+    pthread_mutex_lock(&m_mutexSendQueue);
+    std::deque<vscpEvent*>::iterator iter;
+    for (iter = m_sendQueue.begin(); iter != m_sendQueue.end(); ++iter) {
+        vscpEvent* pEvent = *iter;
+        vscp_deleteEvent_v2(&pEvent);
     }
-    pthread_mutex_unlock(&m_mutexClientInputQueue);
+    m_sendQueue.clear();
+    pthread_mutex_unlock(&m_mutexSendQueue);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// getClientInputQueueSize
-//
-
-size_t
-CClientItem::getClientInputQueueSize(void)
-{
-    pthread_mutex_lock(&m_mutexClientInputQueue);
-    const size_t size = m_clientInputQueue.size();
-    pthread_mutex_unlock(&m_mutexClientInputQueue);
-    return size;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// waitForInputQueueEvent
+// waitForSendQueueEvent
 //
 
 int
-CClientItem::waitForInputQueueEvent(uint32_t timeoutMs)
+CClientItem::waitForSendQueueEvent(uint32_t timeoutMs)
 {
-    return vscp_sem_wait(&m_semClientInputQueue, timeoutMs);
+    return vscp_sem_wait(&m_semSendQueue, timeoutMs);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// getEventFromClientInputQueue
+// getEventFromSendQueue
 //
 
 vscpEvent*
-CClientItem::getEventFromClientInputQueue(bool bRemove)
+CClientItem::getEventFromSendQueue(bool bRemove)
 {
     vscpEvent* pEvent = NULL;
 
-    pthread_mutex_lock(&m_mutexClientInputQueue);
-    if (!m_clientInputQueue.empty()) {
-        pEvent = m_clientInputQueue.front();
+    pthread_mutex_lock(&m_mutexSendQueue);
+    if (!m_sendQueue.empty()) {
+        pEvent = m_sendQueue.front();
         if (bRemove) {
-            m_clientInputQueue.pop_front();
+            m_sendQueue.pop_front();
         }
     }
-    pthread_mutex_unlock(&m_mutexClientInputQueue);
+    pthread_mutex_unlock(&m_mutexSendQueue);
 
     return pEvent;
 }
@@ -282,72 +286,55 @@ CClientItem::getClientItemAsString(void)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// addEventToInputQueue
+// addEventToSendQueue
 //
 
 bool
-CClientItem::addEventToInputQueue(vscpEvent* pEvent)
+CClientItem::addEventToSendQueue(vscpEvent* pEvent)
 {
     if (NULL == pEvent) {
         return false;
     }
     // Mutex handle that is used for sharing of the client object
-    pthread_mutex_lock(&m_mutexClientInputQueue);
-    if (m_maxItemsInClientInputQueue &&
-        (m_clientInputQueue.size() >= m_maxItemsInClientInputQueue)) {
-        pthread_mutex_unlock(&m_mutexClientInputQueue);
+    pthread_mutex_lock(&m_mutexSendQueue);
+    if (m_sendQueue.size() >= CLIENT_ITEM_MAX_SEND_QUEUE_SIZE) {
+        pthread_mutex_unlock(&m_mutexSendQueue);
         return false;
     }
-    m_clientInputQueue.push_back(pEvent);
-    pthread_mutex_unlock(&m_mutexClientInputQueue);
-    // Signal that an event has been added to the input queue
+    m_sendQueue.push_back(pEvent);
+    pthread_mutex_unlock(&m_mutexSendQueue);
+
+    // // TX Statistics
+    m_statistics.cntTransmitData += pEvent->sizeData;
+    m_statistics.cntTransmitFrames++;
+
+    // Signal that an event has been added to the send queue
 #ifdef WIN32
-    SetEvent(m_semClientInputQueue);
+    SetEvent(m_semSendQueue);
 #else
-    sem_post(&m_semClientInputQueue);
+    sem_post(&m_semSendQueue);
 #endif
     return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// getEventFromInputQueue
+// getEventFromSendQueue
 //
 
 vscpEvent*
-CClientItem::getEventFromInputQueue(void)
+CClientItem::getEventFromSendQueue(void)
 {
     vscpEvent* pEvent = NULL;
 
-    pthread_mutex_lock(&m_mutexClientInputQueue);
-    if (!m_clientInputQueue.empty()) {
-        pEvent = m_clientInputQueue.front();
-        m_clientInputQueue.pop_front();
+    pthread_mutex_lock(&m_mutexSendQueue);
+    if (!m_sendQueue.empty()) {
+        pEvent = m_sendQueue.front();
+        m_sendQueue.pop_front();
     }
-    pthread_mutex_unlock(&m_mutexClientInputQueue);
+    pthread_mutex_unlock(&m_mutexSendQueue);
 
     return pEvent;
 }
-
-///////////////////////////////////////////////////////////////////////////////
-// clearInputQueue
-//
-
-void
-CClientItem::clearInputQueue(void)
-{
-    // Lock the input queue mutex before clearing the queue
-    pthread_mutex_lock(&m_mutexClientInputQueue);
-    std::deque<vscpEvent*>::iterator iter;
-    for (iter = m_clientInputQueue.begin(); iter != m_clientInputQueue.end();
-         ++iter) {
-        vscpEvent* pEvent = *iter;
-        vscp_deleteEvent_v2(&pEvent);
-    }
-    m_clientInputQueue.clear();
-    pthread_mutex_unlock(&m_mutexClientInputQueue);
-}
-
-
 
 // ----------------------------------------------------------------------------
 
@@ -389,8 +376,10 @@ CClientList::CClientList()
 
 CClientList::~CClientList()
 {
-    clearOutputQueue();
+    // Remove all events from main receive queue
+    clearClientMainReceiveQueue();
 
+    // Remove all clients
     removeAllClients();
     pthread_mutex_destroy(&m_mutexClientItemList);
 
@@ -417,43 +406,30 @@ CClientList::~CClientList()
 //
 
 bool
-CClientList::enqueueReceiveEvent(vscpEvent* pEvent, size_t maxSize)
+CClientList::enqueueReceiveEvent(vscpEvent* pEvent)
 {
     if (NULL == pEvent) {
         return false;
     }
 
     pthread_mutex_lock(&m_mutex_ClientMainReceiveQueue);
-    if (maxSize <= m_clientMainReceiveQueue.size()) {
+    if (CLIENT_MAIN_RECEIVE_QUEUE_MAX_SIZE <= m_clientMainReceiveQueue.size()) {
         pthread_mutex_unlock(&m_mutex_ClientMainReceiveQueue);
         return false;
     }
     m_clientMainReceiveQueue.push_back(pEvent);
     pthread_mutex_unlock(&m_mutex_ClientMainReceiveQueue);
 
-    notifyOutputQueueEvent();
+    notifyClientMainReceiveQueueEvent();
     return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// getOutputQueueSize
-//
-
-size_t
-CClientList::getOutputQueueSize(void)
-{
-    pthread_mutex_lock(&m_mutex_ClientMainReceiveQueue);
-    const size_t size = m_clientMainReceiveQueue.size();
-    pthread_mutex_unlock(&m_mutex_ClientMainReceiveQueue);
-    return size;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// getEventFromOutputQueue
+// getEventFromClientMainReceiveQueue
 //
 
 vscpEvent*
-CClientList::getEventFromOutputQueue(bool remove)
+CClientList::getEventFromClientMainReceiveQueue(bool remove)
 {
     vscpEvent* pEvent = NULL;
 
@@ -470,21 +446,21 @@ CClientList::getEventFromOutputQueue(bool remove)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// waitForOutputQueueEvent
+// waitForClientMainReceiveQueueEvent
 //
 
 int
-CClientList::waitForOutputQueueEvent(uint32_t timeoutMs)
+CClientList::waitForClientMainReceiveQueueEvent(uint32_t timeoutMs)
 {
     return vscp_sem_wait(&m_semClientMainReceiveQueue, timeoutMs);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// notifyOutputQueueEvent
+// notifyClientMainReceiveQueueEvent
 //
 
 void
-CClientList::notifyOutputQueueEvent(void)
+CClientList::notifyClientMainReceiveQueueEvent(void)
 {
 #ifdef WIN32
     if (!ReleaseSemaphore(m_semClientMainReceiveQueue, 1, NULL)) {
@@ -496,11 +472,11 @@ CClientList::notifyOutputQueueEvent(void)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// clearOutputQueue
+// clearClientMainReceiveQueue
 //
 
 void
-CClientList::clearOutputQueue(void)
+CClientList::clearClientMainReceiveQueue(void)
 {
     pthread_mutex_lock(&m_mutex_ClientMainReceiveQueue);
     while (!m_clientMainReceiveQueue.empty()) {
@@ -635,7 +611,7 @@ CClientList::removeClient(CClientItem* pClientItem)
     }
 
     pthread_mutex_lock(&m_mutexClientItemList);
-    pClientItem->clearClientInputQueue();
+    pClientItem->clearSendQueue();
 
     // Take away the node
     for (std::deque<CClientItem*>::iterator it = m_itemList.begin();
@@ -660,7 +636,7 @@ CClientList::removeAllClients()
     while (!m_itemList.empty()) {
         CClientItem* pClientItem = m_itemList.front();
         m_itemList.pop_front();
-        pClientItem->clearClientInputQueue();
+        pClientItem->clearSendQueue();
         delete pClientItem;
     }
     pthread_mutex_unlock(&m_mutexClientItemList);
@@ -808,8 +784,7 @@ bool
 CClientList::waitEventInMainReceiveQueue(uint32_t timeoutMs)
 {
     int rv;
-    rv = waitForOutputQueueEvent(timeoutMs);
-    if ((-1 == rv)) {
+    if ((-1 == vscp_sem_wait(&m_semSentToAllClients, 10))) {
         if (errno == ETIMEDOUT) {
             return false;
         }
@@ -819,6 +794,7 @@ CClientList::waitEventInMainReceiveQueue(uint32_t timeoutMs)
             return false;
         }
     }
+
     return true;
 }
 
@@ -848,8 +824,8 @@ CClientList::sendEventToClient(CClientItem* pClientItem,
     }
 
     // Create a new event
-    vscpEvent* pnewvscpEvent = new vscpEvent;
-    if (NULL != pnewvscpEvent) {
+    vscpEvent* pnewvscpEvent;
+    if (vscp_newEvent(&pnewvscpEvent)) {
 
         // Copy in the new event
         if (!vscp_copyEvent(pnewvscpEvent, pEvent)) {
@@ -858,7 +834,7 @@ CClientList::sendEventToClient(CClientItem* pClientItem,
             return false;
         }
 
-        if (!pClientItem->addEventToInputQueue(pnewvscpEvent)) {
+        if (!pClientItem->addEventToSendQueue(pnewvscpEvent)) {
             vscp_deleteEvent_v2(&pnewvscpEvent);
             spdlog::info("sendEventToClient - overrun");
             pClientItem->getStatistics().cntOverruns++;
@@ -867,6 +843,41 @@ CClientList::sendEventToClient(CClientItem* pClientItem,
     }
 
     return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// sendEventToClient
+//
+
+bool
+CClientList::sendEventToClient(cguid& destguid, const vscpEvent* pEvent)
+{
+    CClientItem* pClientItem;
+    std::deque<CClientItem*>::iterator it;
+
+    if (NULL == pEvent) {
+        spdlog::error("sendEventToClient - null event");
+        return false;
+    }
+
+    pthread_mutex_lock(&m_mutexClientItemList);
+    for (it = m_itemList.begin(); it != m_itemList.end(); ++it) {
+        pClientItem = *it;
+
+        if ((NULL != pClientItem) &&
+            (pClientItem->getInterfaceGUID() == destguid)) {
+            if (!sendEventToClient(pClientItem, pEvent)) {
+                ;
+            }
+            pthread_mutex_unlock(&m_mutexClientItemList);
+            return true;
+        }
+    }
+    pthread_mutex_unlock(&m_mutexClientItemList);
+
+    spdlog::error("sendEventToClient - client with GUID {} not found",
+                  destguid.toString().c_str());
+    return false;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -893,6 +904,8 @@ CClientList::sendEventAllClients(const vscpEvent* pEvent, uint32_t excludeID)
             spdlog::debug("Send event to client [{}]",
                           pClientItem->getDeviceName());
             if (!sendEventToClient(pClientItem, pEvent)) {
+                spdlog::error("sendEventAllClients - Failed to send event to client [{}]",
+                              pClientItem->getDeviceName());
             }
         }
     }

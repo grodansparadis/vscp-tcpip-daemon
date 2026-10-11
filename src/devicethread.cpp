@@ -142,8 +142,7 @@ deviceThread(void* pdata)
                       pDevItem->getName().c_str());
 
         // * * * * CANAL OPEN * * * *
-        pDevItem->setProcCanalOpen(
-          (LPFNDLL_CANALOPEN)dlsym(hdll, "CanalOpen"));
+        pDevItem->setProcCanalOpen((LPFNDLL_CANALOPEN)dlsym(hdll, "CanalOpen"));
         const char* dlsym_error = dlerror();
 
         if (dlsym_error) {
@@ -178,8 +177,7 @@ deviceThread(void* pdata)
         }
 
         // * * * * CANAL SEND * * * *
-        pDevItem->setProcCanalSend(
-          (LPFNDLL_CANALSEND)dlsym(hdll, "CanalSend"));
+        pDevItem->setProcCanalSend((LPFNDLL_CANALSEND)dlsym(hdll, "CanalSend"));
         dlsym_error = dlerror();
         if (dlsym_error) {
             // Free the library
@@ -436,15 +434,15 @@ deviceThread(void* pdata)
                 if (pDevItem->getProcCanalDataAvailable()(
                       pDevItem->getOpenHandle())) {
 
-                    if (CANAL_ERROR_SUCCESS ==
-                        pDevItem->getProcCanalReceive()(pDevItem->getOpenHandle(),
-                                                         &msg)) {
+                    if (CANAL_ERROR_SUCCESS == pDevItem->getProcCanalReceive()(
+                                                 pDevItem->getOpenHandle(),
+                                                 &msg)) {
 
                         bActivity = true;
 
                         // There must be room in the receive queue
-                        if (pObj->getMaxItemsInClientReceiveQueue() >
-                            pObj->getClientList().getOutputQueueSize()) {
+                        if (true/*pObj->getMaxItemsInClientReceiveQueue() >
+                            pObj->getClientList().getOutputQueueSize()*/) {
 
                             vscpEvent* pev = new vscpEvent;
                             if (NULL != pev) {
@@ -464,13 +462,14 @@ deviceThread(void* pdata)
                                 vscp_convertCanalToEvent(
                                   pev,
                                   &msg,
-                                  (unsigned char *)pClientItem->getInterfaceGUID().getGUID());
+                                  (unsigned char*)pClientItem
+                                    ->getInterfaceGUID()
+                                    .getGUID());
 
                                 pev->obid = pClientItem->getClientID();
 
                                 if (!pObj->getClientList().enqueueReceiveEvent(
-                                      pev,
-                                      pObj->getMaxItemsInClientReceiveQueue())) {
+                                      pev)) {
                                     vscp_deleteEvent_v2(&pev);
                                 }
                             }
@@ -483,7 +482,7 @@ deviceThread(void* pdata)
                 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
                 vscpEvent* pev =
-                  pClientItem->getEventFromClientInputQueue(false);
+                  pClientItem->getEventFromSendQueue(false);
                 if (NULL != pev) {
                     bActivity = true;
 
@@ -494,7 +493,7 @@ deviceThread(void* pdata)
                         (pev->vscp_class > 512)) {
                         // Remove the event and the node
                         vscpEvent* pRemovedEvent =
-                          pClientItem->getEventFromClientInputQueue(true);
+                          pClientItem->getEventFromSendQueue(true);
                         spdlog::error(
                           "Level II event on Level I queue thrown away. "
                           "class=%d, type=%d",
@@ -508,10 +507,10 @@ deviceThread(void* pdata)
                     vscp_convertEventToCanal(&canmsg, pev);
                     if (CANAL_ERROR_SUCCESS ==
                         pDevItem->getProcCanalSend()(pDevItem->getOpenHandle(),
-                                                      &canmsg)) {
+                                                     &canmsg)) {
                         // Remove the event and the node
                         vscpEvent* pRemovedEvent =
-                          pClientItem->getEventFromClientInputQueue(true);
+                          pClientItem->getEventFromSendQueue(true);
                         vscp_deleteEvent(pRemovedEvent);
                     }
                     else {
@@ -558,8 +557,7 @@ deviceThread(void* pdata)
                      pDevItem->getName().c_str());
 
         // * * * * VSCP OPEN * * * *
-        pDevItem->setProcVSCPOpen(
-          (LPFNDLL_VSCPOPEN)dlsym(hdll, "VSCPOpen"));
+        pDevItem->setProcVSCPOpen((LPFNDLL_VSCPOPEN)dlsym(hdll, "VSCPOpen"));
         if (NULL == pDevItem->getProcVSCPOpen()) {
             // Free the library
             spdlog::error("%s: Unable to get dl entry for VSCPOpen.",
@@ -568,8 +566,7 @@ deviceThread(void* pdata)
         }
 
         // * * * * VSCP CLOSE * * * *
-        pDevItem->setProcVSCPClose(
-          (LPFNDLL_VSCPCLOSE)dlsym(hdll, "VSCPClose"));
+        pDevItem->setProcVSCPClose((LPFNDLL_VSCPCLOSE)dlsym(hdll, "VSCPClose"));
         if (NULL == pDevItem->getProcVSCPClose()) {
             // Free the library
             spdlog::error("%s: Unable to get dl entry for VSCPClose.",
@@ -578,8 +575,7 @@ deviceThread(void* pdata)
         }
 
         // * * * * VSCPWRITE * * * *
-        pDevItem->setProcVSCPWrite(
-          (LPFNDLL_VSCPWRITE)dlsym(hdll, "VSCPWrite"));
+        pDevItem->setProcVSCPWrite((LPFNDLL_VSCPWRITE)dlsym(hdll, "VSCPWrite"));
         if (NULL == pDevItem->getProcVSCPWrite()) {
             // Free the library
             spdlog::error("%s: Unable to get dl entry for VSCPWrite.",
@@ -588,8 +584,7 @@ deviceThread(void* pdata)
         }
 
         // * * * * VSCPREAD * * * *
-        pDevItem->setProcVSCPRead(
-          (LPFNDLL_VSCPREAD)dlsym(hdll, "VSCPRead"));
+        pDevItem->setProcVSCPRead((LPFNDLL_VSCPREAD)dlsym(hdll, "VSCPRead"));
         if (NULL == pDevItem->getProcVSCPRead()) {
             // Free the library
             spdlog::error("%s: Unable to get dl entry for VSCPBlockingReceive.",
@@ -611,10 +606,9 @@ deviceThread(void* pdata)
                       pDevItem->getName().c_str());
 
         // Open up the driver
-        pDevItem->setOpenHandle(
-          pDevItem->getProcVSCPOpen()(
-            pDevItem->getConfigurationString().c_str(),
-            pDevItem->getDriverGuid().getGUID()));
+        pDevItem->setOpenHandle(pDevItem->getProcVSCPOpen()(
+          pDevItem->getConfigurationString().c_str(),
+          pDevItem->getDriverGuid().getGUID()));
 
         if (0 == pDevItem->getOpenHandle()) {
             // Free the library
@@ -739,10 +733,11 @@ deviceLevel1ReceiveThread(void* pData)
                                                     500)) {
 
             // There must be room in the receive queue
-            if (pDevItem->getControlObject()
+            if (true/*pDevItem->getControlObject()
                   ->getMaxItemsInClientReceiveQueue() >
-                pDevItem->getControlObject()->getClientList()
-                  .getOutputQueueSize()) {
+                pDevItem->getControlObject()
+                  ->getClientList()
+                  .getOutputQueueSize()*/) {
 
                 vscpEvent* pvscpEvent = new vscpEvent;
                 if (NULL != pvscpEvent) {
@@ -764,7 +759,9 @@ deviceLevel1ReceiveThread(void* pData)
                     vscp_convertCanalToEvent(
                       pvscpEvent,
                       &msg,
-                      (unsigned char *)pDevItem->getClientItem()->getInterfaceGUID().getGUID());
+                      (unsigned char*)pDevItem->getClientItem()
+                        ->getInterfaceGUID()
+                        .getGUID());
 
                     pvscpEvent->obid = pDevItem->getClientItem()->getClientID();
 
@@ -791,7 +788,8 @@ deviceLevel1ReceiveThread(void* pData)
                         }
                         else {
                             // If no driver GUID set use interface GUID
-                            pDevItem->getClientItem()->getInterfaceGUID() = cguid(pvscpEvent->GUID);
+                            pDevItem->getClientItem()->getInterfaceGUID() =
+                              cguid(pvscpEvent->GUID);
                         }
 
                         // Preserve nickname
@@ -833,9 +831,7 @@ deviceLevel1ReceiveThread(void* pData)
                     if (!pDevItem->getControlObject()
                            ->getClientList()
                            .enqueueReceiveEvent(
-                          pvscpEvent,
-                          pDevItem->getControlObject()
-                            ->getMaxItemsInClientReceiveQueue())) {
+                             pvscpEvent)) {
                         vscp_deleteEvent_v2(&pvscpEvent);
                     }
                 }
@@ -872,12 +868,12 @@ deviceLevel1WriteThread(void* pData)
 
         // Wait until there is something to send
         CClientItem* pClientItem = pDevItem->getClientItem();
-        if ((-1 == pClientItem->waitForInputQueueEvent(500)) &&
+        if ((-1 == pClientItem->waitForSendQueueEvent(500)) &&
             errno == ETIMEDOUT) {
             continue;
         }
 
-        vscpEvent* pev = pClientItem->getEventFromClientInputQueue(true);
+        vscpEvent* pev = pClientItem->getEventFromSendQueue(true);
         if (NULL != pev) {
 
             // Trow away event if Level II and Level I interface
@@ -907,9 +903,9 @@ deviceLevel1WriteThread(void* pData)
             }
             else {
                 // Give it another try
-                pDevItem->getControlObject()
-                  ->getClientList()
-                  .notifyOutputQueueEvent();
+                // pDevItem->getControlObject()
+                //   ->getClientList()
+                continue;
             }
 
         } // events in queue
@@ -998,8 +994,7 @@ deviceLevel2ReceiveThread(void* pData)
 
         // There must be room in the receive queue
         if (!pDevItem->getControlObject()->getClientList().enqueueReceiveEvent(
-              pev,
-              pDevItem->getControlObject()->getMaxItemsInClientReceiveQueue())) {
+              pev)) {
             vscp_deleteEvent_v2(&pev);
         }
     }
@@ -1030,23 +1025,28 @@ deviceLevel2WriteThread(void* pData)
     while (!pDevItem->isQuit()) {
 
         // Wait until there is something to send
-        if ((-1 == pClientItem->waitForInputQueueEvent(500)) &&
+        if ((-1 == pClientItem->waitForSendQueueEvent(500)) &&
             errno == ETIMEDOUT) {
+            spdlog::error("deviceLevel2WriteThread - Waiting for ");
             continue;
         }
 
-        vscpEvent* pev = pClientItem->getEventFromClientInputQueue(false);
+        vscpEvent* pev = pClientItem->getEventFromSendQueue(false);
         if (NULL != pev) {
             if (CANAL_ERROR_SUCCESS ==
-                pDevItem->getProcVSCPWrite()(pDevItem->getOpenHandle(), pev, 300)) {
+                pDevItem->getProcVSCPWrite()(pDevItem->getOpenHandle(),
+                                             pev,
+                                             300)) {
 
-                pClientItem->getEventFromClientInputQueue(true);
+                pClientItem->getEventFromSendQueue(true);
             }
             else {
                 // Give it another try
-                pDevItem->getControlObject()
-                  ->getClientList()
-                  .notifyOutputQueueEvent();
+                // pDevItem->getControlObject()
+                //   ->getClientList()
+                //   .notifyOutputQueueEvent();
+                spdlog::trace("deviceLevel2WriteThread - Failed to write event (blocking), will retry");
+                continue;
             }
 
         } // events in queue

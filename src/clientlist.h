@@ -23,11 +23,14 @@
 
 /*!
     @brief Functionality for managing connected clients in the VSCP system.
-    This includes handling client connections, managing input queues, and associating clients with specific interface types.
-    It provides an interface for sending and receiving VSCP events, managing client sessions, and enforcing access control based on client capabilities.
-    The object is owned by the application ControlObject which holds users and clients.
+    This includes handling client connections, managing input queues, and
+   associating clients with specific interface types. It provides an interface
+   for sending and receiving VSCP events, managing client sessions, and
+   enforcing access control based on client capabilities. The object is owned by
+   the application ControlObject which holds users and clients.
 
-    The object is owned by the application ControlObject which holds users and clients
+    The object is owned by the application ControlObject which holds users and
+   clients
 */
 
 #if !defined(CLIENTLIST_H__B0190EE5_E0E8_497F_92A0_A8616296AF3E__INCLUDED_)
@@ -78,10 +81,10 @@ class CClientItem {
       0xffff;                                          // Internal daemon worker
     static const uint16_t CLIENT_ID_INTERNAL = 0xfffe; // Internal client
 
-/*!
-    Maximum default number of items in the client input queue
-*/
-#define CLIENT_ITEM_MAX_INPUT_QUEUE 20000
+    /*!
+        Maximum default number of items in the client input queue
+    */
+    static const uint32_t CLIENT_ITEM_MAX_SEND_QUEUE_SIZE = 20000;
 
     /*!
         VSCP levels
@@ -136,28 +139,20 @@ class CClientItem {
     */
     std::string getDeviceName(void) { return m_strDeviceName; };
 
-    /// Clear input queue
-    void clearClientInputQueue(void);
-
-    /// @brief Get the size of the client input queue
-    /// @param  None
-    /// @return Size of the client input queue
-    size_t getClientInputQueueSize(void);
-
     /*!
         Wait for an event to be added to the client input queue.
         @param timeoutMs Maximum time to wait in milliseconds
         @return 0 when signaled, -1 on timeout or error
     */
-    int waitForInputQueueEvent(uint32_t timeoutMs);
+    int waitForSendQueueEvent(uint32_t timeoutMs);
 
     /*!
-        Get event from the client input queue
+        Get event from the client send queue
         @param bRemove Flag indicating whether to remove the event from the
        queue
-        @return Event from the client input queue, or NULL if the queue is empty
+        @return Event from the client send queue, or NULL if the queue is empty
     */
-    vscpEvent* getEventFromClientInputQueue(bool bRemove);
+    vscpEvent* getEventFromSendQueue(bool bRemove);
 
     /*!
         Get client on string form
@@ -167,24 +162,25 @@ class CClientItem {
     std::string getClientItemAsString(void);
 
     /*!
-        Add an event to the input queue
+        Add an event to the send queue
         @param pEvent Event to add
         @return True if the event was successfully added, false otherwise
     */
-    bool addEventToInputQueue(vscpEvent* pEvent);
+    bool addEventToSendQueue(vscpEvent* pEvent);
 
     /*!
-    Get event from the input queue
-        @return Event from the input queue, or NULL if the queue is empty
+    Get event from the send queue
+        @return Event from the send queue, or NULL if the queue is empty
     */
-    vscpEvent* getEventFromInputQueue(void);
+    vscpEvent* getEventFromSendQueue(void);
 
     /*!
-        Clear the input queue of all events
+        Clear the send queue of all events
         @return None
     */
+    void clearSendQueue(void);
 
-    void clearInputQueue(void);
+    size_t getSendQueueSize(void) { return m_sendQueue.size(); }
 
     /*!
         Check if the client is connected.
@@ -227,7 +223,7 @@ class CClientItem {
     */
     void setUserItem(const CUserItemPtr& pUserItem)
     {
-        m_userItem        = pUserItem;
+        m_userItem       = pUserItem;
         m_bAuthenticated = false;
     };
 
@@ -279,19 +275,6 @@ class CClientItem {
     /// Get client flags
     uint32_t getFlags(void) { return m_flags; };
 
-    /// Set the maximum number of events in the client input queue (zero means
-    /// unlimited)
-    void setMaxItemsInClientInputQueue(uint32_t maxItems)
-    {
-        m_maxItemsInClientInputQueue = maxItems;
-    };
-
-    /// Get the maximum number of events in the client input queue
-    uint32_t getMaxItemsInClientInputQueue(void)
-    {
-        return m_maxItemsInClientInputQueue;
-    };
-
     /*!
         Set the interface GUID
         @param guid Interface GUID to set
@@ -317,8 +300,6 @@ class CClientItem {
 
     /// Get open state
     bool isOpen(void) { return m_bOpen; };
-
-    
 
     /*!
         Get the date and time when the client was started
@@ -368,39 +349,28 @@ class CClientItem {
     /// Set connected status
     void setConnected(bool connected) { m_bConnected = connected; };
 
-
-
   private:
     /// Pointer to control object
     CControlObject* m_pCtrlObj;
 
     // **************************************************************************
-    //                            Input queue
+    //                            send queue
     // **************************************************************************
 
     /*!
-        Input Queue (events directed TO this client)
-        This queue holds events that are directed to this specific client.
-       Events are added to this queue by the server and processed by the client
-       as they are received.
+        This queue holds events that should be sent to the remote client.
     */
-    std::deque<vscpEvent*> m_clientInputQueue;
+    std::deque<vscpEvent*> m_sendQueue;
 
-    // Semaphore to signal that an event has been received
+    // Semaphore to signal that an event has been added to the send queue
 #ifdef WIN32
-    HANDLE m_semClientInputQueue;
+    HANDLE m_semSendQueue;
 #else
-    sem_t m_semClientInputQueue;
+    sem_t m_semSendQueue;
 #endif
 
     // Mutex handle that is used for sharing of the client object
-    pthread_mutex_t m_mutexClientInputQueue;
-
-    /*!
-      Maximum number of events allowed in input queue.
-      Set to zero for no limit
-    */
-    uint32_t m_maxItemsInClientInputQueue;
+    pthread_mutex_t m_mutexSendQueue;
 
     // --------------------------------------------------------------------------
 
@@ -491,8 +461,6 @@ class CClientItem {
         so deleting the registry entry invalidates connected clients safely.
     */
     std::weak_ptr<CUserItem> m_userItem;
-
-    
 };
 
 // ----------------------------------------------------------------------------
@@ -507,6 +475,9 @@ class CClientItem {
 */
 
 class CClientList {
+
+    // Maximum size of the client main receive queue
+    static const uint32_t CLIENT_MAIN_RECEIVE_QUEUE_MAX_SIZE = 1000000;
 
   public:
     /// Constructor
@@ -578,7 +549,8 @@ class CClientList {
         @param connectionId The ID of the connection.
         @return Pointer to the client item, or nullptr if not found.
     */
-    const CClientItem* getClientFromConnection(const struct mg_connection* pConnection);
+    const CClientItem* getClientFromConnection(
+      const struct mg_connection* pConnection);
 
     /*!
         Get current number of clients
@@ -610,6 +582,14 @@ class CClientList {
     bool sendEventToClient(CClientItem* pClientItem, const vscpEvent* pEvent);
 
     /*!
+        Send event to client identified by GUID
+        @param destguid GUID of the destination client
+        @param pEvent Event that should be sent.
+        @return True on success, false on failure.
+    */
+    bool sendEventToClient(cguid& destguid, const vscpEvent* pEvent);
+
+    /*!
       Send event to all clients
       @param VSCP event to send
       @param excludeID Event with this obid will be excluded. Set to zero
@@ -621,26 +601,25 @@ class CClientList {
     /*!
         Add an event to the client output queue if capacity is available.
         @param pEvent Event to enqueue; ownership transfers on success
-        @param maxSize Maximum queue size; zero prevents enqueueing
         @return True if the event was queued
     */
-    bool enqueueReceiveEvent(vscpEvent* pEvent, size_t maxSize);
+    bool enqueueReceiveEvent(vscpEvent* pEvent);
 
     /// Get the client output queue size.
-    size_t getOutputQueueSize(void);
+    size_t getMainReceiveQueueSize(void);
 
     /*!
-        Get an event from the client output queue.
+        Get an event from the client main receive queue.
         @param remove Remove the event from the queue when true
         @return Queue-front event, or nullptr if the queue is empty
     */
-    vscpEvent* getEventFromOutputQueue(bool remove);
+    vscpEvent* getEventFromClientMainReceiveQueue(bool remove);
 
-    /// Wait for an event on the client output queue.
-    int waitForOutputQueueEvent(uint32_t timeoutMs);
+    /// Wait for an event on the client main receive queue.
+    int waitForClientMainReceiveQueueEvent(uint32_t timeoutMs);
 
-    /// Signal that the client output queue should be processed.
-    void notifyOutputQueueEvent(void);
+    /// Signal that the client main receive queue should be processed.
+    void notifyClientMainReceiveQueueEvent(void);
 
     /*!
         Get the size of the client list
@@ -649,24 +628,24 @@ class CClientList {
     size_t size(void) { return m_itemList.size(); }
 
     /*!
-        Clear the client output queue.
+        Clear the client main receive queue.
     */
-    void clearOutputQueue(void);
+    void clearClientMainReceiveQueue(void);
 
     /*!
-        lock mutex for the client main receive queue.
+        Lock the mutex for the client main receive queue.
     */
     void lockClientMainReceiveQueue(void);
 
     /*!
-        Unlock mutex for the client main receive queue.
+        Unlock the mutex for the client main receive queue.
     */
     void unlockClientMainReceiveQueue(void);
 
     /*!
         waitEventInMainReceiveQueue
 
-        @param timeoutMs Maximum time to wait for an event in milliseconds. 
+        @param timeoutMs Maximum time to wait for an event in milliseconds.
         @return True if there is an event waiting in the main receive queue,
        false otherwise (timeout or error).
     */

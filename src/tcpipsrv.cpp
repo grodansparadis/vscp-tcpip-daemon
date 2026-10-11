@@ -1027,13 +1027,13 @@ CTcpipSrv::handleClientMeasurement(struct mg_connection* conn)
                 pEvent->vscp_type  = vscptype;
 
                 // send the event
-                // if (!m_pCtrlObj->sendEvent(pClientItem, pEvent)) {
-                //     vscp_deleteEvent_v2(&pEvent);
-                //     write(conn,
-                //           MSG_UNABLE_TO_SEND_EVENT,
-                //           strlen(MSG_UNABLE_TO_SEND_EVENT));
-                //     return;
-                // }
+                if (!m_pCtrlObj->getClientList().enqueueReceiveEvent(pEvent)) {
+                    vscp_deleteEvent_v2(&pEvent);
+                    write(conn,
+                          MSG_UNABLE_TO_SEND_EVENT,
+                          strlen(MSG_UNABLE_TO_SEND_EVENT));
+                    return;
+                }
 
                 vscp_deleteEvent_v2(&pEvent);
             }
@@ -1062,7 +1062,16 @@ CTcpipSrv::handleClientMeasurement(struct mg_connection* conn)
                 write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
             }
 
-            // TODO have to send also
+            // send the event
+            if (!m_pCtrlObj->getClientList().enqueueReceiveEvent(pEvent)) {
+                vscp_deleteEvent_v2(&pEvent);
+                write(conn,
+                      MSG_UNABLE_TO_SEND_EVENT,
+                      strlen(MSG_UNABLE_TO_SEND_EVENT));
+                return;
+            }
+
+            vscp_deleteEvent_v2(&pEvent);
         }
     }
     else { // Level II
@@ -1113,13 +1122,13 @@ CTcpipSrv::handleClientMeasurement(struct mg_connection* conn)
             memcpy(pEvent->pdata, data, 4 + 8);
 
             // send the event
-            // if (!m_pCtrlObj->sendEvent(pClientItem, pEvent)) {
-            //     vscp_deleteEvent_v2(&pEvent);
-            //     write(conn,
-            //           MSG_UNABLE_TO_SEND_EVENT,
-            //           strlen(MSG_UNABLE_TO_SEND_EVENT));
-            //     return;
-            // }
+            if (!m_pCtrlObj->getClientList().enqueueReceiveEvent(pEvent)) {
+                vscp_deleteEvent_v2(&pEvent);
+                write(conn,
+                      MSG_UNABLE_TO_SEND_EVENT,
+                      strlen(MSG_UNABLE_TO_SEND_EVENT));
+                return;
+            }
 
             vscp_deleteEvent_v2(&pEvent);
         }
@@ -1160,13 +1169,13 @@ CTcpipSrv::handleClientMeasurement(struct mg_connection* conn)
                    strValue.length()); // copy in double
 
             // send the event
-            // if (!m_pCtrlObj->sendEvent(pClientItem, pEvent)) {
-            //     vscp_deleteEvent_v2(&pEvent);
-            //     write(conn,
-            //           MSG_UNABLE_TO_SEND_EVENT,
-            //           strlen(MSG_UNABLE_TO_SEND_EVENT));
-            //     return;
-            // }
+            if (!m_pCtrlObj->getClientList().enqueueReceiveEvent(pEvent)) {
+                vscp_deleteEvent_v2(&pEvent);
+                write(conn,
+                      MSG_UNABLE_TO_SEND_EVENT,
+                      strlen(MSG_UNABLE_TO_SEND_EVENT));
+                return;
+            }
 
             vscp_deleteEvent_v2(&pEvent);
         }
@@ -1406,7 +1415,7 @@ CTcpipSrv::handleClientSend(struct mg_connection* conn)
         tokens.pop_front();
 
         // Parse the GUID string into the event's GUID structure
-        vscp_guid_parse(event.GUID, strGUID.c_str(), nullptr);
+        (void)vscp_parseGuid(event.GUID, strGUID);
     }
     else {
         write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
@@ -1582,11 +1591,11 @@ CTcpipSrv::handleClientSend(struct mg_connection* conn)
     }
 
     // send event
-    // if (!m_pCtrlObj->sendEvent(pClientItem, &event)) {
-    //     vscp_deleteEvent(&event); // Deallocate data
-    //     write(conn, MSG_BUFFER_FULL, strlen(MSG_BUFFER_FULL));
-    //     return;
-    // }
+    if (!m_pCtrlObj->getClientList().enqueueReceiveEvent(&event)) {
+        vscp_deleteEvent(&event); // Deallocate data
+        write(conn, MSG_BUFFER_FULL, strlen(MSG_BUFFER_FULL));
+        return;
+    }
     vscp_deleteEvent(&event); // Deallocate data
 
     write(conn, MSG_OK, strlen(MSG_OK));
@@ -1691,10 +1700,10 @@ CTcpipSrv::sendOneEventFromQueue(struct mg_connection* conn, bool bStatusMsg)
         return false;
     }
 
-    if (pClientItem->getClientInputQueueSize() > 0) {
+    if (true/*pClientItem->getClientSendQueueSize() > 0*/) {
 
         // Get event
-        vscpEvent* pev = pClientItem->getEventFromClientInputQueue(true);
+        vscpEvent* pev = pClientItem->getEventFromSendQueue(true);
         if (nullptr == pev) {
             spdlog::error("sendOneEventFromQueue: Failed to get event from "
                           "client input queue.");
@@ -1760,10 +1769,14 @@ CTcpipSrv::handleClientDataAvailable(struct mg_connection* conn)
         return;
     }
 
+    // Get number of available events from the send queue
+    size_t nAvailable = pClientItem->getSendQueueSize();
     sprintf(outbuf,
             "%zd\r\n%s",
-            pClientItem->getClientInputQueueSize(),
+            nAvailable,
             MSG_OK);
+
+
     write(conn, outbuf, strlen(outbuf));
 }
 
@@ -1808,7 +1821,7 @@ CTcpipSrv::handleClientClearInputQueue(struct mg_connection* conn)
         return;
     }
 
-    pClientItem->clearClientInputQueue();
+    pClientItem->clearSendQueue();
 
     write(conn, MSG_QUEUE_CLEARED, strlen(MSG_QUEUE_CLEARED));
 }
@@ -2398,12 +2411,6 @@ CTcpipSrv::handleClientPassword(struct mg_connection* conn)
         return false;
     }
 
-    // pthread_mutex_lock(&m_pCtrlObj->m_mutex_UserList);
-    // pClientItem->setUserItem(m_pCtrlObj->m_userList.validateUser(
-    //   pUserItem->getUserName().c_str(),
-    //   strPassword));
-    // pthread_mutex_unlock(&m_pCtrlObj->m_mutex_UserList);
-
     if (!pUserItem->validatePassword(strPassword)) {
 
         std::string strErr = vscp_str_format(
@@ -2413,6 +2420,11 @@ CTcpipSrv::handleClientPassword(struct mg_connection* conn)
 
         spdlog::error("%s", strErr.c_str());
         write(conn, MSG_PASSWORD_ERROR, strlen(MSG_PASSWORD_ERROR));
+
+        // Remove the user
+        pClientItem->setUserItem(nullptr);
+        spdlog::info("User removed due to failed password validation.");
+
         return false;
     }
 
@@ -3331,20 +3343,21 @@ void*
 tcpipClientThread(void* pData)
 {
     // Get the TCP/IP server object from the thread data.
-    // CTcpipSrv* ptcpipsrv = (CTcpipSrv*)pData;
-    // if (NULL == ptcpipsrv) {
-    // if (nullptr == ptcpipsrv) {
-    //                   "Client thread object not initialized.");
+    CTcpipSrv* ptcpipsrv = (CTcpipSrv*)pData;
+    if (NULL == ptcpipsrv) {
+        spdlog::error("Client thread object not initialized.");
+        return nullptr;
+    }
 
-    //     return nullptr;
+    // Get the TCP/IP server object from the thread data.
+    CControlObject* pobj = ptcpipsrv->getControlObject();
+    if (nullptr == pobj) {
+        spdlog::error("[TCP/IP srv client thread] Error, "
+                      "Client thread control object not initialized.");
+        return nullptr;
+    }
 
-    // if (nullptr == ptcpipsrv->m_pParent) {
-    //     spdlog::error("[TCP/IP srv client thread] Error, "
-    //                   "Control object not initialized.");
-    //     return nullptr;
-    // }
-
-    // spdlog::debug("[TCP/IP srv client thread] Thread started.");
+    spdlog::debug("[TCP/IP srv client thread] Thread started.");
 
     // ptcpipsrv->pClientItem = new CClientItem();
     // if (NULL == ptcpipsrv->pClientItem) {

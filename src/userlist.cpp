@@ -184,9 +184,11 @@ CUserItem::fixName(void)
 bool
 CUserItem::validatePassword(const std::string& passwordHash)
 {
-    // TODO: Implement password hash validation using Argon2
+    return crypto_pwhash_str_verify(m_passwordhash.c_str(),
+                                    passwordHash.c_str(),
+                                    passwordHash.size()) == 0;
     //return m_passwordhash == passwordHash;
-    return verify_password(m_passwordhash.c_str(), passwordHash.c_str()) == 0;
+    //return verify_password(m_passwordhash.c_str(), passwordHash.c_str()) == 0;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

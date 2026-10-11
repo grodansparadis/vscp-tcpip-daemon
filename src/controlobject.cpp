@@ -429,7 +429,6 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
         return FALSE;
     }
 
-
     // Start TCP/IP server
     try {
         startTcpipWorkerThread();
@@ -515,7 +514,7 @@ CControlObject::run(void)
         }
 
         // Wait for semaphore indicating events have been sent to all clients
-        int rv = m_clientList.waitForOutputQueueEvent(100);
+        int rv = m_clientList.waitForClientMainReceiveQueueEvent(100);
         if (rv == -1) {
             if (errno == ETIMEDOUT) {
                 continue;
@@ -524,26 +523,19 @@ CControlObject::run(void)
                           strerror(errno));
             break;
         }
-        // if ((-1 == vscp_sem_wait(&m_clientList.m_semSentToAllClients, 10)) &&
-        //     errno == ETIMEDOUT) {
-        //     continue;
-        // }
-
-        
 
         //----------------------------------------------------------------------
         //                         Event received here
         //                   from one of the incoming source
         //----------------------------------------------------------------------
 
-        vscpEvent* pev = pClientItem->getEventFromClientInputQueue(true);
+        vscpEvent* pev = pClientItem->getEventFromSendQueue(true);
         if (NULL == pev) {
             continue;
         }
-        
-        // Process the received event here
-        // TODO
 
+        // Process the received event here
+        m_clientList.sendEventAllClients(pev,pev->obid);
 
         vscp_deleteEvent_v2(&pev);
 
@@ -611,9 +603,9 @@ CControlObject::doAutomation(CClientItem* pClientItem)
     ex.data[1] = 0; // zone
     ex.data[2] = 0; // subzone
 
-    // if (!sendEvent(pClientItem, &ex)) {
-    //     spdlog::error("Failed to send Class1 heartbeat");
-    // }
+    if (!sendEvent(pClientItem, &ex)) {
+        spdlog::error("Failed to send Class1 heartbeat");
+    }
 
     // Send VSCP_CLASS2_INFORMATION,
     // Type=2/VSCP2_TYPE_INFORMATION_HEART_BEAT
@@ -633,9 +625,9 @@ CControlObject::doAutomation(CClientItem* pClientItem)
            m_strServerName.c_str(),
            std::min((int)strlen(m_strServerName.c_str()), 64));
 
-    // if (!sendEvent(pClientItem, &ex)) {
-    //     spdlog::error("Failed to send Class2 heartbeat");
-    // }
+    if (!sendEvent(pClientItem, &ex)) {
+        spdlog::error("Failed to send Class2 heartbeat");
+    }
 
     // Send VSCP_CLASS1_PROTOCOL,
     // Type=1/VSCP_TYPE_PROTOCOL_SEGCTRL_HEARTBEAT
@@ -660,9 +652,9 @@ CControlObject::doAutomation(CClientItem* pClientItem)
     ex.data[3] = (uint8_t)((time32 >> 8) & 0xff);
     ex.data[4] = (uint8_t)((time32) & 0xff); // Time since epoch LSB
 
-    // if (!sendEvent(pClientItem, &ex)) {
-    //     spdlog::error("Failed to send segment controller heartbeat");
-    // }
+    if (!sendEvent(pClientItem, &ex)) {
+        spdlog::error("Failed to send segment controller heartbeat");
+    }
 
     // Send VSCP_CLASS2_PROTOCOL,
     // Type=20/VSCP2_TYPE_PROTOCOL_HIGH_END_SERVER_CAPS
@@ -701,9 +693,9 @@ CControlObject::doAutomation(CClientItem* pClientItem)
 
     ex.sizeData = 104;
 
-    // if (!sendEvent(pClientItem, &ex)) {
-    //     spdlog::error("Failed to send high end server capabilities.");
-    // }
+    if (!sendEvent(pClientItem, &ex)) {
+        spdlog::error("Failed to send high end server capabilities.");
+    }
 
     return true;
 }
@@ -788,8 +780,6 @@ CControlObject::startClientMsgWorkerThread(void)
     return true;
 }
 
-
-
 /////////////////////////////////////////////////////////////////////////////
 // stopClientMsgWorkerThread
 //
@@ -838,7 +828,6 @@ CControlObject::stopTcpipWorkerThread(void)
     spdlog::debug("Controlobject: Terminating TCP/IP worker thread.");
 
     pthread_join(m_tcpipWorkerThread, NULL);
-
 
     spdlog::debug("Controlobject: Terminated TCP thread.");
 
@@ -1258,6 +1247,171 @@ CControlObject::getSystemKeyMD5(std::string& strKey)
     char digest[33];
     vscp_md5(digest, m_systemKey, 32);
     strKey = digest;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// sendEvent
+//
+// !!! pEventToSend must be deallocated by sender !!!
+//
+
+bool
+CControlObject::sendEvent(CClientItem* pClientItem, vscpEvent* peventToSend)
+{
+    bool bSent = false;
+
+    // Check pointers
+    if (NULL == pClientItem) {
+        syslog(LOG_ERR, "sendEvent - null clientItem");
+        return false;
+    }
+    if (NULL == peventToSend) {
+        syslog(LOG_ERR, "sendEvent - null event");
+        return false;
+    }
+
+    // If timestamp is nulled make one
+    if (0 == peventToSend->timestamp) {
+        peventToSend->timestamp = vscp_makeTimeStamp();
+    }
+
+    // If obid is nulled set client interface id
+    if (0 == peventToSend->obid) {
+        peventToSend->obid = pClientItem->getClientID();
+    }
+
+    // If GUID is all nilled set interface GUID
+    if (vscp_isGUIDEmpty(peventToSend->GUID)) {
+        memcpy(peventToSend->GUID,
+               pClientItem->getInterfaceGUID().getGUID(),
+               16);
+    }
+
+    vscpEvent* pEvent = new vscpEvent; // Create new VSCP Event
+    if (NULL == pEvent) {
+        syslog(LOG_ERR, "sendEvent - Allocation of event failed");
+        return false;
+    }
+
+    pEvent->pdata = NULL;
+
+    // Copy event
+    if (!vscp_copyEvent(pEvent, peventToSend)) {
+        vscp_deleteEvent_v2(&pEvent);
+        syslog(LOG_ERR, "sendEvent - Event copy failed");
+        return false;
+    }
+
+    // Save the originating clients id so
+    // this client don't get the message back
+    if (0 == pEvent->obid) {
+        pEvent->obid = pClientItem->getClientID();
+    }
+
+    // Level II events between 512-1023 is recognised by the daemon and
+    // sent to the correct interface as Level I events if the interface
+    // is addressed by the client.
+    if ((pEvent->vscp_class <= 1023) && (pEvent->vscp_class >= 512) &&
+        (pEvent->sizeData >= 16)) {
+
+        // This event should be sent to the correct interface if it is
+        // available on this machine. If not it should be sent to
+        // the rest of the network as normal
+
+        cguid destguid;
+        destguid.getFromArray(pEvent->pdata);
+
+        destguid.setAt(14, 0); // Interface GUID's have LSB bytes nilled
+        destguid.setAt(15, 0);
+
+        spdlog::debug("Level I event over Level II "
+                      "dest = %s device = %s",
+                      destguid.toString().c_str(),
+                      pClientItem->getDeviceName().c_str());
+
+        if (!m_clientList.sendEventToClient(destguid, pEvent)) {
+            spdlog::error("Failed to send Level I event over Level II to dest = %s",
+                          destguid.toString().c_str());
+        }
+
+        // Find client
+        // pthread_mutex_lock(&m_clientList.m_mutexItemList);
+
+        // std::deque<CClientItem*>::iterator it;
+        // for (it = m_clientList.getClientList().begin();
+        //      it != m_clientList.getClientList().end();
+        //      ++it) {
+
+        //     CClientItem* pItem = *it;
+
+        //     spdlog::debug("Test if = "
+        //                   "%s:%s",
+        //                   pItem->getInterfaceGUID().toString().c_str(),
+        //                   pItem->getDeviceName().c_str());
+
+        //     if (pItem->getInterfaceGUID() == destguid) {
+        //         // Found
+        //         // pDestClientItem = pItem;
+        //         bSent = true;
+        //         if (!pItem->sendEventToClient(pItem, pEvent)) {
+        //             ;
+        //         }
+        //         break;
+        //     }
+        // }
+
+        // pthread_mutex_unlock(&m_clientList.m_mutexItemList);
+    }
+
+    if (!bSent) {
+
+        pClientItem->addEventToSendQueue(pEvent);
+        // pthread_mutex_lock(&m_mutex_ClientOutputQueue);
+        // m_clientOutputQueue.push_back(pEvent);
+
+        // // TX Statistics
+        // pClientItem->getStatistics().cntTransmitData += pEvent->sizeData;
+        // pClientItem->getStatistics().cntTransmitFrames++;
+
+        // pthread_mutex_unlock(&m_mutex_ClientOutputQueue);
+
+        //sem_post(&m_semClientOutputQueue);
+
+        // else {
+        //     if (__VSCP_DEBUG_EXTRA) {
+        //         syslog(LOG_DEBUG, "sendEvent - overrun");
+        //     }
+        //     pClientItem->m_statistics.cntOverruns++;
+        //     vscp_deleteEvent_v2(&pEvent);
+        //     return false;
+        // }
+    }
+
+    return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// sendEvent
+//
+
+bool
+CControlObject::sendEvent(CClientItem* pClientItem, vscpEventEx* pex)
+{
+    bool rv;
+    vscpEvent ev;
+
+    if (!vscp_convertEventExToEvent(&ev, pex)) {
+        syslog(LOG_ERR, "sendEvent: Failed in vscp_convertEventExToEvent");
+        return false;
+    }
+
+    if (!(rv = sendEvent(pClientItem, &ev))) {
+        syslog(LOG_ERR, "sendEvent: Failed to send event");
+    }
+
+    vscp_deleteEvent(&ev);
+
+    return rv;
 }
 
 // ----------------------------------------------------------------------------
@@ -1962,7 +2116,7 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
         const json& jj = j["tcpip"];
         bool b         = false;
         uint32_t n     = 0;
-        
+
         std::string addr;
         get_string(jj, "interface-address", addr);
         m_tcpipSrv.setInterfaceAddress(addr);
@@ -2189,8 +2343,11 @@ clientMsgWorkerThread(void* userdata)
 
         // Get event
         if (NULL ==
-            (pev = pObj->getClientList().getEventFromOutputQueue(true))) {
-            spdlog::error("clientMsgWorkerThread: No event in output queue (semaphore sinaled it was triggered but queue was empty).");
+            (pev = pObj->getClientList().getEventFromClientMainReceiveQueue(
+               true))) {
+            spdlog::error(
+              "clientMsgWorkerThread: No event in output queue (semaphore "
+              "sinaled it was triggered but queue was empty).");
             continue;
         }
 

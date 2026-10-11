@@ -48,7 +48,7 @@
     },
     {
       "username": "vscp",
-      "password": "$argon2id$v=19$m=262144,t=3,p=1$Fl+fNwFt6sw0o04CToENrw$PWr23wCX40Z3bRYpyIv3Z0axSBYerGRyyheOYTfZNXI",
+      "password": "$argon2id$v=19$m=262144,t=3,p=1$pEAtjA1Pe2yapyhIW16MfA$TjTZ44wn8h/Uxi/I3bltkYncm57EbSh4gT5f860NROA",
       "fullname": "vscp",
       "flags": 4321,
       "filter": "",
