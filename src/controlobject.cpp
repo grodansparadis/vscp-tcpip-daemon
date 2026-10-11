@@ -92,9 +92,11 @@ extern "C" {
 #include "spdlog/sinks/stdout_color_sinks.h"
 #include "spdlog/sinks/udp_sink.h"
 #include "spdlog/spdlog.h"
+#ifndef WIN32
+#include <syslog.h> // for LOG_ERR and other syslog constants
+#endif
 #ifdef __linux__
 #include "spdlog/sinks/syslog_sink.h"
-#include <syslog.h> // for LOG_PID, LOG_USER, etc.
 #endif
 
 #include <vscp-aes.h>
