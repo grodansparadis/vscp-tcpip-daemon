@@ -365,7 +365,11 @@ CClientList::CClientList()
 #else
     sem_init(&m_semClientMainReceiveQueue, 0, 0);
 #endif
+#ifdef WIN32
+    m_semSentToAllClients = CreateSemaphore(NULL, 0, 0x7fffffff, NULL);
+#else
     sem_init(&m_semSentToAllClients, 0, 0);
+#endif
     pthread_mutex_init(&m_mutex_ClientMainReceiveQueue, NULL);
     pthread_mutex_init(&m_mutexClientItemList, NULL);
 }
@@ -391,9 +395,13 @@ CClientList::~CClientList()
     }
 #endif
 
+#ifdef WIN32
+    CloseHandle(m_semSentToAllClients);
+#else
     if (0 != sem_destroy(&m_semSentToAllClients)) {
         spdlog::error("Unable to destroy m_semSentToAllClients");
     }
+#endif
 
     if (0 != pthread_mutex_destroy(&m_mutex_ClientMainReceiveQueue)) {
         spdlog::error("Unable to destroy m_mutex_ClientMainReceiveQueue");
@@ -783,7 +791,6 @@ CClientList::getClient(uint16_t n, std::string& client)
 bool
 CClientList::waitEventInMainReceiveQueue(uint32_t timeoutMs)
 {
-    int rv;
     if ((-1 == vscp_sem_wait(&m_semSentToAllClients, 10))) {
         if (errno == ETIMEDOUT) {
             return false;
@@ -797,6 +804,7 @@ CClientList::waitEventInMainReceiveQueue(uint32_t timeoutMs)
 
     return true;
 }
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // sendEventToClient
@@ -912,7 +920,13 @@ CClientList::sendEventAllClients(const vscpEvent* pEvent, uint32_t excludeID)
     pthread_mutex_unlock(&m_mutexClientItemList);
 
     // Tell main thread that there are work to do
-    sem_post(&m_semSentToAllClients);
+#ifdef WIN32
+    if (!ReleaseSemaphore(m_semSentToAllClients, 1, NULL)) {
+#else
+    if (0 != sem_post(&m_semSentToAllClients)) {
+#endif
+        spdlog::error("Unable to signal the sent-to-all-clients semaphore");
+    }
 
     return true;
 }
