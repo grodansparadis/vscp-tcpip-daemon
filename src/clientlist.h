@@ -676,7 +676,11 @@ class CClientList {
         have send an incoming event that should go to
         all clients
     */
+#ifdef WIN32
+    HANDLE m_semSentToAllClients;
+#else
     sem_t m_semSentToAllClients;
+#endif
 
     /*!
         Receive queue
