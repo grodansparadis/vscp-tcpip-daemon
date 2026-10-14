@@ -22,10 +22,10 @@
     "console-pattern": "[vscpd: %c] [%^%l%$] %v",
     "syslog-enable-log" : true,
     "syslog-log-level" : "info",
-    "syslog-ident" : "mqttvscpd",
+    "syslog-ident" : "vscpd",
     "udp-enable-log": true,
     "udp-log-level" : "info",
-    "udp-pattern" : "[mqttvscpd] [%^%l%$] %v",
+    "udp-pattern" : "[vscpd] [%^%l%$] %v",
     "udp-host" : "127.0.0.1",
     "udp-port" : 9999
   },

@@ -53,6 +53,7 @@
 #include <vscphelper.h>
 
 #include "clientlist.h"
+#include "controlobject.h"
 
 #include "mongoose.h"
 
@@ -93,8 +94,6 @@ const char* interface_description[] = { "Unknown (you should not see this).",
                                         "Lua client",
                                         NULL };
 
-class CControlObject;
-
 ///////////////////////////////////////////////////////////////////////////////
 // CClientItem
 //
@@ -109,6 +108,7 @@ CClientItem::CClientItem()
     m_conn                  = NULL;
     m_bConnected            = false;
     m_bAuthenticated        = false;
+    m_bReceiveLoop          = false;
 
     m_dtutc = vscpdatetime::UTCNow();
 
@@ -135,6 +135,15 @@ CClientItem::CClientItem()
 
     // Nil status (all fields set to zero)
     memset(&m_status, 0, sizeof(m_status));
+
+    // Generate session ID
+    char sid[32] = { 0 };
+    char buf[65] = { 0 };
+    mg_random(sid, sizeof(sid));
+    for (size_t i = 0; i < sizeof(sid); i++) {
+        mg_snprintf(buf + i * 2, 3, "%02x", sid[i]);
+    }
+    setSessionId(buf);
 
     m_userItem.reset(); // No user connected to this client yet
 }
@@ -183,25 +192,6 @@ CClientItem::isConnected(void)
 // clearSendQueue
 //
 
-// void
-// CClientItem::clearSendQueue(void)
-// {
-//     pthread_mutex_lock(&m_mutexSendQueue);
-//     // Remove and delete all events in the queue
-//     while (!m_clientInputQueue.empty()) {
-//         vscpEvent* pEvent = m_clientInputQueue.front();
-//         m_clientInputQueue.pop_front();
-//         if (NULL != pEvent) {
-//             vscp_deleteEvent(pEvent);
-//         }
-//     }
-//     pthread_mutex_unlock(&m_mutexSendQueue);
-// }
-
-///////////////////////////////////////////////////////////////////////////////
-// clearSendQueue
-//
-
 void
 CClientItem::clearSendQueue(void)
 {
@@ -214,6 +204,20 @@ CClientItem::clearSendQueue(void)
     }
     m_sendQueue.clear();
     pthread_mutex_unlock(&m_mutexSendQueue);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// getClientSendQueueSize
+//
+
+size_t
+CClientItem::getClientSendQueueSize(void)
+{
+    size_t size;
+    pthread_mutex_lock(&m_mutexSendQueue);
+    size = m_sendQueue.size();
+    pthread_mutex_unlock(&m_mutexSendQueue);
+    return size;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -242,6 +246,10 @@ CClientItem::getEventFromSendQueue(bool bRemove)
             m_sendQueue.pop_front();
         }
     }
+    else {
+        // No event in the send queue
+        spdlog::debug("getEventFromSendQueue: No event in the send queue");
+    }
     pthread_mutex_unlock(&m_mutexSendQueue);
 
     return pEvent;
@@ -255,9 +263,8 @@ void
 CClientItem::setDeviceName(const std::string& name)
 {
     m_strDeviceName = name;
-    m_strDeviceName += "|Started at ";
-
-    m_strDeviceName += vscpdatetime::Now().getISODateTime();
+    // m_strDeviceName += " | Started at ";
+    // m_strDeviceName += vscpdatetime::Now().getISODateTime();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -803,8 +810,7 @@ CClientList::waitEventInMainReceiveQueue(uint32_t timeoutMs)
 //
 
 bool
-CClientList::sendEventToClient(CClientItem* pClientItem,
-                               const vscpEvent* pEvent)
+CClientList::sendEventToClient(CClientItem* pClientItem, vscpEvent* pEvent)
 {
     // Must be valid pointers
     if (NULL == pClientItem) {
@@ -823,6 +829,23 @@ CClientList::sendEventToClient(CClientItem* pClientItem,
         return false;
     }
 
+    // Make sure it uses unix nanoseconds timestamp format
+    if (VSCP_HEADER16_FRAME_VERSION_ORIGINAL ==
+        (pEvent->head & VSCP_HEADER16_FRAME_VERSION_MASK)) {
+        // Set head with UNIX_NS frame version
+        pEvent->head |= VSCP_HEADER16_FRAME_VERSION_UNIX_NS;
+
+        pEvent->timestamp_ns = vscp_to_unix_ns(pEvent->year,
+                                               pEvent->month,
+                                               pEvent->day,
+                                               pEvent->hour,
+                                               pEvent->minute,
+                                               pEvent->second,
+                                               pEvent->timestamp);
+        pEvent->year         = 0xffff;
+        pEvent->month        = 0xff;
+    }
+
     // Create a new event
     vscpEvent* pnewvscpEvent;
     if (vscp_newEvent(&pnewvscpEvent)) {
@@ -834,11 +857,26 @@ CClientList::sendEventToClient(CClientItem* pClientItem,
             return false;
         }
 
-        if (!pClientItem->addEventToSendQueue(pnewvscpEvent)) {
-            vscp_deleteEvent_v2(&pnewvscpEvent);
-            spdlog::info("sendEventToClient - overrun");
-            pClientItem->getStatistics().cntOverruns++;
-            return false;
+        if (pClientItem->isReceiveLoopActive()) {
+            // Wake up the event manager. Sent the event directly to the client.
+            if (!mg_wakeup(
+                  &pClientItem->getControlObject()->getTcpipSrv().m_mgr,
+                  pClientItem->getConnection()->id,
+                  &pnewvscpEvent,
+                  sizeof(pnewvscpEvent))) {
+                vscp_deleteEvent_v2(&pnewvscpEvent);
+                spdlog::error(
+                  "sendEventToClient - Failed to wake event manager");
+                return false;
+            }
+        }
+        else {
+            if (!pClientItem->addEventToSendQueue(pnewvscpEvent)) {
+                vscp_deleteEvent_v2(&pnewvscpEvent);
+                spdlog::info("sendEventToClient - overrun");
+                pClientItem->getStatistics().cntOverruns++;
+                return false;
+            }
         }
     }
 
@@ -850,7 +888,7 @@ CClientList::sendEventToClient(CClientItem* pClientItem,
 //
 
 bool
-CClientList::sendEventToClient(cguid& destguid, const vscpEvent* pEvent)
+CClientList::sendEventToClient(cguid& destguid, vscpEvent* pEvent)
 {
     CClientItem* pClientItem;
     std::deque<CClientItem*>::iterator it;
@@ -885,7 +923,7 @@ CClientList::sendEventToClient(cguid& destguid, const vscpEvent* pEvent)
 //
 
 bool
-CClientList::sendEventAllClients(const vscpEvent* pEvent, uint32_t excludeID)
+CClientList::sendEventAllClients(vscpEvent* pEvent, uint32_t excludeID)
 {
     CClientItem* pClientItem;
     std::deque<CClientItem*>::iterator it;
@@ -901,11 +939,13 @@ CClientList::sendEventAllClients(const vscpEvent* pEvent, uint32_t excludeID)
 
         if ((NULL != pClientItem) &&
             (excludeID != pClientItem->getClientID())) {
-            spdlog::debug("Send event to client [{}]",
-                          pClientItem->getDeviceName());
+            spdlog::trace("Send event to client [{}] clientid={}",
+                          pClientItem->getDeviceName(),
+                          pClientItem->getClientID());
             if (!sendEventToClient(pClientItem, pEvent)) {
-                spdlog::error("sendEventAllClients - Failed to send event to client [{}]",
-                              pClientItem->getDeviceName());
+                spdlog::error(
+                  "sendEventAllClients - Failed to send event to client [{}]",
+                  pClientItem->getDeviceName());
             }
         }
     }

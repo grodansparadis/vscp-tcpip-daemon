@@ -133,11 +133,29 @@ timer_fn(void* arg)
     struct mg_mgr* mgr       = (struct mg_mgr*)arg;
     CControlObject* pCtrlObj = (CControlObject*)mgr->userdata;
 
-    // if (c_res.c == NULL) {
-    //     c_res.i = 0;
-    //     c_res.c = mg_connect(mgr, s_conn, cfn, &c_res);
-    //     MG_INFO(("CLIENT %s", c_res.c ? "connecting" : "failed"));
-    // }
+    // iterate through all active connections
+    for (struct mg_connection* conn = mgr->conns; conn != NULL;
+         conn                       = conn->next) {
+
+        if (conn->is_listening) {
+            continue;
+        }
+
+        // Get client item
+        CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+        if (NULL == pClientItem) {
+            continue;
+        }
+
+        // Get timestamp current
+        uint32_t currentTimestamp = vscp_getMsTimeStamp();
+        bool test                 = pClientItem->isReceiveLoopActive();
+        if (pClientItem->isReceiveLoopActive() &&
+            (currentTimestamp - pClientItem->getActivityTimestamp() > 1000)) {
+            pClientItem->setActivityTimestamp(currentTimestamp);
+            mg_send(conn, "+OK\r\n", 5);
+        }
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -149,9 +167,8 @@ timer_fn(void* arg)
 
 CTcpipSrv::CTcpipSrv(CControlObject* obj)
 {
-    m_pCtrlObj     = obj;   // Set the control object pointer
-    m_bReceiveLoop = false; // Not in receive loop
-    m_bRun         = true;  // Not quitting yet
+    m_pCtrlObj = obj;  // Set the control object pointer
+    m_bRun     = true; // Not quitting yet
 
     // Default TCP/IP interface settings
     m_interfaceAddress = "tcp://localhost:9598";
@@ -310,6 +327,7 @@ CTcpipSrv::commandHandler(struct mg_connection* conn,
     if (NULL == m_pCtrlObj) {
         spdlog::error("[TCP/IP srv] ERROR: Control object pointer is NULL in "
                       "command handler.");
+        conn->is_draining = 1;
         return VSCP_ERROR_INTERNAL; // Close connection
     }
 
@@ -339,7 +357,7 @@ CTcpipSrv::commandHandler(struct mg_connection* conn,
         if ((pUserItem != nullptr) &&
             pUserItem->isUserAllowed(VSCP_USER_RIGHT_ALLOW_RCV_EVENT)) {
             try {
-                pClientItem->setReceiveLoopTimestamp(time(NULL));
+                pClientItem->setActivityTimestamp(vscp_getMsTimeStamp());
                 handleClientRcvLoop(conn);
             }
             catch (...) {
@@ -355,9 +373,23 @@ CTcpipSrv::commandHandler(struct mg_connection* conn,
     //                             Quitloop
     //*********************************************************************
 
-    else if (commandStartsWith("quitloop", true)) {
-        m_bReceiveLoop = false;
-        write(conn, MSG_QUIT_LOOP, strlen(MSG_QUIT_LOOP));
+    else if (commandStartsWith("quitreceiveloop", true) ||
+             commandStartsWith("quitrcvloop", true) ||
+             commandStartsWith("quitloop", true)) {
+        if ((pUserItem != nullptr) &&
+            pUserItem->isUserAllowed(VSCP_USER_RIGHT_ALLOW_RCV_EVENT)) {
+            try {
+                pClientItem->setActivityTimestamp(vscp_getMsTimeStamp());
+                handleClientQuitRcvLoop(conn);
+            }
+            catch (...) {
+                spdlog::error(
+                  "TCPIP: Exception occurred handleClientQuitRcvLoop");
+            }
+        }
+        else {
+            write(conn, MSG_NO_RIGHTS_ERROR, strlen(MSG_NO_RIGHTS_ERROR));
+        }
     }
 
     //*********************************************************************
@@ -383,6 +415,7 @@ CTcpipSrv::commandHandler(struct mg_connection* conn,
             if (!handleClientPassword(conn)) {
                 spdlog::error(
                   "[TCP/IP srv] Command: Password. Not authorized.");
+                conn->is_draining = 1;
                 return VSCP_ERROR_NOT_AUTHORIZED; // Close connection
             }
         }
@@ -415,8 +448,11 @@ CTcpipSrv::commandHandler(struct mg_connection* conn,
         spdlog::info("[TCP/IP srv] Command: Close.");
         // write(conn, MSG_GOODBY, strlen(MSG_GOODBY));
         mg_send(conn, MSG_GOODBY, strlen(MSG_GOODBY));
-        conn->is_draining = 1; // close after all pending data is sent
-        // conn->is_closing = 1;
+        conn->is_draining        = 1; // close after all pending data is sent
+        CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+        if (pClientItem) {
+            pClientItem->setOpen(false);
+        }
         return VSCP_ERROR_SUCCESS; // Close connection
     }
 
@@ -1361,12 +1397,16 @@ CTcpipSrv::handleClientSend(struct mg_connection* conn)
         return;
     }
 
-    // Get date/time - can be empty
+    // Get date/time - should be empty for events from modern senders
     if (!tokens.empty()) {
         str = tokens.front();
         tokens.pop_front();
         vscp_trim(str);
         if (str.length()) {
+            /*
+              We set the datettime the old way so we can take care of possible
+              timestamp relative timing.
+            */
             vscpdatetime dt;
             if (dt.set(str)) {
                 event.year   = dt.getYear();
@@ -1377,12 +1417,17 @@ CTcpipSrv::handleClientSend(struct mg_connection* conn)
                 event.second = dt.getSecond();
             }
             else {
+                // Failed to parse date/time string, set current date/time
+                // instead
                 vscp_setEventDateTimeBlockToNow(&event);
             }
         }
         else {
-            // set current time
-            vscp_setEventDateTimeBlockToNow(&event);
+            // Set current timestamp in Unix nanoseconds format
+            event.head |= VSCP_HEADER16_FRAME_VERSION_UNIX_NS;
+            event.year         = 0xffff;
+            event.month        = 0xff;
+            event.timestamp_ns = vscp_makeTimeStampNs();
         }
     }
     else {
@@ -1390,21 +1435,64 @@ CTcpipSrv::handleClientSend(struct mg_connection* conn)
         return;
     }
 
-    // Get Timestamp - can be empty
+    /*
+        Get (Unix nanosecond) timestamp - can be empty
+        (Old type is a regular timestamp in microsecond).
+        The old type should be preserved so realtive timing calculations remain
+       accurate.
+    */
     if (!tokens.empty()) {
         str = tokens.front();
         tokens.pop_front();
         vscp_trim(str);
         if (str.length()) {
-            event.timestamp = vscp_readStringValue(str);
+            // If the event uses the Unix nanosecond timestamp format, store it
+            // in timestamp_ns, otherwise store it in timestamp
+            if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS ==
+                (event.head & VSCP_HEADER16_FRAME_VERSION_MASK)) {
+                // Extra marker to indicate that the timestamp is in Unix
+                // nanoseconds format
+                event.year         = 0xffff;
+                event.month        = 0xff;
+                event.timestamp_ns = (uint64_t)vscp_readStringValue(str);
+            }
+            else {
+                event.timestamp = vscp_readStringValue(str);
+            }
         }
         else {
-            event.timestamp = vscp_makeTimeStamp();
+            // Set current timestamp in Unix nanoseconds format
+            event.head |= VSCP_HEADER16_FRAME_VERSION_UNIX_NS;
+            event.year         = 0xffff;
+            event.month        = 0xff;
+            event.timestamp_ns = vscp_makeTimeStampNs();
         }
     }
     else {
         write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
         return;
+    }
+
+    // Translate all frames so they use the unix nanosecond timestamp format
+
+    if (VSCP_HEADER16_FRAME_VERSION_ORIGINAL ==
+        (event.head & VSCP_HEADER16_FRAME_VERSION_MASK)) {
+
+        // Original frame format - convert date/time fields to unix nanoseconds
+        // format
+
+        // Set head with UNIX_NS frame version
+        event.head |= VSCP_HEADER16_FRAME_VERSION_UNIX_NS;
+
+        event.timestamp_ns = vscp_to_unix_ns(event.year,
+                                             event.month,
+                                             event.day,
+                                             event.hour,
+                                             event.minute,
+                                             event.second,
+                                             event.timestamp);
+        event.year         = 0xffff;
+        event.month        = 0xff;
     }
 
     // Get GUID
@@ -1590,13 +1678,20 @@ CTcpipSrv::handleClientSend(struct mg_connection* conn)
         return;
     }
 
+    // If the event has no originator ID, set it to the client ID.
+    if (!event.obid) {
+        event.obid = pClientItem->getClientID();
+    }
+
     // send event
     if (!m_pCtrlObj->getClientList().enqueueReceiveEvent(&event)) {
-        vscp_deleteEvent(&event); // Deallocate data
         write(conn, MSG_BUFFER_FULL, strlen(MSG_BUFFER_FULL));
         return;
     }
-    vscp_deleteEvent(&event); // Deallocate data
+
+    // Update statistics
+    pClientItem->getStatistics().cntReceiveFrames++;
+    pClientItem->getStatistics().cntReceiveData += event.sizeData;
 
     write(conn, MSG_OK, strlen(MSG_OK));
 }
@@ -1685,7 +1780,6 @@ CTcpipSrv::sendOneEventFromQueue(struct mg_connection* conn, bool bStatusMsg)
     }
 
     // Client item must be available
-    // Client item must be available
     if (nullptr == conn->fn_data) {
         spdlog::info("Connection has noassociated client item.");
         return false;
@@ -1700,7 +1794,7 @@ CTcpipSrv::sendOneEventFromQueue(struct mg_connection* conn, bool bStatusMsg)
         return false;
     }
 
-    if (true/*pClientItem->getClientSendQueueSize() > 0*/) {
+    if (pClientItem->getClientSendQueueSize() > 0) {
 
         // Get event
         vscpEvent* pev = pClientItem->getEventFromSendQueue(true);
@@ -1771,11 +1865,7 @@ CTcpipSrv::handleClientDataAvailable(struct mg_connection* conn)
 
     // Get number of available events from the send queue
     size_t nAvailable = pClientItem->getSendQueueSize();
-    sprintf(outbuf,
-            "%zd\r\n%s",
-            nAvailable,
-            MSG_OK);
-
+    sprintf(outbuf, "%zd\r\n%s", nAvailable, MSG_OK);
 
     write(conn, outbuf, strlen(outbuf));
 }
@@ -2463,11 +2553,11 @@ CTcpipSrv::handleClientPassword(struct mg_connection* conn)
       (const char*)remoteaddr.c_str(),
       (const char*)pUserItem->getUserName().c_str());
 
-    spdlog::error("{}", strErr.c_str());
+    spdlog::info("{}", strErr.c_str());
 
     pClientItem->setAuthenticated(true);
 
-    //pClientItem->setUserItem(nullptr);
+    // pClientItem->setUserItem(nullptr);
     write(conn, MSG_OK, strlen(MSG_OK));
 
     return true;
@@ -2503,21 +2593,15 @@ CTcpipSrv::handleChallenge(struct mg_connection* conn)
         return;
     }
 
-    vscp_trim(getCurrentCommand());
+    char sid[32] = { 0 };
+    char buf[65] = { 0 };
+    mg_random(sid, sizeof(sid));
+    for (size_t i = 0; i < sizeof(sid); i++) {
+        mg_snprintf(buf + i * 2, 3, "%02x", sid[i]);
+    }
+    pClientItem->setSessionId(buf);
 
-    // pClientItem->clearSessionId();
-    // if (!m_pCtrlObj->generateSessionId(
-    //       (const char*)getCurrentCommand().c_str(),
-    //       pClientItem->getSessionId().c_str())) {
-    //     write(conn,
-    //           MSG_FAILED_TO_GENERATE_SID,
-    //           strlen(MSG_FAILED_TO_GENERATE_SID));
-    //     return;
-    // }
-
-    str = std::string("+OK - ") +
-          std::string(pClientItem->getSessionId().c_str()) +
-          std::string("\r\n");
+    str = std::string("+OK - ") + buf + std::string("\r\n");
     write(conn, str);
 }
 
@@ -2549,13 +2633,51 @@ CTcpipSrv::handleClientRcvLoop(struct mg_connection* conn)
         return;
     }
 
-    m_bReceiveLoop = true; // Mark connection as being in receive loop
+    // Mark client item as being in receive loop
+    pClientItem->setReceiveLoop(true);
 
     // Notify the client that it has entered the receive loop
     write(conn, MSG_RECEIVE_LOOP, strlen(MSG_RECEIVE_LOOP));
 
     // Clear the read buffer before entering the receive loop
     // pClientItem->clearReadBuffer();
+
+    return;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// handleClientQuitRcvLoop
+//
+
+void
+CTcpipSrv::handleClientQuitRcvLoop(struct mg_connection* conn)
+{
+    // Check that conn is valid
+    if (nullptr == conn) {
+        spdlog::info("Connection is NULL.");
+        return;
+    }
+
+    // Client item must be available
+    if (nullptr == conn->fn_data) {
+        spdlog::info("Connection has noassociated client item.");
+        return;
+    }
+
+    // Get client item
+    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
+    // Must be connected
+    if (!pClientItem->isConnected()) {
+        spdlog::error("Client is not connected, cannot enter receive loop.");
+        return;
+    }
+
+    // Mark client item as having quit the receive loop
+    pClientItem->setReceiveLoop(false);
+
+    // Notify the client that it has quit the receive loop
+    write(conn, MSG_QUIT_LOOP, strlen(MSG_QUIT_LOOP));
 
     return;
 }
@@ -2761,31 +2883,30 @@ CTcpipSrv::handleClientInterface_List(struct mg_connection* conn)
     CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
 
     // Display Interface List
-    // pthread_mutex_lock(&m_pCtrlObj->getClientList().m_mutexClientItemList);
+    m_pCtrlObj->getClientList().lockClientItemList();
 
-    // std::deque<CClientItem*>::iterator it;
-    // for (it = m_pCtrlObj->getClientList().m_itemList.begin();
-    //      it != m_pCtrlObj->getClientList().m_itemList.end();
-    //      ++it) {
+    std::deque<CClientItem*>::iterator it;
+    for (it = m_pCtrlObj->getClientList().getItemList().begin();
+         it != m_pCtrlObj->getClientList().getItemList().end();
+         ++it) {
 
-    //     CClientItem* pItem = *it;
+        CClientItem* pItem = *it;
+        pItem->getInterfaceGUID().toString(strGUID);
+        strBuf = vscp_str_format("%d,", pItem->getClientID());
+        strBuf += vscp_str_format("%d,", pItem->getInterfaceType());
+        strBuf += strGUID;
+        strBuf += std::string(",");
+        strBuf += pItem->getDeviceName().c_str();
+        strBuf += std::string(" | Started at ");
+        strBuf += pItem->getDateTimeStarted().getISODateTime();
+        strBuf += std::string("\r\n");
 
-    //     pItem->getInterfaceGUID().toString(strGUID);
-    //     strBuf = vscp_str_format("%d,", pItem->getClientID());
-    //     strBuf += vscp_str_format("%d,", pItem->getInterfaceType());
-    //     strBuf += strGUID;
-    //     strBuf += std::string(",");
-    //     strBuf += pItem->getDeviceName().c_str();
-    //     strBuf += std::string(" | Started at ");
-    //     strBuf += pItem->getDateUtcStarted().getISODateTime();
-    //     strBuf += std::string("\r\n");
-
-    //     write(conn, strBuf);
-    // }
+        write(conn, strBuf);
+    }
 
     write(conn, MSG_OK, strlen(MSG_OK));
 
-    // pthread_mutex_unlock(&m_pCtrlObj->getClientList().m_mutexClientItemList);
+    m_pCtrlObj->getClientList().unlockClientItemList();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2918,7 +3039,9 @@ CTcpipSrv::handleClientHelp(struct mg_connection* conn)
         str += "=============================================================="
                "======\r\n";
         str += "To get more information about a specific command issue 'HELP "
-               "command'\r\n";
+               "command or read here "
+               "https://grodansparadis.github.io/vscp-doc-spec/#/./"
+               "vscp_tcpiplink'\r\n";
         str += "+                 - Repeat last command.\r\n";
         str += "+n                - Repeat command 'n' (0 is last).\r\n";
         str += "++                - List repeatable commands.\r\n";
@@ -2949,9 +3072,10 @@ CTcpipSrv::handleClientHelp(struct mg_connection* conn)
                "debugging.\r\n";
         str += "SHUTDOWN          - Shutdown the daemon.\r\n";
         str += "RESTART           - Restart the daemon.\r\n";
-        str += "DRIVER            - Driver manipulation.\r\n";
         str += "INTERFACE         - Interface handling. \r\n";
         str += "WCYD/WHATCANYOUDO - Check server capabilities. \r\n";
+        str += "MEASUREMENT       - Post measurement event. \r\n";
+        str += "BINARY            - Enter binary mode. \r\n";
         write(conn, (const char*)str.c_str(), str.length());
     }
     else if (commandStartsWith("+")) {
@@ -3030,10 +3154,16 @@ CTcpipSrv::handleClientHelp(struct mg_connection* conn)
     }
     else if (commandStartsWith("stat", true)) {
         std::string str = "'STAT' - Get statistical information.\r\n";
+        str += "Format is "
+               "x,y,z,cntReceiveData,cntReceiveFrames,cntTransmitData,"
+               "cntTransmitFrames\r\n";
+        str += "x = always zero, y = always zero, z = always zero\r\n";
         write(conn, (const char*)str.c_str(), str.length());
     }
     else if (commandStartsWith("info", true)) {
         std::string str = "'INFO' - Get status information.\r\n";
+        str +=
+          "channel-status,lasterrorcode,lasterrorsubcode,\"lasterrorstr\"\r\n";
         write(conn, (const char*)str.c_str(), str.length());
     }
     else if (commandStartsWith("chid", true) ||
@@ -3095,15 +3225,31 @@ CTcpipSrv::handleClientHelp(struct mg_connection* conn)
         write(conn, (const char*)str.c_str(), str.length());
     }
     else if (commandStartsWith("interface", true)) {
-        std::string str = "'INTERFACE' Handle interfaces on the daemon.\r\n";
-        str += "'INTERFACE list'.\r\n";
-        str += "'INTERFACE close'.\r\n";
+        std::string str =
+          "'INTERFACE' list interfaces on the daemon. Format is\r\n";
+        str += "'count'.\r\n";
+        str +=
+          "'Row(s) with interface details: (clientid, type, guid,name)'.\r\n";
         write(conn, (const char*)str.c_str(), str.length());
     }
     else if (commandStartsWith("wcyd", true) ||
              commandStartsWith("whatcanyoudo", true)) {
         std::string str = "'WCYD/WHATCANYOUDO' Return the VSCP server "
-                          "capabilities 64-bit array.\r\n";
+                          "capabilities as a 64-bit array.\r\n";
+        write(conn, (const char*)str.c_str(), str.length());
+    }
+    else if (commandStartsWith("measurement", true)) {
+        std::string str = "'MEASUREMENT' Post measurement event.\r\n";
+        str +=
+          "Syntax: measurement class,type,value,[unit],[index],[guid].\r\n";
+        str += "Example: measurement "
+               "10,6,23.5,1,0,00:00:00:00:00:00:00:00:00:00:00:00\r\n";
+        str +=
+          "Default unit=0, Default index=0. Default GUID=interface GUID.\r\n";
+        write(conn, (const char*)str.c_str(), str.length());
+    }
+    else if (commandStartsWith("binary", true)) {
+        std::string str = "'BINARY' Enter binary mode.\r\n";
         write(conn, (const char*)str.c_str(), str.length());
     }
     else {
@@ -3126,21 +3272,25 @@ CTcpipSrv::handleClientHelp(struct mg_connection* conn)
 static void
 tcpip_event_handler(struct mg_connection* conn, int ev, void* ev_data)
 {
-    // Get client item
-    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
-    if (nullptr == pClientItem) {
-        spdlog::error("[TCP/IP srv client thread] Error, "
-                      "Client thread TCP/IP server object not initialized.");
+    auto* server = static_cast<CTcpipSrv*>(conn->mgr->userdata);
+    if (server == nullptr) {
+        spdlog::error("TCP/IP event handler: missing server");
         return;
     }
 
-    // Get the TCP/IP server object from the thread data.
-    CControlObject* pobj = pClientItem->getControlObject();
-    if (nullptr == pobj) {
-        spdlog::error("[TCP/IP srv client thread] Error, "
-                      "Client thread control object not initialized.");
+    CControlObject* pobj = server->getControlObject();
+    if (pobj == nullptr) {
+        spdlog::error("TCP/IP event handler: missing control object");
         return;
     }
+
+    // // Get the TCP/IP server object from the thread data.
+    // CControlObject* pobj = pClientItem->getControlObject();
+    // if (nullptr == pobj) {
+    //     spdlog::error("[TCP/IP srv client thread] Error, "
+    //                   "Client thread control object not initialized.");
+    //     return;
+    // }
 
     // Handle communication events
     if (ev == MG_EV_OPEN && conn->is_listening == 1) {
@@ -3180,10 +3330,7 @@ tcpip_event_handler(struct mg_connection* conn, int ev, void* ev_data)
                             CLIENT_ITEM_INTERFACE_TYPE_CLIENT_TCPIP,
                           conn);
 
-        // Mark as connected
-        newClient->setConnected(true);
-
-        // Addd to connectd list
+        // Add to client list
         if (!pobj->addClient(newClient)) {
             mg_send(conn, MSG_INTERNAL_ERROR, strlen(MSG_INTERNAL_ERROR));
             spdlog::error("Failed to add new client to the server");
@@ -3192,8 +3339,38 @@ tcpip_event_handler(struct mg_connection* conn, int ev, void* ev_data)
             return;
         }
 
+        // Set unique GUID for the client based on the control object's GUID
+        cguid guid = pobj->getGUID();
+        guid.setClientID(newClient->getClientID());
+        newClient->setInterfaceGUID(guid);
+
         // Associate the new client item with the connection
         conn->fn_data = newClient;
+
+        std::string deviceName = "TCP/IP Client. clientid = " +
+                                 std::to_string(newClient->getClientID());
+        newClient->setDeviceName(deviceName);
+
+        // Mark as connected
+        newClient->setConnected(true);
+
+        // Mark as open
+        newClient->setOpen(true);
+
+        // Remote address as tracked by mongoose (portable, no raw socket calls)
+        char remote_address[64] = "";
+        mg_snprintf(remote_address,
+                    sizeof(remote_address),
+                    "%M",
+                    mg_print_ip,
+                    &conn->rem);
+        unsigned int port = mg_ntohs(conn->rem.port);
+
+        spdlog::info("New TCP/IP client connected with clientid = {} remote "
+                     "address = {} port = {}",
+                     newClient->getClientID(),
+                     remote_address,
+                     port);
 
         // Greet the new client
         mg_send(conn, MSG_WELCOME, sizeof(MSG_WELCOME));
@@ -3245,16 +3422,50 @@ tcpip_event_handler(struct mg_connection* conn, int ev, void* ev_data)
             // Here you can process the line as needed, for example:
             pobj->getTcpipSrv().commandHandler(conn, std::string(line));
         }
+    }
+    else if (ev == MG_EV_POLL) {
+        // This event is called periodically for housekeeping tasks.
+        // spdlog::trace("SERVER poll event");
+        // Go through all clienst that is in receive loop mode
+        // for (auto& pClientItem : pobj->getClientList().getCl()) {
+        //     if (pClientItem->isReceiveLoopActive()) {
+        //         spdlog::trace("Client in receive loop: {}",
+        //         pClientItem->getDeviceName());
+        //     }
+        // }
+    }
+    else if (ev == MG_EV_WAKEUP) {
+        auto* data = static_cast<struct mg_str*>(ev_data);
+        if (data == nullptr || data->len != sizeof(vscpEvent*)) {
+            spdlog::error("TCP/IP wakeup: invalid event payload");
+            return;
+        }
 
-        // mg_send(conn, r->buf, r->len); // echo it back
-        // r->len = 0; // Tell Mongoose we've consumed the data
+        vscpEvent* pev = nullptr;
+        memcpy(&pev, data->buf, sizeof(pev));
+        if (pev == nullptr) {
+            spdlog::error("TCP/IP wakeup: null event pointer");
+            return;
+        }
+
+        std::string eventStr;
+        vscp_convertEventToString(eventStr, pev);
+        eventStr += "\r\n";
+        mg_send(conn, eventStr.c_str(), eventStr.size());
+        vscp_deleteEvent_v2(&pev);
     }
     else if (ev == MG_EV_CLOSE) {
+
+        // Get client item
+        CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+
         // Mark as disconnected
         if (nullptr != pClientItem) {
             pobj->getClientList().removeClient((CClientItem*)pClientItem);
         }
         conn->is_closing = 1; // Ensure the connection is marked as closing
+        conn->fn_data    = nullptr; // Clear the client item from the connection
+
         spdlog::debug("SERVER disconnected (MG_EV_CLOSE)");
     }
     else if (ev == MG_EV_ERROR) {
@@ -3291,27 +3502,32 @@ tcpipWorkerThread(void* pdata)
     //-------------------------------------------------------------------------
     //                            Initiate Mongoose
     //-------------------------------------------------------------------------
-    struct mg_mgr mgr; // Event manager
+    // struct mg_mgr mgr; // Event manager
     struct mg_connection* conn;
 
-    mg_log_set(MG_LL_INFO); // Set log level
-    mg_mgr_init(&mgr);      // Initialize event manager
-    mgr.userdata = pdata;
+    mg_log_set(MG_LL_INFO);         // Set log level
+    mg_mgr_init(&ptcpipsrv->m_mgr); // Initialize event manager
+    ptcpipsrv->m_mgr.userdata = pdata;
+
+    // Initialize the wakeup mechanism for the Mongoose event manager. This
+    // allows other threads to wake up the event loop when needed.
+    mg_wakeup_init(&ptcpipsrv->m_mgr);
 
     // // Add a timer to the Mongoose event manager
-    mg_timer_add(&mgr,
-                 15000,
+    mg_timer_add(&ptcpipsrv->m_mgr,
+                 100, // Every 100 milliseconds
                  MG_TIMER_REPEAT | MG_TIMER_RUN_NOW,
                  timer_fn,
-                 &mgr);
+                 &ptcpipsrv->m_mgr);
 
     // Start to listen for connections
     spdlog::debug("Starting TCP/IP server on interface: {}",
                   ptcpipsrv->getInterfaceAddress().c_str());
-    conn = mg_listen(&mgr,
+
+    conn = mg_listen(&ptcpipsrv->m_mgr,
                      ptcpipsrv->getInterfaceAddress().c_str(),
                      tcpip_event_handler,
-                     pdata); // Create server connection
+                     nullptr); // Create server connection
     if (conn == NULL) {
         MG_INFO(("SERVER cant' open a connection"));
         return nullptr;
@@ -3319,10 +3535,10 @@ tcpipWorkerThread(void* pdata)
 
     // Event loop
     while (ptcpipsrv->isWorking()) {
-        mg_mgr_poll(&mgr, 100); // Poll the event manager
+        mg_mgr_poll(&ptcpipsrv->m_mgr, 1000); // Poll the event manager
     }
 
-    mg_mgr_free(&mgr); // Free the event manager resources
+    mg_mgr_free(&ptcpipsrv->m_mgr); // Free the event manager resources
 
     spdlog::debug("clientWorkerThread: Client worker thread exiting.");
 
@@ -3590,6 +3806,7 @@ tcpipClientThread(void* pData)
     // pthread_mutex_unlock(&ptcpipsrv->m_pParent->m_mutexTcpClientList);
 
     // // Close the connection
+    // conn->is_closing = 1;
     // stcp_close_connection(ptcpipsrv->m_conn);
     // ptcpipsrv->m_conn = nullptr;
 

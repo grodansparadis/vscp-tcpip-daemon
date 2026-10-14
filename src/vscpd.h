@@ -34,11 +34,11 @@
 #include <canal.h>
 
 #ifdef WIN32
-#define VSCPD_DEFAULT_ROOT_FOLDER "c:\\ProgramData\\vscp\\mqttvscpd\\"
-#define VSCPD_DEFAULT_CONFIG_FILE "c:\\ProgramData\\vscp\\mqttvscpd.json"
+#define VSCPD_DEFAULT_ROOT_FOLDER "c:\\ProgramData\\vscp\\vscpd\\"
+#define VSCPD_DEFAULT_CONFIG_FILE "c:\\ProgramData\\vscp\\vscpd.json"
 #else
-#define VSCPD_DEFAULT_ROOT_FOLDER "/var/lib/vscp/mqttvscpd/"
-#define VSCPD_DEFAULT_CONFIG_FILE "/etc/vscp/mqttvscpd.json"
+#define VSCPD_DEFAULT_ROOT_FOLDER "/var/lib/vscp/vscpd/"
+#define VSCPD_DEFAULT_CONFIG_FILE "/etc/vscp/vscpd.json"
 #endif
 
 

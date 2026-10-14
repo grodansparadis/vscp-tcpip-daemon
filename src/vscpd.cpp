@@ -136,7 +136,7 @@ createDirectoryRecursive(const std::string &path)
 void
 _sighandlerStop(int sig)
 {
-  fprintf(stderr, "mqttvscpd: signal received, forced to stop.\n");
+  fprintf(stderr, "vscpd: signal received, forced to stop.\n");
   gpobj->m_bQuit = true;
   gbStopDaemon   = true;
 }
@@ -144,7 +144,7 @@ _sighandlerStop(int sig)
 void
 _sighandlerRestart(int sig)
 {
-  fprintf(stderr, "mqttvscpd: signal received, restart. %s\n", strerror(errno));
+  fprintf(stderr, "vscpd: signal received, restart. %s\n", strerror(errno));
   gpobj->m_bQuit = true;
   gbStopDaemon   = false;
 }
@@ -357,8 +357,8 @@ main(int argc, char **argv)
 #ifndef WIN32
   if (chdir((const char *) rootFolder.c_str())) {
     console->warn("Failed to change dir to rootdir.");
-    if (-1 == chdir("/var/lib/vscp/mqttvscpd")) {
-      console->warn("Unable to chdir to home folder [/var/lib/vscp/mqttvscpd] errno=%d", errno);
+    if (-1 == chdir("/var/lib/vscp/vscpd")) {
+      console->warn("Unable to chdir to home folder [/var/lib/vscp/vscpd] errno=%d", errno);
     }
 
     unlink("/var/run/vscpd.pid");
@@ -424,16 +424,16 @@ main(int argc, char **argv)
   //   spdlog::set_default_logger(logger);
   // }
   // catch (...) {
-  //   console->critical("mqttvscpd: Unable to start the application due to spdlog setup failure. Exiting.");
+  //   console->critical("vscpd: Unable to start the application due to spdlog setup failure. Exiting.");
   //   spdlog::drop_all();
   //   spdlog::shutdown();
   //   exit(EXIT_FAILURE);
   // }
 
-  console->debug("mqttvscpd: run.");
+  console->debug("vscpd: run.");
 
   if (!gpobj->run()) {
-    console->critical("mqttvscpd: Unable to start the vscpd application. Exiting.");
+    console->critical("vscpd: Unable to start the vscpd application. Exiting.");
 #ifndef WIN32
     unlink("/var/run/vscpd.pid");
 #endif
@@ -442,16 +442,16 @@ main(int argc, char **argv)
     exit(EXIT_FAILURE);
   }
 
-  console->debug("mqttvscpd: cleanup.");
+  console->debug("vscpd: cleanup.");
 
   if (!gpobj->cleanup()) {
-    console->critical("mqttvscpd: Unable to clean up the vscpd application.");
+    console->critical("vscpd: Unable to clean up the vscpd application.");
     spdlog::drop_all();
     spdlog::shutdown();
     exit(EXIT_FAILURE);
   }
 
-  console->debug("mqttvscpd: Deleting the control object.");
+  console->debug("vscpd: Deleting the control object.");
   delete gpobj;
 
 #ifndef WIN32
@@ -459,7 +459,7 @@ main(int argc, char **argv)
 #endif
   gpobj = NULL;
 
-  console->info("mqttvscpd: Bye, bye.");
+  console->info("vscpd: Bye, bye.");
 
   spdlog::drop_all();
   spdlog::shutdown();

@@ -24,19 +24,19 @@ The **debug** entry in the configuration file let you set flags to get different
 The log file is by default located at 
 
 ```bash
-sudo cat /var/log/log/vscp/mqttvscpd.log
+sudo cat /var/log/log/vscp/vscpd.log
 ```
 
 or with
 
 ```bash
-sudo tail -f /var/log/log/vscp/mqttvscpd.log
+sudo tail -f /var/log/log/vscp/vscpd.log
 ```
 
 but there is also [lnav](http://lnav.org/) and other tools that can be used to view the system logs on your system. For a graphical viewer we can recommend [qjournalctl](https://github.com/pentix/qjournalctl).
 
 ```
-lnav /var/log/vscp/mqttvscpd.log
+lnav /var/log/vscp/vscpd.log
 ```
 
 Do not set debug bits for information you are not interested in. There can be much information anyway without getting info from sources you have no problem or interest in.

@@ -140,6 +140,12 @@ class CClientItem {
     std::string getDeviceName(void) { return m_strDeviceName; };
 
     /*!
+        Get the size of the client send queue
+        @return Number of events in the send queue
+    */
+    size_t getClientSendQueueSize(void);
+
+    /*!
         Wait for an event to be added to the client input queue.
         @param timeoutMs Maximum time to wait in milliseconds
         @return 0 when signaled, -1 on timeout or error
@@ -246,6 +252,25 @@ class CClientItem {
     void resetAuthentication(void) { m_bAuthenticated = false; };
 
     /*!
+        Set the receive loop status for this client.
+        @param receiveLoop true if the client is in the receive loop, false otherwise
+    */
+    void setReceiveLoop(bool receiveLoop) { m_bReceiveLoop = receiveLoop; };
+
+    /*!
+        Get the receive loop status for this client.
+        @return true if the client is in the receive loop, false otherwise
+    */
+    bool getReceiveLoop(void) { return m_bReceiveLoop; };
+
+    /*!
+        Check whether the client is in the receive loop.
+        @return true if the client is in the receive loop, false otherwise
+    */
+    bool isReceiveLoopActive(void) { return m_bReceiveLoop; };
+
+
+    /*!
       Get filter for VSCP events
       @return Filter for VSCP events
     */
@@ -317,10 +342,19 @@ class CClientItem {
         Get the session ID for this client
         @return Session ID
     */
-    std::string getSessionId(void) { return std::string(m_sid); };
+    std::string &getSessionId(void) { return m_sid; };
+
+    /*!
+        Set the session ID for this client
+        @param sid Session ID to set
+    */
+    void setSessionId(const std::string& sid)
+    {
+        m_sid = sid;
+    };
 
     // Clear session id
-    void clearSessionId(void) { memset(m_sid, 0, sizeof(m_sid)); };
+    void clearSessionId(void) { m_sid.clear(); };
 
     /// Get status (reference)
     canalStatus& getStatus(void) { return m_status; };
@@ -337,13 +371,13 @@ class CClientItem {
         m_statistics = statistics;
     };
 
-    /// Get the time when the receive loop was last active
-    time_t getReceiveLoopTimestamp(void) { return m_timeRcvLoop; };
+    /// Get the time when the client was last active
+    uint32_t getActivityTimestamp(void) { return m_clientActivity; };
 
-    /// Set the time when the receive loop was last active
-    void setReceiveLoopTimestamp(time_t timestamp)
+    /// Set the time when the client was last active
+    void setActivityTimestamp(uint32_t timestamp)
     {
-        m_timeRcvLoop = timestamp;
+        m_clientActivity = timestamp;
     };
 
     /// Set connected status
@@ -392,6 +426,9 @@ class CClientItem {
 
     /// Indicates whether this client has authenticated its selected user.
     bool m_bAuthenticated;
+
+    /// Indicates whether the client is in the receive loop
+    bool m_bReceiveLoop;
 
     /// Client ID for this client item
     uint16_t m_clientID;
@@ -447,14 +484,11 @@ class CClientItem {
     ///                       Used by TCP/IP client thread
     //////////////////////////////////////////////////////////////////////////
 
-    /// UTC time since last client activity
-    long m_clientActivity;
-
-    /// RCVLOOP clock (UTC time for last sent "+OK")
-    time_t m_timeRcvLoop;
+    /// millisecond timestamp since last client activity (used for receive loop)
+    uint32_t m_clientActivity;
 
     /// Session id
-    char m_sid[33];
+    std::string m_sid;
 
     /*!
         Weak reference to the selected user. The user registry owns the user,
@@ -579,7 +613,7 @@ class CClientList {
       @param pEvent Event that should be sent.
       @return True on success, false on failure.
     */
-    bool sendEventToClient(CClientItem* pClientItem, const vscpEvent* pEvent);
+    bool sendEventToClient(CClientItem* pClientItem, vscpEvent* pEvent);
 
     /*!
         Send event to client identified by GUID
@@ -587,16 +621,16 @@ class CClientList {
         @param pEvent Event that should be sent.
         @return True on success, false on failure.
     */
-    bool sendEventToClient(cguid& destguid, const vscpEvent* pEvent);
+    bool sendEventToClient(cguid& destguid, vscpEvent* pEvent);
 
     /*!
-      Send event to all clients
-      @param VSCP event to send
-      @param excludeID Event with this obid will be excluded. Set to zero
+        Send event to all clients
+        @param pEvent VSCP event to send
+        @param excludeID Event with this obid will be excluded. Set to zero
           if all events should be sent.
-      @return true on success, false on failure
+        @return true on success, false on failure
     */
-    bool sendEventAllClients(const vscpEvent* pEvent, uint32_t excludeID = 0);
+    bool sendEventAllClients(vscpEvent* pEvent, uint32_t excludeID = 0);
 
     /*!
         Add an event to the client output queue if capacity is available.
@@ -650,6 +684,22 @@ class CClientList {
        false otherwise (timeout or error).
     */
     bool waitEventInMainReceiveQueue(uint32_t timeoutMs);
+
+    /*!
+        Lock the mutex for the client item list.
+    */
+    void lockClientItemList(void) {  pthread_mutex_lock(&m_mutexClientItemList); };
+
+    /*!
+        Unlock the mutex for the client item list.
+    */
+    void unlockClientItemList(void) {  pthread_mutex_unlock(&m_mutexClientItemList); };
+
+    /*!
+        Get the list of client items.
+        @return Reference to the deque containing client items.
+    */
+    std::deque<CClientItem*>& getItemList(void) { return m_itemList; }  
 
   private:
     // *********************************************************************

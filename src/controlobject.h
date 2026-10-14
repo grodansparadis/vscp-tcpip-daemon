@@ -132,9 +132,9 @@ class CControlObject {
     /*!
         Generate a random session key from a string key
         @param pKey Null terminated string key (max 255 characters)
-        @param pSid Pointer to 33 byte sid that will receive sid
+        @param psid Reference to string that will receive the sid
      */
-    bool generateSessionId(const char* pKey, char* pSid);
+    bool generateSessionId(const char* pKey, std::string &psid);
 
     /*!
         Get server capabilities (64-bit array)
@@ -237,6 +237,11 @@ class CControlObject {
     */
     void addKnownNode(cguid& guid, cguid& ifguid, std::string& name);
 
+    /*!
+        Get the GUID of the control object.
+        @return The GUID of the control object.
+    */
+    cguid getGUID(void) const { return m_guid; }
 
     /*!
         Get device address for primary ehernet adapter
@@ -375,6 +380,8 @@ class CControlObject {
         @return Reference to the TCP/IP server object.
     */
     CTcpipSrv& getTcpipSrv() { return m_tcpipSrv; }
+
+    
 
   private:
     // This is the root folder for the VSCP daemon, it will look for
@@ -541,8 +548,7 @@ class CControlObject {
     //**************************************************************************
 
     // The list of users allowed to connect
-    CUserList m_userList; // deque
-    // pthread_mutex_t m_mutex_UserList;
+    CUserList m_userList; 
 
     // *************************************************************************
     //                      Output queue for clients

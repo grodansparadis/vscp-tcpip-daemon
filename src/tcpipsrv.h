@@ -246,135 +246,210 @@ class CTcpipSrv {
                                bool bStatusMsg = true);
 
     /*!
-        Client DataAvailable
+        Client data available
+
+        @param conn Pointer to the client connection.
+        @return void.
     */
     void handleClientDataAvailable(struct mg_connection* conn);
 
     /*!
-        Client Clear Input queue
+        Client clear input queue
+
+        @param conn Pointer to the client connection.
+        @return void.
     */
     void handleClientClearInputQueue(struct mg_connection* conn);
 
     /*!
-        Client Get statistics
+        Client get status
+
+        @param conn Pointer to the client connection.
+        @return void.
     */
     void handleClientGetStatistics(struct mg_connection* conn);
 
     /*!
         Client get status
+
+        @param conn Pointer to the client connection.
+        @return void.
     */
     void handleClientGetStatus(struct mg_connection* conn);
 
     /*!
         Client get channel GUID
+
+        @param conn Pointer to the client connection.
+        @return void.
     */
     void handleClientGetChannelGUID(struct mg_connection* conn);
 
     /*!
         Client set channel ID
+
+        @param conn Pointer to the client connection.
+        @return void.
     */
     void handleClientSetChannelGUID(struct mg_connection* conn);
 
     /*!
         Client get version
+
+        @param conn Pointer to the client connection.
+        @return void.
     */
     void handleClientGetVersion(struct mg_connection* conn);
 
     /*!
         Client set filter
+
+        @param conn Pointer to the client connection.
+        @return void.
     */
     void handleClientSetFilter(struct mg_connection* conn);
 
     /*!
         Client set mask
+
+        @param conn Pointer to the client connection.
+        @return void.
     */
     void handleClientSetMask(struct mg_connection* conn);
 
     /*!
         Client issue user
+        @param conn Pointer to the client connection.
+        @return True on success/false on failure.
     */
     void handleClientUser(struct mg_connection* conn);
 
     /*!
-    Client issue password
+        Client issue password
+        @param conn Pointer to the client connection.
+        @return True on success/false on failure.
     */
     bool handleClientPassword(struct mg_connection* conn);
 
     /*!
-     Handle challenge
+        Handle challenge for the client.
+
+        @param conn Pointer to the client connection.
+        @return void.
      */
     void handleChallenge(struct mg_connection* conn);
 
     /*!
-        Client Get channel ID
+        Handle get channel ID
+        @param conn Pointer to the client connection.
     */
     void handleClientGetChannelID(struct mg_connection* conn);
 
     /*!
         Handle RcvLoop
+        @param conn Pointer to the client connection.
     */
     void handleClientRcvLoop(struct mg_connection* conn);
 
     /*!
-          Client Help
+        Handle quitting the receive loop for the client.
+        @param conn Pointer to the client connection.
+    */
+    void handleClientQuitRcvLoop(struct mg_connection* conn);
+
+    /*!
+        Client Help
+        @param conn Pointer to the client connection.
+        @return void.
       */
     void handleClientHelp(struct mg_connection* conn);
 
     /*!
-          Client Test
+        Client Test
+
+        @param conn Pointer to the client connection.
+        @return void.
       */
     void handleClientTest(struct mg_connection* conn);
 
     /*!
-          Client Restart
+        Client Restart
+
+        @param conn Pointer to the client connection.
+        @return void.
       */
     void handleClientRestart(struct mg_connection* conn);
 
     /*!
         Client Shutdown
+
+        @param conn Pointer to the client connection.
+        @return void.
     */
     void handleClientShutdown(struct mg_connection* conn);
 
     /*!
         Client REMOTE command
+
+        @param conn Pointer to the client connection.
+        @return void.
     */
     void handleClientRemote(struct mg_connection* conn);
 
     /*!
         Client CLIENT/INTERFACE command
+
+        @param conn Pointer to the client connection.
+        @return void.
     */
     void handleClientInterface(struct mg_connection* conn);
 
     /*!
         Client INTERFACE LIST command
+
+        @param conn Pointer to the client connection.
+        @return void.
     */
     void handleClientInterface_List(struct mg_connection* conn);
 
     /*!
         Client INTERFACE UNIQUE command
+
+        @param conn Pointer to the client connection.
+        @return void.
     */
     void handleClientInterface_Unique(struct mg_connection* conn);
 
     /*!
         Client INTERFACE NORMAL command
+
+        @param conn Pointer to the client connection.
+        @return void.
     */
     void handleClientInterface_Normal(struct mg_connection* conn);
 
     /*!
         Client INTERFACE CLOSE command
+
+        @param conn Pointer to the client connection.
+        @return void.
     */
     void handleClientInterface_Close(struct mg_connection* conn);
 
     /*!
         Client WhatCanYouDo command
+
+        @param conn Pointer to the client connection.
+        @return void.
     */
     void handleClientCapabilityRequest(struct mg_connection* conn);
 
     /*!
-     * Handle client measurement
+        Client Measurement
 
-       @param conn Pointer to the client connection.
-     */
+        @param conn Pointer to the client connection.
+        @return void.
+    */
     void handleClientMeasurement(struct mg_connection* conn);
 
     /*!
@@ -470,7 +545,14 @@ class CTcpipSrv {
     void setControlObjectPointer(CControlObject* pobj) { m_pCtrlObj = pobj; };
     CControlObject* getControlObject(void) { return m_pCtrlObj; };
 
+  public:
+
     /*!
+        Mongoose event manager for handling TCP/IP connections.
+        This manager is responsible for managing all network events,
+        timers, and wakeup mechanisms for the TCP/IP server instance.
+    */
+    struct mg_mgr m_mgr;
 
   private:
     // --- Member variables ---
@@ -532,16 +614,11 @@ class CTcpipSrv {
     */
     mg_tls_opts m_tcpip_tls_opts;
 
-    // All input is added to the receive buf. as it is
-    // received. Commands are then fetched from this buffer
-    // as we go
-    // std::string m_strResponse;
+    
+
 
     // Saved return value for last sockettcp operation
     size_t m_rv;
-
-    // Flag for receive loop active
-    bool m_bReceiveLoop;
 
     /*!
         The current command being processed for the client connection.

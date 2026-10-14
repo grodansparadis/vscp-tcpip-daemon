@@ -69,7 +69,7 @@ endif()
 option(VSCPD_BUILD_MANPAGES "Build and install man pages" ON)
 set(VSCPD_PACKAGE_GENERATORS "" CACHE STRING "Semicolon-separated list of CPack generators to enable")
 
-if(DEFINED MQTTVSCPD_PACKAGE_GENERATORS AND NOT VSCPD_PACKAGE_GENERATORS)
+if(DEFINED VSCPD_PACKAGE_GENERATORS AND NOT VSCPD_PACKAGE_GENERATORS)
     set(VSCPD_PACKAGE_GENERATORS "${VSCPD_PACKAGE_GENERATORS}")
 endif()
 
@@ -308,7 +308,7 @@ if(UNIX AND NOT APPLE)
     find_path(SYSTEMD_INCLUDE_DIR systemd/sd-daemon.h)
     find_library(SYSTEMD_LIBRARY NAMES systemd)
     if(NOT SYSTEMD_INCLUDE_DIR OR NOT SYSTEMD_LIBRARY)
-        message(FATAL_ERROR "libsystemd headers and library are required to build mqttvscpd on Linux.")
+        message(FATAL_ERROR "libsystemd headers and library are required to build vscpd on Linux.")
     endif()
 
     target_include_directories(vscpd PRIVATE ${SYSTEMD_INCLUDE_DIR})

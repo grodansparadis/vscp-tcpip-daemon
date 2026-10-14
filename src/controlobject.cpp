@@ -32,34 +32,41 @@
 
 #include <controlobject.h>
 
-#include <arpa/inet.h>
 #include <errno.h>
-#ifdef __linux__
-#include <linux/if_ether.h>
-#include <linux/if_packet.h>
-#include <linux/sockios.h>
-#endif
-#include <net/if.h>
-#include <net/if_arp.h>
-#include <netdb.h>
-#include <netinet/in.h>
-#include <pthread.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifndef WIN32
+#include <time.h>
+#ifdef WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <iphlpapi.h>
+#else
+#include <arpa/inet.h>
+#ifdef __linux__
+#include <linux/if_ether.h>
+#include <linux/if_packet.h>
+#include <linux/sockios.h>
+#endif
+#include <ifaddrs.h>
+#include <net/if.h>
+#include <net/if_arp.h>
+#ifdef __APPLE__
+#include <net/if_dl.h>
+#include <net/if_types.h>
+#endif
+#include <netdb.h>
+#include <netinet/in.h>
+#include <pthread.h>
 #include <pwd.h>
 #include <sys/ioctl.h>
 #include <sys/msg.h>
-#endif
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
-#ifdef WIN32
-#include <nb30.h>
 #endif
 #ifdef WITH_SYSTEMD
 #include <systemd/sd-daemon.h>
@@ -71,6 +78,7 @@
 #include <list>
 #include <map>
 #include <set>
+#include <vector>
 #include <string>
 
 #include "version.h"
@@ -236,7 +244,7 @@ CControlObject::CControlObject()
     // Logging defaults
     m_bEnableFileLog   = false;
     m_fileLogLevel     = spdlog::level::info;
-    m_fileLogPattern   = "[mqttvscpd] [%^%l%$] %v";
+    m_fileLogPattern   = "[vscpd] [%^%l%$] %v";
     m_path_to_log_file = "/var/log/vscp/vscpd.log"; // Directory is created
                                                     // automatically if missing
     m_max_log_size  = 5242880;
@@ -244,11 +252,11 @@ CControlObject::CControlObject()
 
     m_bEnableConsoleLog = true;
     m_consoleLogLevel   = spdlog::level::info;
-    m_consoleLogPattern = "[mqttvscpd] [%^%l%$] %v";
+    m_consoleLogPattern = "[vscpd] [%^%l%$] %v";
 
     m_bEnableSysLog = false;
     m_sysLogLevel   = spdlog::level::info;
-    m_sysLogIdent   = "mqttvscpd";
+    m_sysLogIdent   = "vscpd";
 
     m_bEnableUdpLog = false;
     m_udpLogHost    = "127.0.0.1";
@@ -354,10 +362,10 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
             spdlog::error("Unknown user.");
         }
         else if (setgid(pw->pw_gid) != 0) {
-            spdlog::error("setgid() failed. [%s]", strerror(errno));
+            spdlog::error("setgid() failed. [{}]", strerror(errno));
         }
         else if (setuid(pw->pw_uid) != 0) {
-            spdlog::error("setuid() failed. [%s]", strerror(errno));
+            spdlog::error("setuid() failed. [{}]", strerror(errno));
         }
     }
 #endif
@@ -398,11 +406,12 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
 
     // Get GUID
     if (m_guid.isNULL()) {
-        if (!getGuidFromMacAddress(m_guid)) {
-            // We failed to create GUID from MAC address use
-            // 'localhost' IP instead as the base.
-            getGuidFromIPAddress(m_guid);
-        }
+        getGuidFromIPAddress(m_guid);
+        // if (!getGuidFromMacAddress(m_guid)) {
+        //     // We failed to create GUID from MAC address use
+        //     // 'localhost' IP instead as the base.
+        //     getGuidFromIPAddress(m_guid);
+        // }
     }
 
     // If no server name set construct one
@@ -471,10 +480,10 @@ CControlObject::run(void)
 
     // This is an active client
     pClientItem->setOpen(true);
+    pClientItem->setInterfaceGUID(m_guid);
     pClientItem->setInterfaceType(
       CClientItem::CLIENT_ITEM_INTERFACE_TYPE_CLIENT_INTERNAL);
-    pClientItem->setDeviceName("Internal Server Client.|Started at " +
-                               vscpdatetime::Now().getISODateTime());
+    pClientItem->setDeviceName("Internal Server Client");
 
     // Add the client to the Client List (protected (mutex) in addClient)
     if (!m_clientList.addClient(pClientItem, CClientItem::CLIENT_ID_INTERNAL)) {
@@ -508,13 +517,13 @@ CControlObject::run(void)
             // Save time
             timespec_get(&old_now, TIME_UTC);
 
-            if (!doAutomation(pClientItem)) {
-                spdlog::error("Failed to send automation events!");
-            }
+            // if (!doAutomation(pClientItem)) {
+            //     spdlog::error("Failed to send automation events!");
+            // }
         }
 
         // Wait for semaphore indicating events have been sent to all clients
-        int rv = m_clientList.waitForClientMainReceiveQueueEvent(100);
+        int rv = m_clientList.waitForClientMainReceiveQueueEvent(500);
         if (rv == -1) {
             if (errno == ETIMEDOUT) {
                 continue;
@@ -529,7 +538,8 @@ CControlObject::run(void)
         //                   from one of the incoming source
         //----------------------------------------------------------------------
 
-        vscpEvent* pev = pClientItem->getEventFromSendQueue(true);
+        //vscpEvent* pev = pClientItem->getEventFromSendQueue(true);
+        vscpEvent* pev = m_clientList.getEventFromClientMainReceiveQueue(true);
         if (NULL == pev) {
             continue;
         }
@@ -537,7 +547,7 @@ CControlObject::run(void)
         // Process the received event here
         m_clientList.sendEventAllClients(pev,pev->obid);
 
-        vscp_deleteEvent_v2(&pev);
+        vscp_deleteEvent(pev);
 
         // mg_mgr_poll(&mgr, 100); // Infinite event loop, blocks for upto 100ms
         //  unless there is network activity
@@ -872,7 +882,66 @@ CControlObject::startDeviceWorkerThreads(void)
     return true;
 }
 
-////////////////////////////////////////////////////////////////////////////////
+#ifdef WIN32
+///////////////////////////////////////////////////////////////////////////////
+// getFirstWindowsAdapter
+//
+// Find first operational Ethernet/Wi-Fi adapter. Returns its MAC address and
+// first usable IPv4 address (ip is left zeroed if there is none).
+//
+
+static bool
+getFirstWindowsAdapter(uint8_t mac[6], uint8_t ip[4])
+{
+    ULONG size = 16 * 1024;
+    std::vector<uint8_t> buf;
+    ULONG rc;
+
+    for (int tries = 0; tries < 3; tries++) {
+        buf.resize(size);
+        rc = GetAdaptersAddresses(AF_INET,
+                                  GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST |
+                                    GAA_FLAG_SKIP_DNS_SERVER,
+                                  nullptr,
+                                  (PIP_ADAPTER_ADDRESSES)buf.data(),
+                                  &size);
+        if (ERROR_BUFFER_OVERFLOW != rc) {
+            break;
+        }
+    }
+    if (NO_ERROR != rc) {
+        return false;
+    }
+
+    for (PIP_ADAPTER_ADDRESSES a = (PIP_ADAPTER_ADDRESSES)buf.data(); a != nullptr; a = a->Next) {
+        if ((IF_TYPE_ETHERNET_CSMACD != a->IfType && IF_TYPE_IEEE80211 != a->IfType) ||
+            IfOperStatusUp != a->OperStatus || 6 != a->PhysicalAddressLength) {
+            continue;
+        }
+        const uint8_t* m = a->PhysicalAddress;
+        if (0 == (m[0] | m[1] | m[2] | m[3] | m[4] | m[5])) {
+            continue;
+        }
+        memcpy(mac, m, 6);
+        for (PIP_ADAPTER_UNICAST_ADDRESS u = a->FirstUnicastAddress; u != nullptr; u = u->Next) {
+            if (AF_INET != u->Address.lpSockaddr->sa_family) {
+                continue;
+            }
+            const uint8_t* v = (const uint8_t*)&((sockaddr_in*)u->Address.lpSockaddr)->sin_addr;
+            if (0 == v[0] || (169 == v[0] && 254 == v[1])) {
+                continue;
+            }
+            memcpy(ip, v, 4);
+            break;
+        }
+        return true;
+    }
+
+    return false;
+}
+#endif // WIN32
+
+///////////////////////////////////////////////////////////////////////////////
 // stopDeviceWorkerThreads
 //
 
@@ -906,7 +975,7 @@ CControlObject::stopDeviceWorkerThreads(void)
 //
 
 bool
-CControlObject::generateSessionId(const char* pKey, char* psid)
+CControlObject::generateSessionId(const char* pKey, std::string &psid)
 {
     char buf[8193];
 
@@ -914,9 +983,7 @@ CControlObject::generateSessionId(const char* pKey, char* psid)
     if (NULL == pKey) {
         return false;
     }
-    if (NULL == psid) {
-        return false;
-    }
+
 
     if (strlen(pKey) > 256) {
         return false;
@@ -935,7 +1002,7 @@ CControlObject::generateSessionId(const char* pKey, char* psid)
             (unsigned int)rand(),
             1337);
 
-    vscp_md5(psid, (const unsigned char*)buf, strlen(buf));
+    vscp_md5(psid.data(), (const unsigned char*)buf, strlen(buf));
 
     return true;
 }
@@ -1030,139 +1097,107 @@ bool
 CControlObject::getGuidFromMacAddress(cguid& guid)
 {
 #ifdef WIN32
-
-    bool rv = false;
-    NCB Ncb;
-    UCHAR uRetCode;
-    LANA_ENUM lenum;
-    struct ASTAT {
-        ADAPTER_STATUS adapt;
-        NAME_BUFFER NameBuff[30];
-    } Adapter;
-    int i;
-
-    // Clear the GUID
     guid.clear();
 
-    memset(&Ncb, 0, sizeof(Ncb));
-    Ncb.ncb_command = NCBENUM;
-    Ncb.ncb_buffer  = (UCHAR*)&lenum;
-    Ncb.ncb_length  = sizeof(lenum);
-    uRetCode        = Netbios(&Ncb);
-    // printf( "The NCBENUM return code is: 0x%x ", uRetCode );
+    uint8_t mac[6] = { 0 };
+    uint8_t ip[4]  = { 0 };
+    if (!getFirstWindowsAdapter(mac, ip)) {
+        spdlog::error("Failed to find a physical Ethernet/Wi-Fi adapter.");
+        return false;
+    }
 
-    for (i = 0; i < lenum.length; i++) {
-        memset(&Ncb, 0, sizeof(Ncb));
-        Ncb.ncb_command  = NCBRESET;
-        Ncb.ncb_lana_num = lenum.lana[i];
+    for (int i = 0; i < 7; i++) {
+        guid.setAt(i, 0xff);
+    }
+    guid.setAt(7, 0xfe);
+    for (int i = 0; i < 6; i++) {
+        guid.setAt(8 + i, mac[i]);
+    }
+    guid.setAt(14, 0);
+    guid.setAt(15, 0);
 
-        uRetCode = Netbios(&Ncb);
+    return true;
 
-        memset(&Ncb, 0, sizeof(Ncb));
-        Ncb.ncb_command  = NCBASTAT;
-        Ncb.ncb_lana_num = lenum.lana[i];
+#else
+    uint8_t mac[6] = { 0 };
+    bool found     = false;
 
-        strcpy((char*)Ncb.ncb_callname, "*               ");
-        Ncb.ncb_buffer = (unsigned char*)&Adapter;
-        Ncb.ncb_length = sizeof(Adapter);
+    guid.clear();
 
-        uRetCode = Netbios(&Ncb);
+    struct ifaddrs* ifap = nullptr;
+    if (0 != getifaddrs(&ifap)) {
+        spdlog::error("getifaddrs failed. [{}]", strerror(errno));
+        return false;
+    }
 
-        if (uRetCode == 0) {
-            guid.setAt(0, 0xff);
-            guid.setAt(1, 0xff);
-            guid.setAt(2, 0xff);
-            guid.setAt(3, 0xff);
-            guid.setAt(4, 0xff);
-            guid.setAt(5, 0xff);
-            guid.setAt(6, 0xff);
-            guid.setAt(7, 0xfe);
-            guid.setAt(8, Adapter.adapt.adapter_address[0]);
-            guid.setAt(9, Adapter.adapt.adapter_address[1]);
-            guid.setAt(10, Adapter.adapt.adapter_address[2]);
-            guid.setAt(11, Adapter.adapt.adapter_address[3]);
-            guid.setAt(12, Adapter.adapt.adapter_address[4]);
-            guid.setAt(13, Adapter.adapt.adapter_address[5]);
-            guid.setAt(14, 0);
-            guid.setAt(15, 0);
-#ifdef DEBUG__
-            char buf[256];
-            sprintf(buf,
-                    "The Ethernet MAC Address: %02x:%02x:%02x:%02x:%02x:%02x",
-                    guid.getAt(2),
-                    guid.getAt(3),
-                    guid.getAt(4),
-                    guid.getAt(5),
-                    guid.getAt(6),
-                    guid.getAt(7));
+    // Find first physical Ethernet/Wi-Fi interface
+    for (struct ifaddrs* ifa = ifap; ifa != nullptr && !found; ifa = ifa->ifa_next) {
 
-            std::string str = std::string(buf);
+        if (nullptr == ifa->ifa_addr || (ifa->ifa_flags & IFF_LOOPBACK)) {
+            continue;
+        }
+
+        const uint8_t* p = nullptr;
+
+#ifdef __linux__
+        if (ifa->ifa_addr->sa_family != AF_PACKET) {
+            continue;
+        }
+        struct sockaddr_ll* sll = (struct sockaddr_ll*)ifa->ifa_addr;
+        if (sll->sll_hatype != ARPHRD_ETHER || sll->sll_halen != 6) {
+            continue;
+        }
+        // Physical devices have a "device" link (skips docker, veth, bridges, ...)
+        std::string devpath = std::string("/sys/class/net/") + ifa->ifa_name + "/device";
+        if (0 != access(devpath.c_str(), F_OK)) {
+            continue;
+        }
+        p = sll->sll_addr;
+#else
+        if (ifa->ifa_addr->sa_family != AF_LINK) {
+            continue;
+        }
+        struct sockaddr_dl* sdl = (struct sockaddr_dl*)ifa->ifa_addr;
+        // enN are the Ethernet/Wi-Fi devices on macOS (skips bridge, awdl, llw, utun, ...)
+        if (sdl->sdl_type != IFT_ETHER || sdl->sdl_alen != 6 || 0 != strncmp(ifa->ifa_name, "en", 2)) {
+            continue;
+        }
+        p = (const uint8_t*)LLADDR(sdl);
 #endif
 
-            rv = true;
+        if (0 == (p[0] | p[1] | p[2] | p[3] | p[4] | p[5])) {
+            continue;
         }
+        memcpy(mac, p, 6);
+        found = true;
+        spdlog::debug("Using interface {} MAC address: {:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
+                      ifa->ifa_name,
+                      mac[0],
+                      mac[1],
+                      mac[2],
+                      mac[3],
+                      mac[4],
+                      mac[5]);
     }
 
-    return rv;
+    freeifaddrs(ifap);
 
-#else
-    // cat /sys/class/net/eth0/address
-    bool rv = true;
-#ifdef __linux__
-    struct ifreq s;
-    int fd;
-
-    // Clear the GUID
-    guid.clear();
-
-    fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_IP);
-    if (-1 == fd)
+    if (!found) {
+        spdlog::error("Failed to find a physical Ethernet/Wi-Fi interface.");
         return false;
-
-    memset(&s, 0, sizeof(s));
-    strcpy(s.ifr_name, "eth0");
-
-    if (0 == ioctl(fd, SIOCGIFHWADDR, &s)) {
-
-        // ptr = (unsigned char *)&s.ifr_ifru.ifru_hwaddr.sa_data[0];
-
-        spdlog::debug("Ethernet MAC address: %02X:%02X:%02X:%02X:%02X:%02X",
-                      (uint8_t)s.ifr_addr.sa_data[0],
-                      (uint8_t)s.ifr_addr.sa_data[1],
-                      (uint8_t)s.ifr_addr.sa_data[2],
-                      (uint8_t)s.ifr_addr.sa_data[3],
-                      (uint8_t)s.ifr_addr.sa_data[4],
-                      (uint8_t)s.ifr_addr.sa_data[5]);
-
-        guid.setAt(0, 0xff);
-        guid.setAt(1, 0xff);
-        guid.setAt(2, 0xff);
-        guid.setAt(3, 0xff);
-        guid.setAt(4, 0xff);
-        guid.setAt(5, 0xff);
-        guid.setAt(6, 0xff);
-        guid.setAt(7, 0xfe);
-        guid.setAt(8, s.ifr_addr.sa_data[0]);
-        guid.setAt(9, s.ifr_addr.sa_data[1]);
-        guid.setAt(10, s.ifr_addr.sa_data[2]);
-        guid.setAt(11, s.ifr_addr.sa_data[3]);
-        guid.setAt(12, s.ifr_addr.sa_data[4]);
-        guid.setAt(13, s.ifr_addr.sa_data[5]);
-        guid.setAt(14, 0);
-        guid.setAt(15, 0);
-    }
-    else {
-        spdlog::error("Failed to get hardware address (must be root?).");
-        rv = false;
     }
 
-    return rv;
+    for (int i = 0; i < 7; i++) {
+        guid.setAt(i, 0xff);
+    }
+    guid.setAt(7, 0xfe);
+    for (int i = 0; i < 6; i++) {
+        guid.setAt(8 + i, mac[i]);
+    }
+    guid.setAt(14, 0);
+    guid.setAt(15, 0);
 
-#else
-    // SIOCGIFHWADDR not available on this platform (e.g. macOS)
-    rv = false;
-    return rv;
-#endif // __linux__
+    return true;
 
 #endif // WIN32
 }
@@ -1186,34 +1221,65 @@ CControlObject::getGuidFromIPAddress(cguid& guid)
     guid.setAt(6, 0xff);
     guid.setAt(7, 0xfd);
 
-    char szName[128];
-    gethostname(szName, sizeof(szName));
-#if defined(_WIN32)
-    LPHOSTENT lpLocalHostEntry;
+    uint8_t ip[4] = { 0 };
+
+#ifndef WIN32
+    // Prefer the address of the first physical Ethernet/Wi-Fi interface
+    bool found            = false;
+    struct ifaddrs* ifap = nullptr;
+    if (0 == getifaddrs(&ifap)) {
+        for (struct ifaddrs* ifa = ifap; ifa != nullptr && !found; ifa = ifa->ifa_next) {
+
+            if (nullptr == ifa->ifa_addr || ifa->ifa_addr->sa_family != AF_INET ||
+                (ifa->ifa_flags & IFF_LOOPBACK) || !(ifa->ifa_flags & IFF_UP)) {
+                continue;
+            }
+#ifdef __linux__
+            // Physical devices have a "device" link (skips docker, veth, bridges, ...)
+            std::string devpath = std::string("/sys/class/net/") + ifa->ifa_name + "/device";
+            if (0 != access(devpath.c_str(), F_OK)) {
+                continue;
+            }
 #else
-    struct hostent* lpLocalHostEntry;
+            if (0 != strncmp(ifa->ifa_name, "en", 2)) {
+                continue;
+            }
 #endif
-    lpLocalHostEntry = gethostbyname(szName);
-    if (NULL == lpLocalHostEntry) {
-        return false;
+            const uint8_t* a = (const uint8_t*)&((struct sockaddr_in*)ifa->ifa_addr)->sin_addr;
+            if (0 == a[0] || (169 == a[0] && 254 == a[1])) {
+                continue; // Unspecified or link-local
+            }
+            memcpy(ip, a, 4);
+            found = true;
+        }
+        freeifaddrs(ifap);
     }
 
-    // Get all local addresses
-    int idx = -1;
-    void* pAddr;
-    unsigned long localaddr[16]; // max 16 local addresses
-    do {
-        idx++;
-        localaddr[idx] = 0;
-        pAddr          = lpLocalHostEntry->h_addr_list[idx];
-        if (NULL != pAddr)
-            localaddr[idx] = *((unsigned long*)pAddr);
-    } while ((NULL != pAddr) && (idx < 16));
+#else
+    bool found = false;
+    {
+        uint8_t m[6];
+        found = getFirstWindowsAdapter(m, ip) && (ip[0] != 0);
+    }
+#endif
 
-    guid.setAt(8, (localaddr[0] >> 24) & 0xff);
-    guid.setAt(9, (localaddr[0] >> 16) & 0xff);
-    guid.setAt(10, (localaddr[0] >> 8) & 0xff);
-    guid.setAt(11, localaddr[0] & 0xff);
+    if (!found)
+    {
+        // Fallback: first address of the host name
+        char szName[128] = { 0 };
+        gethostname(szName, sizeof(szName) - 1);
+        struct hostent* lpLocalHostEntry = gethostbyname(szName);
+        if (NULL == lpLocalHostEntry || NULL == lpLocalHostEntry->h_addr_list[0] ||
+            lpLocalHostEntry->h_length < 4) {
+            return false;
+        }
+        memcpy(ip, lpLocalHostEntry->h_addr_list[0], 4);
+    }
+
+    guid.setAt(8, ip[0]);
+    guid.setAt(9, ip[1]);
+    guid.setAt(10, ip[2]);
+    guid.setAt(11, ip[3]);
 
     guid.setAt(12, 0);
     guid.setAt(13, 0);
@@ -2334,10 +2400,10 @@ clientMsgWorkerThread(void* userdata)
     }
 
     // Work on until told to quit
-    while (!pObj->shouldClientWorkerThreadQuit()) {
+    while (0 && !pObj->shouldClientWorkerThreadQuit()) {
 
         // Wait for event
-        if (!pObj->getClientList().waitEventInMainReceiveQueue(100)) {
+        if (!pObj->getClientList().waitEventInMainReceiveQueue(500)) {
             continue;
         }
 
