@@ -3423,36 +3423,17 @@ tcpip_event_handler(struct mg_connection* conn, int ev, void* ev_data)
             pobj->getTcpipSrv().commandHandler(conn, std::string(line));
         }
     }
-    else if (ev == MG_EV_POLL) {
-        // This event is called periodically for housekeeping tasks.
-        // spdlog::trace("SERVER poll event");
-        // Go through all clienst that is in receive loop mode
-        // for (auto& pClientItem : pobj->getClientList().getCl()) {
-        //     if (pClientItem->isReceiveLoopActive()) {
-        //         spdlog::trace("Client in receive loop: {}",
-        //         pClientItem->getDeviceName());
-        //     }
-        // }
-    }
-    else if (ev == MG_EV_WAKEUP) {
-        auto* data = static_cast<struct mg_str*>(ev_data);
-        if (data == nullptr || data->len != sizeof(vscpEvent*)) {
-            spdlog::error("TCP/IP wakeup: invalid event payload");
+    else if (ev == MG_EV_WAKEUP || ev == MG_EV_POLL) {
+        auto* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+        if (conn->is_listening || conn->is_closing ||
+            nullptr == pClientItem || !pClientItem->isConnected() ||
+            !pClientItem->isReceiveLoopActive()) {
             return;
         }
 
-        vscpEvent* pev = nullptr;
-        memcpy(&pev, data->buf, sizeof(pev));
-        if (pev == nullptr) {
-            spdlog::error("TCP/IP wakeup: null event pointer");
-            return;
+        // Polling also delivers queued events if a wakeup was lost or failed.
+        while (server->sendOneEventFromQueue(conn, false)) {
         }
-
-        std::string eventStr;
-        vscp_convertEventToString(eventStr, pev);
-        eventStr += "\r\n";
-        mg_send(conn, eventStr.c_str(), eventStr.size());
-        vscp_deleteEvent_v2(&pev);
     }
     else if (ev == MG_EV_CLOSE) {
 

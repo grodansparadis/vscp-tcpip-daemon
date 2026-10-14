@@ -1,0 +1,59 @@
+{
+  "name": "vscp-level2-client",
+  "version": "15.0.3",
+  "description": "VSCP Level 2 Client Interface for Node.js",
+  "main": "lib/index.js",
+  "types": "types/index.d.ts",
+  "scripts": {
+    "test": "node examples/test-level2.js",
+    "test:guid": "node vscp-guid/test/guid.test.js",
+    "example:basic": "node examples/basic-usage.js",
+    "example:events": "node examples/event-handling.js",
+    "example:filter": "node examples/filtering.js"
+  },
+  "keywords": [
+    "vscp",
+    "level2",
+    "iot",
+    "m2m",
+    "automation",
+    "protocol",
+    "events",
+    "sensors",
+    "actuators",
+    "control"
+  ],
+  "author": {
+    "name": "Ake Hedman, the VSCP project",
+    "email": "akhe@paradiseofthefrog.com",
+    "url": "https://www.vscp.org"
+  },
+  "license": "MIT",
+  "homepage": "https://www.vscp.org",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/grodansparadis/vscp.git",
+    "directory": "src/vscp/nodejs"
+  },
+  "bugs": {
+    "url": "https://github.com/grodansparadis/vscp/issues"
+  },
+  "dependencies": {
+    "events": "^3.3.0",
+    "crypto": "^1.0.1",
+    "vscp-guid": "file:./vscp-guid"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "files": [
+    "lib/",
+    "types/",
+    "examples/",
+    "README.md",
+    "LICENSE"
+  ]
+}

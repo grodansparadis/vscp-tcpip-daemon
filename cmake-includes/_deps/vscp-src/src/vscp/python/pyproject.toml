@@ -1,0 +1,90 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vscp-level2-client"
+version = "15.0.3"
+description = "VSCP Level 2 Client Interface for Python"
+readme = "README.md"
+license = {file = "LICENSE"}
+authors = [
+    {name = "Ake Hedman", email = "akhe@paradiseofthefrog.com"}
+]
+maintainers = [
+    {name = "VSCP Project", email = "info@vscp.org"}
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Hardware",
+    "Topic :: Communications",
+    "Topic :: Home Automation",
+    "Topic :: Scientific/Engineering :: Interface Engine/Protocol Translators"
+]
+keywords = [
+    "vscp",
+    "level2", 
+    "iot",
+    "m2m",
+    "automation",
+    "protocol",
+    "events",
+    "sensors", 
+    "actuators",
+    "control"
+]
+requires-python = ">=3.8"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=22.0",
+    "flake8>=5.0",
+    "mypy>=1.0",
+    "isort>=5.0"
+]
+
+[project.urls]
+Homepage = "https://www.vscp.org"
+Documentation = "https://docs.vscp.org"
+Repository = "https://github.com/grodansparadis/vscp"
+"Bug Reports" = "https://github.com/grodansparadis/vscp/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["vscp_level2*"]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"

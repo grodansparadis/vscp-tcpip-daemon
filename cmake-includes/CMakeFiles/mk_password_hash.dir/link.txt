@@ -1,0 +1,1 @@
+/usr/bin/c++ -Wl,--dependency-file=CMakeFiles/mk_password_hash.dir/link.d CMakeFiles/mk_password_hash.dir/src/mkpasswd/mk_password_hash.cpp.o -o bin/mk_password_hash  /usr/lib/x86_64-linux-gnu/libsodium.so

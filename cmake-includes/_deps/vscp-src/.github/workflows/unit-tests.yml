@@ -1,0 +1,141 @@
+name: Unit Tests
+
+on:
+  push:
+    branches: [ master, main, development ]
+  pull_request:
+    branches: [ master, main, development ]
+
+env:
+  BUILD_TYPE: Debug
+
+jobs:
+  test-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+     
+    - name: Update package lists
+      run: sudo apt-get update
+
+    - name: Install Google Test
+      run: |
+        sudo apt-get install -y libgtest-dev
+        cd /usr/src/googletest
+        sudo cmake -S . -B build -DBUILD_GMOCK=OFF
+        sudo cmake --build build
+        sudo cmake --install build
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get install -y \
+          libssl-dev \
+          libexpat-dev \
+          libcurl4-openssl-dev \
+          libmosquitto-dev
+
+    - name: Create test build directory
+      run: cmake -E make_directory ${{github.workspace}}/tests/build
+
+    - name: Configure unit tests
+      working-directory: ${{github.workspace}}/tests/build
+      run: cmake .. -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+
+    - name: Build unit tests
+      working-directory: ${{github.workspace}}/tests/build
+      run: make -j$(nproc)
+
+    - name: Run unit tests
+      working-directory: ${{github.workspace}}/tests/build
+      run: |
+        echo "Running GUID tests..."
+        ./guid/unittest_guid
+        echo "Running DateTime tests..."
+        ./vscpdatetime/unittest_datetime
+        echo "Running VscpHelper tests..."
+        ./vscphelper/unittest_vscphelper
+        echo "Running MDF Parser tests..."
+        cd ${{github.workspace}}/tests/mdfparser && ${{github.workspace}}/tests/build/mdfparser/unittest_mdfparser
+        echo "Running TcpipTls tests..."
+        ${{github.workspace}}/tests/build/tcpiptls/unittest_tcpiptls
+        echo "Running VSCP Client Base tests..."
+        ${{github.workspace}}/tests/build/vscp-client-base/unittest_vscp_client_base
+        echo "Running VSCP Client Canal tests..."
+        ${{github.workspace}}/tests/build/vscp-client-canal/unittest_vscp_client_canal
+        echo "Running VSCP Client MQTT tests..."
+        ${{github.workspace}}/tests/build/vscp-client-mqtt/unittest_vscp_client_mqtt
+        echo "Running VSCP Client Multicast tests..."
+        ${{github.workspace}}/tests/build/vscp-client-multicast/unittest_vscp_client_multicast
+        echo "Running VSCP Client SocketCan tests..."
+        ${{github.workspace}}/tests/build/vscp-client-socketcan/unittest_vscp_client_socketcan
+        echo "Running VSCP Client UDP tests..."
+        ${{github.workspace}}/tests/build/vscp-client-udp/unittest_vscp_client_udp
+        echo "Running VSCP Client WS1 tests..."
+        ${{github.workspace}}/tests/build/vscp-client-ws1/unittest_vscp_client_ws1
+        echo "Running VSCP Client WS2 tests..."
+        ${{github.workspace}}/tests/build/vscp-client-ws2/unittest_vscp_client_ws2
+
+  test-macos:
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+
+    - name: Install dependencies via Homebrew
+      run: |
+        brew update
+        brew install googletest openssl@3 expat mosquitto cjson
+
+    - name: Create test build directory
+      run: cmake -E make_directory ${{github.workspace}}/tests/build
+
+    - name: Configure unit tests
+      working-directory: ${{github.workspace}}/tests/build
+      run: |
+        OPENSSL_PREFIX=$(brew --prefix openssl@3)
+        EXPAT_PREFIX=$(brew --prefix expat)
+        GTEST_PREFIX=$(brew --prefix googletest)
+        MOSQUITTO_PREFIX=$(brew --prefix mosquitto)
+        CJSON_PREFIX=$(brew --prefix cjson)
+        cmake .. -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+          -DOPENSSL_ROOT_DIR=${OPENSSL_PREFIX} \
+          -DCMAKE_PREFIX_PATH="${OPENSSL_PREFIX};${EXPAT_PREFIX};${GTEST_PREFIX};${MOSQUITTO_PREFIX};${CJSON_PREFIX}" \
+          -DCMAKE_CXX_FLAGS="-I${GTEST_PREFIX}/include -I${CJSON_PREFIX}/include" \
+          -DCMAKE_EXE_LINKER_FLAGS="-L${GTEST_PREFIX}/lib"
+
+    - name: Build unit tests
+      working-directory: ${{github.workspace}}/tests/build
+      run: make -j$(sysctl -n hw.ncpu)
+
+    - name: Run unit tests
+      working-directory: ${{github.workspace}}/tests/build
+      run: |
+        echo "Running GUID tests..."
+        ./guid/unittest_guid
+        echo "Running DateTime tests..."
+        ./vscpdatetime/unittest_datetime
+        echo "Running VscpHelper tests..."
+        ./vscphelper/unittest_vscphelper
+        echo "Running MDF Parser tests..."
+        cd ${{github.workspace}}/tests/mdfparser && ${{github.workspace}}/tests/build/mdfparser/unittest_mdfparser
+        echo "Running TcpipTls tests..."
+        ${{github.workspace}}/tests/build/tcpiptls/unittest_tcpiptls
+        echo "Running VSCP Client Base tests..."
+        ${{github.workspace}}/tests/build/vscp-client-base/unittest_vscp_client_base
+        echo "Running VSCP Client Canal tests..."
+        ${{github.workspace}}/tests/build/vscp-client-canal/unittest_vscp_client_canal
+        echo "Running VSCP Client MQTT tests..."
+        ${{github.workspace}}/tests/build/vscp-client-mqtt/unittest_vscp_client_mqtt
+        echo "Running VSCP Client Multicast tests..."
+        ${{github.workspace}}/tests/build/vscp-client-multicast/unittest_vscp_client_multicast
+        echo "Running VSCP Client UDP tests..."
+        ${{github.workspace}}/tests/build/vscp-client-udp/unittest_vscp_client_udp
+        echo "Running VSCP Client WS1 tests..."
+        ${{github.workspace}}/tests/build/vscp-client-ws1/unittest_vscp_client_ws1
+        echo "Running VSCP Client WS2 tests..."
+        ${{github.workspace}}/tests/build/vscp-client-ws2/unittest_vscp_client_ws2

@@ -1,0 +1,38 @@
+name: Build VSCP library on macOS
+
+on:
+  push:
+    branches: [ master, main, development ]
+  pull_request:
+    branches: [ master, main, development ]
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+
+    - name: Install dependencies via Homebrew
+      run: |
+        brew update
+        brew install openssl@3 mosquitto expat curl cjson
+
+    - name: Configure CMake
+      run: |
+        MOSQUITTO_PREFIX=$(brew --prefix mosquitto)
+        OPENSSL_PREFIX=$(brew --prefix openssl@3)
+        EXPAT_PREFIX=$(brew --prefix expat)
+        CJSON_PREFIX=$(brew --prefix cjson)
+        cmake -B ${{github.workspace}}/build \
+          -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+          -DOPENSSL_ROOT_DIR=${OPENSSL_PREFIX} \
+          -DCMAKE_PREFIX_PATH="${MOSQUITTO_PREFIX};${EXPAT_PREFIX};${OPENSSL_PREFIX};${CJSON_PREFIX}"
+
+    - name: Build
+      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} -j$(sysctl -n hw.ncpu)

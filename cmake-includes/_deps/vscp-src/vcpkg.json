@@ -1,0 +1,20 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "vscpd",
+  "version-string": "15.0.3",
+  "description": "The VSCP daemon",
+  "dependencies": [
+    "curl",
+    "openssl",
+    "expat",
+    {
+      "name": "pthreads",
+      "platform": "windows"
+    },
+    {
+      "name": "dlfcn-win32",
+      "platform": "windows"
+    },
+    "mosquitto"
+  ]
+}

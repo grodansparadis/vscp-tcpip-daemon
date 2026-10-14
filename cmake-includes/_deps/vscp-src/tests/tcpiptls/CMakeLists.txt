@@ -1,0 +1,36 @@
+cmake_minimum_required(VERSION 3.10)
+
+# set the project name
+project(test_tcpiptls LANGUAGES CXX C)
+
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
+
+# specify the C++ standard
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+
+message(STATUS "Build dir: " ${PROJECT_SOURCE_DIR})
+
+find_package(GTest REQUIRED)
+
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+
+# add the executable
+add_executable(unittest_tcpiptls unittest.cpp)
+
+target_link_libraries(unittest_tcpiptls PRIVATE
+    vscp_common
+    Threads::Threads
+    GTest::GTest
+    GTest::Main
+)
+
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+add_executable(unittest_tcp_transport transport.cpp)
+target_link_libraries(unittest_tcp_transport PRIVATE vscp_client_tcp GTest::GTest GTest::Main)
+add_custom_target(test_tcp_transport
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/run_transport_tests.py
+            $<TARGET_FILE:unittest_tcp_transport>
+    DEPENDS unittest_tcp_transport
+    USES_TERMINAL)

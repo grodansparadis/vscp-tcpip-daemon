@@ -857,24 +857,29 @@ CClientList::sendEventToClient(CClientItem* pClientItem, vscpEvent* pEvent)
             return false;
         }
 
+        if (!pClientItem->addEventToSendQueue(pnewvscpEvent)) {
+            vscp_deleteEvent_v2(&pnewvscpEvent);
+            spdlog::info("sendEventToClient - overrun");
+            pClientItem->getStatistics().cntOverruns++;
+            return false;
+        }
+
         if (pClientItem->isReceiveLoopActive()) {
-            // Wake up the event manager. Sent the event directly to the client.
+            if (nullptr == pClientItem->getControlObject() ||
+                nullptr == pClientItem->getConnection()) {
+                spdlog::error(
+                  "sendEventToClient - Receive-loop client has no control object or connection");
+                return false;
+            }
+
             if (!mg_wakeup(
                   &pClientItem->getControlObject()->getTcpipSrv().m_mgr,
                   pClientItem->getConnection()->id,
-                  &pnewvscpEvent,
-                  sizeof(pnewvscpEvent))) {
-                vscp_deleteEvent_v2(&pnewvscpEvent);
+                  "x",
+                  1)) {
+                // The queue owns the event; polling can retry delivery.
                 spdlog::error(
                   "sendEventToClient - Failed to wake event manager");
-                return false;
-            }
-        }
-        else {
-            if (!pClientItem->addEventToSendQueue(pnewvscpEvent)) {
-                vscp_deleteEvent_v2(&pnewvscpEvent);
-                spdlog::info("sendEventToClient - overrun");
-                pClientItem->getStatistics().cntOverruns++;
                 return false;
             }
         }

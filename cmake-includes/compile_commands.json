@@ -1,0 +1,176 @@
+[
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/c++ -DSPDLOG_COMPILED_LIB -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/mongoose-src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/nlohmann_json-src/include -std=gnu++17 -fPIE -o CMakeFiles/vscpd.dir/src/vscpd.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/src/vscpd.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/src/vscpd.cpp",
+  "output": "CMakeFiles/vscpd.dir/src/vscpd.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/c++ -DSPDLOG_COMPILED_LIB -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/mongoose-src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/nlohmann_json-src/include -std=gnu++17 -fPIE -o CMakeFiles/vscpd.dir/src/controlobject.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/src/controlobject.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/src/controlobject.cpp",
+  "output": "CMakeFiles/vscpd.dir/src/controlobject.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/c++ -DSPDLOG_COMPILED_LIB -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/mongoose-src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/nlohmann_json-src/include -std=gnu++17 -fPIE -o CMakeFiles/vscpd.dir/src/tcpipsrv.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/src/tcpipsrv.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/src/tcpipsrv.cpp",
+  "output": "CMakeFiles/vscpd.dir/src/tcpipsrv.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/c++ -DSPDLOG_COMPILED_LIB -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/mongoose-src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/nlohmann_json-src/include -std=gnu++17 -fPIE -o CMakeFiles/vscpd.dir/src/interfacelist.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/src/interfacelist.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/src/interfacelist.cpp",
+  "output": "CMakeFiles/vscpd.dir/src/interfacelist.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/c++ -DSPDLOG_COMPILED_LIB -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/mongoose-src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/nlohmann_json-src/include -std=gnu++17 -fPIE -o CMakeFiles/vscpd.dir/src/userlist.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/src/userlist.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/src/userlist.cpp",
+  "output": "CMakeFiles/vscpd.dir/src/userlist.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/c++ -DSPDLOG_COMPILED_LIB -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/mongoose-src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/nlohmann_json-src/include -std=gnu++17 -fPIE -o CMakeFiles/vscpd.dir/src/devicethread.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/src/devicethread.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/src/devicethread.cpp",
+  "output": "CMakeFiles/vscpd.dir/src/devicethread.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/c++ -DSPDLOG_COMPILED_LIB -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/mongoose-src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/nlohmann_json-src/include -std=gnu++17 -fPIE -o CMakeFiles/vscpd.dir/src/devicelist.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/src/devicelist.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/src/devicelist.cpp",
+  "output": "CMakeFiles/vscpd.dir/src/devicelist.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/c++ -DSPDLOG_COMPILED_LIB -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/mongoose-src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/nlohmann_json-src/include -std=gnu++17 -fPIE -o CMakeFiles/vscpd.dir/src/clientlist.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/src/clientlist.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/src/clientlist.cpp",
+  "output": "CMakeFiles/vscpd.dir/src/clientlist.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/c++ -DSPDLOG_COMPILED_LIB -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/mongoose-src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/nlohmann_json-src/include -std=gnu++17 -fPIE -o CMakeFiles/vscpd.dir/_deps/vscp-src/src/vscp/common/guid.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/guid.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/guid.cpp",
+  "output": "CMakeFiles/vscpd.dir/_deps/vscp-src/src/vscp/common/guid.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/c++ -DSPDLOG_COMPILED_LIB -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/mongoose-src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/nlohmann_json-src/include -std=gnu++17 -fPIE -o CMakeFiles/vscpd.dir/_deps/vscp-src/src/vscp/common/vscphelper.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscphelper.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscphelper.cpp",
+  "output": "CMakeFiles/vscpd.dir/_deps/vscp-src/src/vscp/common/vscphelper.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/c++ -DSPDLOG_COMPILED_LIB -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/mongoose-src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/nlohmann_json-src/include -std=gnu++17 -fPIE -o CMakeFiles/vscpd.dir/_deps/vscp-src/src/vscp/common/vscpdatetime.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscpdatetime.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscpdatetime.cpp",
+  "output": "CMakeFiles/vscpd.dir/_deps/vscp-src/src/vscp/common/vscpdatetime.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/cc -DSPDLOG_COMPILED_LIB -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/mongoose-src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/nlohmann_json-src/include -std=gnu99 -fPIE -o CMakeFiles/vscpd.dir/_deps/vscp-src/src/vscp/common/vscp-guid-parser.c.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscp-guid-parser.c",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common/vscp-guid-parser.c",
+  "output": "CMakeFiles/vscpd.dir/_deps/vscp-src/src/vscp/common/vscp-guid-parser.c.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/c++ -DSPDLOG_COMPILED_LIB -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/mongoose-src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/nlohmann_json-src/include -std=gnu++17 -fPIE -o CMakeFiles/vscpd.dir/_deps/vscp-src/src/common/vscphelper-common.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/vscphelper-common.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/vscphelper-common.cpp",
+  "output": "CMakeFiles/vscpd.dir/_deps/vscp-src/src/common/vscphelper-common.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/cc -DSPDLOG_COMPILED_LIB -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/mongoose-src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/nlohmann_json-src/include -std=gnu99 -fPIE -o CMakeFiles/vscpd.dir/_deps/vscp-src/src/common/crc.c.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/crc.c",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/crc.c",
+  "output": "CMakeFiles/vscpd.dir/_deps/vscp-src/src/common/crc.c.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/cc -DSPDLOG_COMPILED_LIB -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/mongoose-src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/nlohmann_json-src/include -std=gnu99 -fPIE -o CMakeFiles/vscpd.dir/_deps/vscp-src/src/common/crc8.c.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/crc8.c",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/crc8.c",
+  "output": "CMakeFiles/vscpd.dir/_deps/vscp-src/src/common/crc8.c.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/cc -DSPDLOG_COMPILED_LIB -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/mongoose-src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/nlohmann_json-src/include -std=gnu99 -fPIE -o CMakeFiles/vscpd.dir/_deps/vscp-src/src/common/vscp-aes.c.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/vscp-aes.c",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/vscp-aes.c",
+  "output": "CMakeFiles/vscpd.dir/_deps/vscp-src/src/common/vscp-aes.c.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/cc -DSPDLOG_COMPILED_LIB -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/mongoose-src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/nlohmann_json-src/include -std=gnu99 -fPIE -o CMakeFiles/vscpd.dir/_deps/vscp-src/src/common/vscpmd5.c.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/vscpmd5.c",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/vscpmd5.c",
+  "output": "CMakeFiles/vscpd.dir/_deps/vscp-src/src/common/vscpmd5.c.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/cc -DSPDLOG_COMPILED_LIB -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/mongoose-src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/nlohmann_json-src/include -std=gnu99 -fPIE -o CMakeFiles/vscpd.dir/_deps/vscp-src/src/common/vscpbase64.c.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/vscpbase64.c",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/vscpbase64.c",
+  "output": "CMakeFiles/vscpd.dir/_deps/vscp-src/src/common/vscpbase64.c.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/c++ -DSPDLOG_COMPILED_LIB -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/mongoose-src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/nlohmann_json-src/include -std=gnu++17 -fPIE -o CMakeFiles/vscpd.dir/_deps/vscp-src/src/common/randpassword.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/randpassword.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/randpassword.cpp",
+  "output": "CMakeFiles/vscpd.dir/_deps/vscp-src/src/common/randpassword.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/cc -DSPDLOG_COMPILED_LIB -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/mongoose-src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/nlohmann_json-src/include -std=gnu99 -fPIE -o CMakeFiles/vscpd.dir/_deps/vscp-src/src/common/sockettcp.c.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/sockettcp.c",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common/sockettcp.c",
+  "output": "CMakeFiles/vscpd.dir/_deps/vscp-src/src/common/sockettcp.c.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/cc -DSPDLOG_COMPILED_LIB -DUSE_IPV6 -DUSE_SERVER_STATS -DUSE_WEBSOCKET -DWITH_SYSTEMD -I/home/akhe/development/VSCP/vscp-tcpip-daemon -I/home/akhe/development/VSCP/vscp-tcpip-daemon/src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/vscp-src/src/vscp/common -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/mongoose-src -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/include -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/nlohmann_json-src/include -std=gnu99 -fPIE -o CMakeFiles/vscpd.dir/_deps/mongoose-src/mongoose.c.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/mongoose-src/mongoose.c",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/mongoose-src/mongoose.c",
+  "output": "CMakeFiles/vscpd.dir/_deps/mongoose-src/mongoose.c.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes",
+  "command": "/usr/bin/c++   -std=gnu++17 -fPIE -o CMakeFiles/mk_password_hash.dir/src/mkpasswd/mk_password_hash.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/src/mkpasswd/mk_password_hash.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/src/mkpasswd/mk_password_hash.cpp",
+  "output": "CMakeFiles/mk_password_hash.dir/src/mkpasswd/mk_password_hash.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-build",
+  "command": "/usr/bin/c++ -DSPDLOG_COMPILED_LIB -DSPDLOG_FWRITE_UNLOCKED -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/include -std=c++17 -fPIC -o CMakeFiles/spdlog.dir/src/spdlog.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/src/spdlog.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/src/spdlog.cpp",
+  "output": "_deps/spdlog-build/CMakeFiles/spdlog.dir/src/spdlog.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-build",
+  "command": "/usr/bin/c++ -DSPDLOG_COMPILED_LIB -DSPDLOG_FWRITE_UNLOCKED -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/include -std=c++17 -fPIC -o CMakeFiles/spdlog.dir/src/stdout_sinks.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/src/stdout_sinks.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/src/stdout_sinks.cpp",
+  "output": "_deps/spdlog-build/CMakeFiles/spdlog.dir/src/stdout_sinks.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-build",
+  "command": "/usr/bin/c++ -DSPDLOG_COMPILED_LIB -DSPDLOG_FWRITE_UNLOCKED -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/include -std=c++17 -fPIC -o CMakeFiles/spdlog.dir/src/color_sinks.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/src/color_sinks.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/src/color_sinks.cpp",
+  "output": "_deps/spdlog-build/CMakeFiles/spdlog.dir/src/color_sinks.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-build",
+  "command": "/usr/bin/c++ -DSPDLOG_COMPILED_LIB -DSPDLOG_FWRITE_UNLOCKED -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/include -std=c++17 -fPIC -o CMakeFiles/spdlog.dir/src/file_sinks.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/src/file_sinks.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/src/file_sinks.cpp",
+  "output": "_deps/spdlog-build/CMakeFiles/spdlog.dir/src/file_sinks.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-build",
+  "command": "/usr/bin/c++ -DSPDLOG_COMPILED_LIB -DSPDLOG_FWRITE_UNLOCKED -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/include -std=c++17 -fPIC -o CMakeFiles/spdlog.dir/src/async.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/src/async.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/src/async.cpp",
+  "output": "_deps/spdlog-build/CMakeFiles/spdlog.dir/src/async.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-build",
+  "command": "/usr/bin/c++ -DSPDLOG_COMPILED_LIB -DSPDLOG_FWRITE_UNLOCKED -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/include -std=c++17 -fPIC -o CMakeFiles/spdlog.dir/src/cfg.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/src/cfg.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/src/cfg.cpp",
+  "output": "_deps/spdlog-build/CMakeFiles/spdlog.dir/src/cfg.cpp.o"
+},
+{
+  "directory": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-build",
+  "command": "/usr/bin/c++ -DSPDLOG_COMPILED_LIB -DSPDLOG_FWRITE_UNLOCKED -I/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/include -std=c++17 -fPIC -o CMakeFiles/spdlog.dir/src/bundled_fmtlib_format.cpp.o -c /home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/src/bundled_fmtlib_format.cpp",
+  "file": "/home/akhe/development/VSCP/vscp-tcpip-daemon/cmake-includes/_deps/spdlog-src/src/bundled_fmtlib_format.cpp",
+  "output": "_deps/spdlog-build/CMakeFiles/spdlog.dir/src/bundled_fmtlib_format.cpp.o"
+}
+]
