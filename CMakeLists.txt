@@ -289,7 +289,7 @@ if(WIN32)
         message(FATAL_ERROR "No usable pthreads target found for MSVC. Install the PThreads4W/pthread dependency (for example via vcpkg) before building.")
     endif()
 
-    target_link_libraries(vscpd PRIVATE netapi32)
+    target_link_libraries(vscpd PRIVATE iphlpapi netapi32)
     target_link_libraries(vscpd PRIVATE dlfcn-win32::dl)
 
     if(MSVC)
