@@ -20,9 +20,12 @@ int main()
             frame[0] |= encryption;
             std::vector<uint8_t> wire, decoded;
             assert(vscp_binary::encode(frame, encryption, key, wire));
-            assert(vscp_binary::read16(wire.data()) == wire.size() - 2);
+            size_t length = 0;
+            assert(vscp_binary::parseHeader(wire.data(), length));
+            assert(wire[0] == 0x55 && (wire[1] >> 5) == 1);
+            assert(length == wire.size() - vscp_binary::headerSize);
             assert(vscp_binary::decode(
-              std::vector<uint8_t>(wire.begin() + 2, wire.end()), key, decoded));
+              std::vector<uint8_t>(wire.begin() + 3, wire.end()), key, decoded));
             if (frame != decoded) {
                 std::cerr << "Round trip mismatch: encryption=" << unsigned(encryption)
                           << " payload=" << size << " expected="
@@ -64,9 +67,22 @@ int main()
         assert(vscp_binary::encode(command, encryption, key, wire));
         wire[wire.size() - 17] ^= 0xff;
         assert(!vscp_binary::decode(
-          std::vector<uint8_t>(wire.begin() + 2, wire.end()), key, decoded));
+          std::vector<uint8_t>(wire.begin() + 3, wire.end()), key, decoded));
     }
+    size_t length = 0;
+    const uint8_t noop[] = {0x55, 0x20, 0x05, 0xe0};
+    assert(vscp_binary::parseHeader(noop, length) && length == 5);
+    const uint8_t wrongVersion[] = {0x55, 0x40, 0x05, 0xe0};
+    assert(!vscp_binary::parseHeader(wrongVersion, length));
+    const uint8_t wrongType[] = {0x55, 0x20, 0x05, 0x20};
+    assert(!vscp_binary::parseHeader(wrongType, length));
+    const uint8_t wrongSync[] = {0x54, 0x20, 0x05, 0xe0};
+    assert(!vscp_binary::parseHeader(wrongSync, length));
+    const uint8_t tooLong[] = {0x55, 0x30, 0x01, 0xe0};
+    assert(!vscp_binary::parseHeader(tooLong, length));
+    const uint8_t badAesLength[] = {0x55, 0x20, 0x22, 0xe1};
+    assert(!vscp_binary::parseHeader(badAesLength, length));
     std::cout << "Binary codec: 2052 plaintext/AES round trips, event and "
-                 "malformed-frame checks passed\n";
+                 "malformed-frame and header checks passed\n";
     testBinaryTcp();
 }

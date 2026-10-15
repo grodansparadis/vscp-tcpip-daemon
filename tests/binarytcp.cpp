@@ -27,14 +27,16 @@ static void feed(CTcpipSrv& server, mg_connection* connection,
 
 static std::vector<uint8_t> receive(mg_connection* connection, const uint8_t* key)
 {
-    assert(connection->send.len >= 2);
-    size_t length = vscp_binary::read16(connection->send.buf);
-    assert(connection->send.len >= length + 2);
+    assert(connection->send.len >= vscp_binary::headerSize + 1);
+    size_t length = 0;
+    assert(vscp_binary::parseHeader(connection->send.buf, length));
+    assert(connection->send.len >= length + vscp_binary::headerSize);
     std::vector<uint8_t> frame;
     assert(vscp_binary::decode(
-      std::vector<uint8_t>(connection->send.buf + 2,
-                           connection->send.buf + length + 2), key, frame));
-    mg_iobuf_del(&connection->send, 0, length + 2);
+      std::vector<uint8_t>(connection->send.buf + vscp_binary::headerSize,
+                           connection->send.buf + vscp_binary::headerSize + length),
+      key, frame));
+    mg_iobuf_del(&connection->send, 0, length + vscp_binary::headerSize);
     return frame;
 }
 
@@ -160,10 +162,42 @@ void testBinaryTcp()
     mg_iobuf_del(&connection->send, 0, sizeof(MSG_OK) - 1);
     reply = receive(connection, key);
     assert(vscp_binary::read16(reply.data() + 1) == 0);
-    uint8_t invalidLength[] = {0xff, 0xff};
-    feed(server, connection, invalidLength, sizeof(invalidLength));
-    assert(connection->is_closing);
+
+    // Garbage, a bad header and a corrupt CRC are skipped; the connection
+    // stays open and the next valid frame is handled.
+    std::vector<uint8_t> noisy = {'x', 0x55, 0xff, 0xff, 0x00, 0x55};
+    auto corrupt = command(0, 0, key);
+    corrupt.back() ^= 0xff;
+    noisy.insert(noisy.end(), corrupt.begin(), corrupt.end());
+    auto version16 = command(16, 0, key);
+    noisy.insert(noisy.end(), version16.begin(), version16.end());
+    feed(server, connection, noisy.data(), noisy.size());
+    assert(!connection->is_closing && !client.isBinaryResyncing());
+    reply = receive(connection, key);
+    assert(vscp_binary::read16(reply.data() + 1) == 0xffff);
+    assert(vscp_binary::read16(reply.data() + 3) == VSCP_ERROR_INVALID_FRAME);
+    reply = receive(connection, key);
+    assert(vscp_binary::read16(reply.data() + 1) == 16);
+    assert(connection->send.len == 0);
+
+    // A false header claiming a long frame stalls only until the timeout.
+    const uint8_t stall[] = {0x55, 0x2f, 0xff, 0xe0};
+    feed(server, connection, stall, sizeof(stall));
+    auto afterStall = command(0, 1, key);
+    feed(server, connection, afterStall.data(), afterStall.size());
+    assert(connection->send.len == 0 && client.getBinaryPartialSince());
+    uint64_t since = client.getBinaryPartialSince();
+    server.checkBinaryReceiveTimeout(connection, since + 1);
+    assert(connection->send.len == 0);
+    server.checkBinaryReceiveTimeout(
+      connection, since + vscp_binary::partialFrameTimeoutMs);
+    reply = receive(connection, key);
+    assert(vscp_binary::read16(reply.data() + 3) == VSCP_ERROR_INVALID_FRAME);
+    reply = receive(connection, key);
+    assert(vscp_binary::read16(reply.data() + 1) == 0);
+    assert(reply[0] == 0xf1 && !connection->is_closing);
+    assert(connection->recv.len == 0 && !client.getBinaryPartialSince());
     mg_mgr_free(&manager);
     std::cout << "Binary TCP: fragmented AES commands, coalesced frames, "
-                 "authorization, asynchronous events, RETR and TEXT passed\n";
+                 "authorization, asynchronous events, RETR, TEXT and resync passed\n";
 }

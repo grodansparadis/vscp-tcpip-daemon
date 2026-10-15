@@ -164,6 +164,23 @@ class CTcpipSrv {
     void handleBinaryFrame(struct mg_connection* conn,
                            const std::vector<uint8_t>& frame);
     void handleIncomingData(struct mg_connection* conn);
+
+    /*!
+     * Skip a stalled incomplete binary frame and resume searching for
+     * the next frame. Called from polling.
+     * @param conn Client connection
+     * @param now Current time in milliseconds
+     */
+    void checkBinaryReceiveTimeout(struct mg_connection* conn, uint64_t now);
+
+    /*!
+     * Discard received binary bytes that do not start a valid frame.
+     * The first discard after a valid frame logs a warning and sends one
+     * reply with command 0xFFFF and VSCP_ERROR_INVALID_FRAME.
+     * @param conn Client connection
+     * @param count Number of bytes to discard
+     */
+    void discardBinaryInput(struct mg_connection* conn, size_t count);
     uint16_t enqueueBinaryEvent(struct mg_connection* conn,
                                 const std::vector<uint8_t>& frame);
 

@@ -278,6 +278,10 @@ class CClientItem {
     void setBinaryCommand(uint16_t command) { m_binaryCommand = command; }
     uint64_t getBinaryLoginDeadline(void) const { return m_binaryLoginDeadline; }
     void setBinaryLoginDeadline(uint64_t deadline) { m_binaryLoginDeadline = deadline; }
+    uint64_t getBinaryPartialSince(void) const { return m_binaryPartialSince; }
+    void setBinaryPartialSince(uint64_t since) { m_binaryPartialSince = since; }
+    bool isBinaryResyncing(void) const { return m_binaryResyncing; }
+    void setBinaryResyncing(bool resyncing) { m_binaryResyncing = resyncing; }
 
     /*!
       Get filter for VSCP events
@@ -443,6 +447,12 @@ class CClientItem {
     uint8_t m_binaryEncryption = 0;
     uint16_t m_binaryCommand = 0;
     uint64_t m_binaryLoginDeadline = 0;
+
+    /// Time (ms) the current incomplete binary frame started waiting, 0 if none.
+    uint64_t m_binaryPartialSince = 0;
+
+    /// True while discarding bytes to find the next valid binary frame.
+    bool m_binaryResyncing = false;
 
     /// Client ID for this client item
     uint16_t m_clientID;

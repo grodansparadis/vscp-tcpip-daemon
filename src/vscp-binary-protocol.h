@@ -38,6 +38,14 @@ namespace vscp_binary {
 
 constexpr size_t maxFrameSize = 4096;
 
+// TCP framing header: [syncByte][version:3 | length 12..8][length 7..0].
+constexpr uint8_t syncByte = 0x55;
+constexpr uint8_t framingVersion = 1;
+constexpr size_t headerSize = 3;
+
+// An incomplete frame older than this is treated as a false frame start.
+constexpr uint64_t partialFrameTimeoutMs = 2000;
+
 /*!
     @brief Read a 16-bit big-endian value from a byte array.
 
@@ -89,6 +97,39 @@ inline bool validCrc(const uint8_t* data, size_t size)
     return size >= 3 &&
            crcFast(data + 1, static_cast<int>(size - 3)) ==
              read16(data + size - 2);
+}
+
+/*!
+    @brief Check whether a frame length suits the encryption in its lead byte.
+
+    @param lead First byte of the VSCP-GBP frame.
+    @param length Length of the VSCP-GBP frame.
+    @return True if the lead byte and length can start a valid frame.
+*/
+inline bool plausibleFrame(uint8_t lead, size_t length)
+{
+    uint8_t type = lead >> 4;
+    uint8_t encryption = lead & 0x0f;
+    if ((type > 1 && type < 14) || encryption > VSCP_ENCRYPTION_AES256 ||
+        length < 5 || length > maxFrameSize) {
+        return false;
+    }
+    return !encryption || (length >= 33 && (length - 17) % 16 == 0);
+}
+
+/*!
+    @brief Parse a TCP framing header.
+
+    @param data Pointer to at least headerSize + 1 bytes.
+    @param length Receives the VSCP-GBP frame length.
+    @return True if the header and frame lead byte look valid.
+*/
+inline bool parseHeader(const uint8_t* data, size_t& length)
+{
+    uint16_t word = read16(data + 1);
+    length = word & 0x1fff;
+    return data[0] == syncByte && (word >> 13) == framingVersion &&
+           plausibleFrame(data[headerSize], length);
 }
 
 /*!
@@ -149,7 +190,8 @@ inline bool encode(std::vector<uint8_t> frame,
         frame = std::move(encrypted);
     }
     wire.clear();
-    append(wire, frame.size(), 2);
+    wire.push_back(syncByte);
+    append(wire, (static_cast<uint16_t>(framingVersion) << 13) | frame.size(), 2);
     wire.insert(wire.end(), frame.begin(), frame.end());
     return true;
 }
@@ -166,19 +208,13 @@ inline bool decode(std::vector<uint8_t> wire,
                    const uint8_t* key,
                    std::vector<uint8_t>& frame)
 {
-    if (wire.size() < 5 || wire.size() > maxFrameSize) {
+    if (wire.empty() || !plausibleFrame(wire[0], wire.size())) {
         return false;
     }
     uint8_t encryption = wire[0] & 0x0f;
-    if (encryption > VSCP_ENCRYPTION_AES256) {
-        return false;
-    }
     if (!encryption) {
         frame = std::move(wire);
         return validCrc(frame.data(), frame.size());
-    }
-    if (wire.size() < 33 || (wire.size() - 17) % 16 != 0) {
-        return false;
     }
     if (!key) return false;
     std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)>

@@ -408,6 +408,9 @@ CTcpipSrv::commandHandler(struct mg_connection* conn,
         // The transition acknowledgement is the last text response.
         if (write(conn, MSG_OK, sizeof(MSG_OK) - 1)) {
             pClientItem->setBinaryMode(true);
+            pClientItem->setBinaryEncryption(0);
+            pClientItem->setBinaryPartialSince(0);
+            pClientItem->setBinaryResyncing(false);
         }
         return VSCP_ERROR_SUCCESS;
     }
@@ -1252,6 +1255,35 @@ CTcpipSrv::handleBinaryFrame(struct mg_connection* conn,
 }
 
 void
+CTcpipSrv::discardBinaryInput(struct mg_connection* conn, size_t count)
+{
+    auto* client = static_cast<CClientItem*>(conn->fn_data);
+    mg_iobuf_del(&conn->recv, 0, count);
+    client->setBinaryPartialSince(0);
+    if (!client->isBinaryResyncing()) {
+        client->setBinaryResyncing(true);
+        spdlog::warn("TCP/IP binary: invalid data, searching for next frame");
+        writeBinaryReply(conn, 0xffff, VSCP_ERROR_INVALID_FRAME);
+    }
+}
+
+void
+CTcpipSrv::checkBinaryReceiveTimeout(struct mg_connection* conn, uint64_t now)
+{
+    auto* client = static_cast<CClientItem*>(conn->fn_data);
+    if (!client || !client->isBinaryMode() || !conn->recv.len ||
+        conn->is_closing) {
+        return;
+    }
+    uint64_t since = client->getBinaryPartialSince();
+    if (since && now - since >= vscp_binary::partialFrameTimeoutMs) {
+        spdlog::warn("TCP/IP binary: incomplete frame timed out");
+        discardBinaryInput(conn, 1);
+        handleIncomingData(conn);
+    }
+}
+
+void
 CTcpipSrv::handleIncomingData(struct mg_connection* conn)
 {
     auto* client = static_cast<CClientItem*>(conn->fn_data);
@@ -1263,23 +1295,36 @@ CTcpipSrv::handleIncomingData(struct mg_connection* conn)
     auto& input = conn->recv;
     while (input.len && !conn->is_closing && !conn->is_draining) {
         if (client->isBinaryMode()) {
-            if (input.len < 2) return;
-            size_t length = vscp_binary::read16(input.buf);
-            if (length < 5 || length > vscp_binary::maxFrameSize) {
-                spdlog::error("TCP/IP binary: invalid frame length {}", length);
-                conn->is_closing = 1;
+            if (input.buf[0] != vscp_binary::syncByte) {
+                auto* sync = static_cast<uint8_t*>(
+                  memchr(input.buf, vscp_binary::syncByte, input.len));
+                discardBinaryInput(conn, sync ? sync - input.buf : input.len);
+                continue;
+            }
+            if (input.len < vscp_binary::headerSize + 1) return;
+            size_t length = 0;
+            if (!vscp_binary::parseHeader(input.buf, length)) {
+                discardBinaryInput(conn, 1);
+                continue;
+            }
+            if (input.len < length + vscp_binary::headerSize) {
+                if (!client->getBinaryPartialSince()) {
+                    client->setBinaryPartialSince(mg_millis());
+                }
                 return;
             }
-            if (input.len < length + 2) return;
-            std::vector<uint8_t> wire(input.buf + 2, input.buf + length + 2);
-            mg_iobuf_del(&input, 0, length + 2);
+            std::vector<uint8_t> wire(input.buf + vscp_binary::headerSize,
+                                      input.buf + vscp_binary::headerSize + length);
             std::vector<uint8_t> frame;
             if (!vscp_binary::decode(std::move(wire),
                                      m_pCtrlObj->getSystemKey(nullptr), frame)) {
-                spdlog::error("TCP/IP binary: invalid encryption, padding or CRC");
-                conn->is_closing = 1;
-                return;
+                // The length may be corrupt, so search from the next byte.
+                discardBinaryInput(conn, 1);
+                continue;
             }
+            mg_iobuf_del(&input, 0, length + vscp_binary::headerSize);
+            client->setBinaryPartialSince(0);
+            client->setBinaryResyncing(false);
             client->setBinaryEncryption(frame[0] & 15);
             handleBinaryFrame(conn, frame);
         }
@@ -3910,13 +3955,13 @@ tcpip_event_handler(struct mg_connection* conn, int ev, void* ev_data)
                      remote_address,
                      port);
 
-        // Greet the new client
-        mg_send(conn, MSG_WELCOME, sizeof(MSG_WELCOME));
-        mg_send(conn, VSCPD_DISPLAY_VERSION, sizeof(VSCPD_DISPLAY_VERSION));
+        // Greet the new client (without the string terminators)
+        mg_send(conn, MSG_WELCOME, sizeof(MSG_WELCOME) - 1);
+        mg_send(conn, VSCPD_DISPLAY_VERSION, sizeof(VSCPD_DISPLAY_VERSION) - 1);
         mg_send(conn, "\r\n", 2);
-        mg_send(conn, VSCPD_COPYRIGHT, sizeof(VSCPD_COPYRIGHT));
+        mg_send(conn, VSCPD_COPYRIGHT, sizeof(VSCPD_COPYRIGHT) - 1);
         mg_send(conn, "\r\n", 2);
-        mg_send(conn, MSG_OK, sizeof(MSG_OK));
+        mg_send(conn, MSG_OK, sizeof(MSG_OK) - 1);
         spdlog::debug("SERVER sent welcome message");
     }
 
@@ -3931,6 +3976,9 @@ tcpip_event_handler(struct mg_connection* conn, int ev, void* ev_data)
         }
 
         auto* pClientItem = static_cast<CClientItem*>(conn->fn_data);
+        if (ev == MG_EV_POLL && !conn->is_listening && nullptr != pClientItem) {
+            server->checkBinaryReceiveTimeout(conn, mg_millis());
+        }
         if (conn->is_listening || conn->is_closing ||
             nullptr == pClientItem || !pClientItem->isConnected() ||
             !pClientItem->isReceiveLoopActive()) {
