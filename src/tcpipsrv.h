@@ -45,6 +45,7 @@
 #include "clientlist.h"
 #include "controlobject.h"
 #include "userlist.h"
+#include <vector>
 
 #define VSCP_TCPIP_SRV_RUN  0
 #define VSCP_TCPIP_SRV_STOP 1
@@ -154,6 +155,17 @@ class CTcpipSrv {
 
     /// Destructor
     ~CTcpipSrv();
+
+    bool writeBinaryFrame(struct mg_connection* conn, std::vector<uint8_t> frame);
+    bool writeBinaryReply(struct mg_connection* conn,
+                          uint16_t command,
+                          uint16_t error,
+                          const std::vector<uint8_t>& arguments = {});
+    void handleBinaryFrame(struct mg_connection* conn,
+                           const std::vector<uint8_t>& frame);
+    void handleIncomingData(struct mg_connection* conn);
+    uint16_t enqueueBinaryEvent(struct mg_connection* conn,
+                                const std::vector<uint8_t>& frame);
 
     /*!
      * Write string to client
@@ -640,7 +652,7 @@ class CTcpipSrv {
     // *************************************************************************
 
     // TCP/IP client thread
-    pthread_t m_tcpipClientThread;
+    pthread_t m_tcpipClientThread{};
 };
 
 #endif

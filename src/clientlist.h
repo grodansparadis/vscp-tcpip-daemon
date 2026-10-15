@@ -270,6 +270,14 @@ class CClientItem {
     */
     bool isReceiveLoopActive(void) { return m_bReceiveLoop; };
 
+    bool isBinaryMode(void) const { return m_binaryMode; }
+    void setBinaryMode(bool enabled) { m_binaryMode = enabled; }
+    uint8_t getBinaryEncryption(void) const { return m_binaryEncryption; }
+    void setBinaryEncryption(uint8_t encryption) { m_binaryEncryption = encryption; }
+    uint16_t getBinaryCommand(void) const { return m_binaryCommand; }
+    void setBinaryCommand(uint16_t command) { m_binaryCommand = command; }
+    uint64_t getBinaryLoginDeadline(void) const { return m_binaryLoginDeadline; }
+    void setBinaryLoginDeadline(uint64_t deadline) { m_binaryLoginDeadline = deadline; }
 
     /*!
       Get filter for VSCP events
@@ -430,6 +438,11 @@ class CClientItem {
 
     /// Indicates whether the client is in the receive loop
     bool m_bReceiveLoop;
+
+    bool m_binaryMode = false;
+    uint8_t m_binaryEncryption = 0;
+    uint16_t m_binaryCommand = 0;
+    uint64_t m_binaryLoginDeadline = 0;
 
     /// Client ID for this client item
     uint16_t m_clientID;

@@ -6,11 +6,12 @@
     "organization": "grodansparadis",
     "repositoryId": "904632",
     "repositoryName": "vscp-tcpip-daemon",
-    "createdAt": "2026-10-14T18:47:19.595Z",
-    "updatedAt": "2026-10-14T18:47:19.595Z",
+    "createdAt": "2026-10-15T10:34:04.610Z",
+    "updatedAt": "2026-10-15T10:34:04.610Z",
     "languages": [
       "C",
       "CPP",
+      "CSharp",
       "CSS",
       "HTML",
       "Javascript",
@@ -20,6 +21,7 @@
       "PHP",
       "Python",
       "Shell",
+      "SQL",
       "TypeScript",
       "XML",
       "YAML"
@@ -4594,6 +4596,861 @@
       ]
     },
     {
+      "toolId": "Bandit",
+      "useLocalConfigurationFile": true,
+      "patterns": []
+    },
+    {
+      "toolId": "PMD",
+      "patterns": [
+        {
+          "patternId": "PMD_category_java_security_HardCodedCryptoKey"
+        },
+        {
+          "patternId": "PMD_category_vm_errorprone_EmptyForeachStmt"
+        },
+        {
+          "patternId": "PMD_category_apex_security_ApexBadCrypto"
+        },
+        {
+          "patternId": "PMD_category_java_errorprone_EmptyFinalizer"
+        },
+        {
+          "patternId": "PMD_category_java_errorprone_UselessOperationOnImmutable"
+        },
+        {
+          "patternId": "PMD_category_plsql_bestpractices_TomKytesDespair"
+        },
+        {
+          "patternId": "PMD_category_java_errorprone_MethodWithSameNameAsEnclosingClass"
+        },
+        {
+          "patternId": "PMD_category_apex_security_ApexXSSFromURLParam"
+        },
+        {
+          "patternId": "PMD_category_java_errorprone_EqualsNull"
+        },
+        {
+          "patternId": "PMD_category_apex_security_ApexSOQLInjection"
+        },
+        {
+          "patternId": "PMD_category_java_errorprone_JumbledIncrementer"
+        },
+        {
+          "patternId": "PMD_category_apex_security_ApexXSSFromEscapeFalse"
+        },
+        {
+          "patternId": "PMD_category_java_errorprone_UnnecessaryBooleanAssertion"
+        },
+        {
+          "patternId": "PMD_category_apex_security_ApexDangerousMethods"
+        },
+        {
+          "patternId": "PMD_category_ecmascript_errorprone_InnaccurateNumericLiteral"
+        },
+        {
+          "patternId": "PMD_category_java_errorprone_AvoidDecimalLiteralsInBigDecimalConstructor"
+        },
+        {
+          "patternId": "PMD_category_java_errorprone_AvoidCallingFinalize"
+        },
+        {
+          "patternId": "PMD_category_java_errorprone_UnconditionalIfStatement"
+        },
+        {
+          "patternId": "PMD_category_java_errorprone_DontUseFloatTypeForLoopIndices"
+        },
+        {
+          "patternId": "PMD_category_java_errorprone_NonStaticInitializer"
+        },
+        {
+          "patternId": "PMD_category_apex_security_ApexOpenRedirect"
+        },
+        {
+          "patternId": "PMD_category_java_errorprone_JUnitSpelling"
+        },
+        {
+          "patternId": "PMD_category_java_errorprone_AvoidInstanceofChecksInCatchClause"
+        },
+        {
+          "patternId": "PMD_category_vm_errorprone_EmptyIfStmt"
+        },
+        {
+          "patternId": "PMD_category_java_errorprone_JUnitStaticSuite"
+        },
+        {
+          "patternId": "PMD_category_java_multithreading_AvoidThreadGroup"
+        },
+        {
+          "patternId": "PMD_category_java_errorprone_AvoidBranchingStatementAsLastInLoop"
+        },
+        {
+          "patternId": "PMD_category_java_errorprone_ReturnFromFinallyBlock"
+        },
+        {
+          "patternId": "PMD_category_java_errorprone_AssignmentToNonFinalStatic"
+        },
+        {
+          "patternId": "PMD_category_plsql_errorprone_TO_TIMESTAMPWithoutDateFormat"
+        },
+        {
+          "patternId": "PMD_category_jsp_security_IframeMissingSrcAttribute"
+        },
+        {
+          "patternId": "PMD_category_java_errorprone_AvoidMultipleUnaryOperators"
+        },
+        {
+          "patternId": "PMD_category_apex_security_ApexSuggestUsingNamedCred"
+        },
+        {
+          "patternId": "PMD_category_apex_security_ApexInsecureEndpoint"
+        },
+        {
+          "patternId": "PMD_category_java_errorprone_UnnecessaryCaseChange"
+        },
+        {
+          "patternId": "PMD_category_apex_security_ApexSharingViolations"
+        },
+        {
+          "patternId": "PMD_category_jsp_errorprone_JspEncoding"
+        },
+        {
+          "patternId": "PMD_category_pom_errorprone_InvalidDependencyTypes",
+          "parameters": {
+            "validTypes": "pom,jar,maven-plugin,ejb,war,ear,rar,par"
+          }
+        },
+        {
+          "patternId": "PMD_category_ecmascript_errorprone_EqualComparison"
+        },
+        {
+          "patternId": "PMD_category_java_performance_UseStringBufferLength"
+        },
+        {
+          "patternId": "PMD_category_java_errorprone_NonCaseLabelInSwitchStatement"
+        },
+        {
+          "patternId": "PMD_category_xml_errorprone_MistypedCDATASection"
+        },
+        {
+          "patternId": "PMD_category_jsp_bestpractices_NoHtmlComments"
+        },
+        {
+          "patternId": "PMD_category_vf_security_VfUnescapeEl"
+        },
+        {
+          "patternId": "PMD_category_java_errorprone_CheckSkipResult"
+        },
+        {
+          "patternId": "PMD_category_jsp_security_NoUnsanitizedJSPExpression"
+        },
+        {
+          "patternId": "PMD_category_java_performance_StringInstantiation"
+        },
+        {
+          "patternId": "PMD_category_apex_security_ApexCRUDViolation"
+        },
+        {
+          "patternId": "PMD_category_java_multithreading_DontCallThreadRun"
+        },
+        {
+          "patternId": "PMD_category_java_errorprone_MisplacedNullCheck"
+        },
+        {
+          "patternId": "PMD_category_vf_security_VfCsrf"
+        },
+        {
+          "patternId": "PMD_category_plsql_errorprone_TO_DATE_TO_CHAR"
+        },
+        {
+          "patternId": "PMD_category_java_errorprone_DoNotHardCodeSDCard"
+        },
+        {
+          "patternId": "PMD_category_java_errorprone_AvoidAccessibilityAlteration"
+        },
+        {
+          "patternId": "PMD_category_java_errorprone_BrokenNullCheck"
+        },
+        {
+          "patternId": "PMD_category_xsl_performance_AvoidAxisNavigation",
+          "parameters": {
+            "checkSelfDescendantAbreviation": "false"
+          }
+        },
+        {
+          "patternId": "PMD_category_java_errorprone_CompareObjectsWithEquals",
+          "parameters": {
+            "typesThatCompareByReference": "java.lang.Enum,java.lang.Class"
+          }
+        },
+        {
+          "patternId": "PMD_category_java_errorprone_MissingStaticMethodInNonInstantiatableClass",
+          "parameters": {
+            "annotations": "org.springframework.beans.factory.annotation.Autowired,javax.inject.Inject"
+          }
+        },
+        {
+          "patternId": "PMD_category_java_errorprone_UseEqualsToCompareStrings"
+        },
+        {
+          "patternId": "PMD_category_pom_errorprone_ProjectVersionAsDependencyVersion"
+        },
+        {
+          "patternId": "PMD_category_plsql_errorprone_TO_DATEWithoutDateFormat"
+        },
+        {
+          "patternId": "PMD_category_java_performance_StringToString"
+        }
+      ]
+    },
+    {
+      "toolId": "PyLintPython3",
+      "patterns": [
+        {
+          "patternId": "PyLintPython3_E0203"
+        },
+        {
+          "patternId": "PyLintPython3_E0102"
+        },
+        {
+          "patternId": "PyLintPython3_E1102"
+        },
+        {
+          "patternId": "PyLintPython3_E1121"
+        },
+        {
+          "patternId": "PyLintPython3_W1301"
+        },
+        {
+          "patternId": "PyLintPython3_E0241"
+        },
+        {
+          "patternId": "PyLintPython3_W0101"
+        },
+        {
+          "patternId": "PyLintPython3_E0107"
+        },
+        {
+          "patternId": "PyLintPython3_E0202"
+        },
+        {
+          "patternId": "PyLintPython3_E1003"
+        },
+        {
+          "patternId": "PyLintPython3_E0302"
+        },
+        {
+          "patternId": "PyLintPython3_E1306"
+        },
+        {
+          "patternId": "PyLintPython3_E0113"
+        },
+        {
+          "patternId": "PyLintPython3_E0301"
+        },
+        {
+          "patternId": "PyLintPython3_W0711"
+        },
+        {
+          "patternId": "PyLintPython3_E0108"
+        },
+        {
+          "patternId": "PyLintPython3_E0604"
+        },
+        {
+          "patternId": "PyLintPython3_W0102"
+        },
+        {
+          "patternId": "PyLintPython3_E0603"
+        },
+        {
+          "patternId": "PyLintPython3_W0150"
+        },
+        {
+          "patternId": "PyLintPython3_E0240"
+        },
+        {
+          "patternId": "PyLintPython3_E0101"
+        },
+        {
+          "patternId": "PyLintPython3_E0110"
+        },
+        {
+          "patternId": "PyLintPython3_E0112"
+        },
+        {
+          "patternId": "PyLintPython3_E0117"
+        },
+        {
+          "patternId": "PyLintPython3_E0211"
+        },
+        {
+          "patternId": "PyLintPython3_E1303"
+        },
+        {
+          "patternId": "PyLintPython3_W0123"
+        },
+        {
+          "patternId": "PyLintPython3_E0106"
+        },
+        {
+          "patternId": "PyLintPython3_E1300"
+        },
+        {
+          "patternId": "PyLintPython3_W1305"
+        },
+        {
+          "patternId": "PyLintPython3_E0105"
+        },
+        {
+          "patternId": "PyLintPython3_E1200"
+        },
+        {
+          "patternId": "PyLintPython3_W0109"
+        },
+        {
+          "patternId": "PyLintPython3_W1306"
+        },
+        {
+          "patternId": "PyLintPython3_E0236"
+        },
+        {
+          "patternId": "PyLintPython3_E0712"
+        },
+        {
+          "patternId": "PyLintPython3_E0710"
+        },
+        {
+          "patternId": "PyLintPython3_E1301"
+        },
+        {
+          "patternId": "PyLintPython3_E0104"
+        },
+        {
+          "patternId": "PyLintPython3_E0702"
+        },
+        {
+          "patternId": "PyLintPython3_E1132"
+        },
+        {
+          "patternId": "PyLintPython3_W0221"
+        },
+        {
+          "patternId": "PyLintPython3_E0701"
+        },
+        {
+          "patternId": "PyLintPython3_E1206"
+        },
+        {
+          "patternId": "PyLintPython3_E0238"
+        },
+        {
+          "patternId": "PyLintPython3_E1126"
+        },
+        {
+          "patternId": "PyLintPython3_E0114"
+        },
+        {
+          "patternId": "PyLintPython3_W0702"
+        },
+        {
+          "patternId": "PyLintPython3_E0100"
+        },
+        {
+          "patternId": "PyLintPython3_W0106"
+        },
+        {
+          "patternId": "PyLintPython3_E0601"
+        },
+        {
+          "patternId": "PyLintPython3_W1307"
+        },
+        {
+          "patternId": "PyLintPython3_E1302"
+        },
+        {
+          "patternId": "PyLintPython3_E1125"
+        },
+        {
+          "patternId": "PyLintPython3_W0622"
+        },
+        {
+          "patternId": "PyLintPython3_E1111"
+        },
+        {
+          "patternId": "PyLintPython3_E1305"
+        },
+        {
+          "patternId": "PyLintPython3_E0103"
+        },
+        {
+          "patternId": "PyLintPython3_W0410"
+        },
+        {
+          "patternId": "PyLintPython3_E0115"
+        },
+        {
+          "patternId": "PyLintPython3_E1304"
+        },
+        {
+          "patternId": "PyLintPython3_E1123"
+        },
+        {
+          "patternId": "PyLintPython3_W0233"
+        },
+        {
+          "patternId": "PyLintPython3_W1303"
+        },
+        {
+          "patternId": "PyLintPython3_W0199"
+        },
+        {
+          "patternId": "PyLintPython3_W0705"
+        },
+        {
+          "patternId": "PyLintPython3_E1124"
+        },
+        {
+          "patternId": "PyLintPython3_E0704"
+        },
+        {
+          "patternId": "PyLintPython3_W0601"
+        },
+        {
+          "patternId": "PyLintPython3_E0239"
+        },
+        {
+          "patternId": "PyLintPython3_E1120"
+        },
+        {
+          "patternId": "PyLintPython3_W1302"
+        },
+        {
+          "patternId": "PyLintPython3_W0222"
+        },
+        {
+          "patternId": "PyLintPython3_E0711"
+        },
+        {
+          "patternId": "PyLintPython3_W1300"
+        },
+        {
+          "patternId": "PyLintPython3_E1205"
+        },
+        {
+          "patternId": "PyLintPython3_E1201"
+        },
+        {
+          "patternId": "PyLintPython3_W0122"
+        },
+        {
+          "patternId": "PyLintPython3_E1127"
+        }
+      ]
+    },
+    {
+      "toolId": "SonarCSharp",
+      "patterns": [
+        {
+          "patternId": "SonarCSharp_S6781"
+        },
+        {
+          "patternId": "SonarCSharp_S6377"
+        },
+        {
+          "patternId": "SonarCSharp_S5344"
+        },
+        {
+          "patternId": "SonarCSharp_S4347"
+        },
+        {
+          "patternId": "SonarCSharp_S6444"
+        },
+        {
+          "patternId": "SonarCSharp_S4502"
+        },
+        {
+          "patternId": "SonarCSharp_S2115"
+        },
+        {
+          "patternId": "SonarCSharp_S5753"
+        },
+        {
+          "patternId": "SonarCSharp_S5332"
+        },
+        {
+          "patternId": "SonarCSharp_S4423"
+        },
+        {
+          "patternId": "SonarCSharp_S3329"
+        },
+        {
+          "patternId": "SonarCSharp_S2612"
+        },
+        {
+          "patternId": "SonarCSharp_S2257"
+        },
+        {
+          "patternId": "SonarCSharp_S2053"
+        },
+        {
+          "patternId": "SonarCSharp_S5773"
+        },
+        {
+          "patternId": "SonarCSharp_S5766"
+        },
+        {
+          "patternId": "SonarCSharp_S5659"
+        },
+        {
+          "patternId": "SonarCSharp_S2755"
+        },
+        {
+          "patternId": "SonarCSharp_S5542"
+        },
+        {
+          "patternId": "SonarCSharp_S4830"
+        },
+        {
+          "patternId": "SonarCSharp_S5547"
+        },
+        {
+          "patternId": "SonarCSharp_S2068",
+          "parameters": {
+            "credentialWords": "password, passwd, pwd, passphrase"
+          }
+        },
+        {
+          "patternId": "SonarCSharp_S2245"
+        },
+        {
+          "patternId": "SonarCSharp_S4790"
+        },
+        {
+          "patternId": "SonarCSharp_S5042"
+        },
+        {
+          "patternId": "SonarCSharp_S4426"
+        },
+        {
+          "patternId": "SonarCSharp_S4433"
+        },
+        {
+          "patternId": "SonarCSharp_S1215"
+        },
+        {
+          "patternId": "SonarCSharp_S3610"
+        },
+        {
+          "patternId": "SonarCSharp_S1764"
+        },
+        {
+          "patternId": "SonarCSharp_S2934"
+        },
+        {
+          "patternId": "SonarCSharp_S131"
+        },
+        {
+          "patternId": "SonarCSharp_S3217"
+        },
+        {
+          "patternId": "SonarCSharp_S3005"
+        },
+        {
+          "patternId": "SonarCSharp_S1226"
+        },
+        {
+          "patternId": "SonarCSharp_S112"
+        },
+        {
+          "patternId": "SonarCSharp_S2688"
+        },
+        {
+          "patternId": "SonarCSharp_S2743"
+        },
+        {
+          "patternId": "SonarCSharp_S3447"
+        },
+        {
+          "patternId": "SonarCSharp_S2551"
+        },
+        {
+          "patternId": "SonarCSharp_S3440"
+        },
+        {
+          "patternId": "SonarCSharp_S1699"
+        },
+        {
+          "patternId": "SonarCSharp_S2692"
+        },
+        {
+          "patternId": "SonarCSharp_S2674"
+        },
+        {
+          "patternId": "SonarCSharp_S2995"
+        },
+        {
+          "patternId": "SonarCSharp_S2190"
+        },
+        {
+          "patternId": "SonarCSharp_S3880"
+        },
+        {
+          "patternId": "SonarCSharp_S3600"
+        },
+        {
+          "patternId": "SonarCSharp_S3397"
+        },
+        {
+          "patternId": "SonarCSharp_S3251"
+        },
+        {
+          "patternId": "SonarCSharp_S3877"
+        },
+        {
+          "patternId": "SonarCSharp_S3466"
+        },
+        {
+          "patternId": "SonarCSharp_S2955"
+        },
+        {
+          "patternId": "SonarCSharp_S127"
+        },
+        {
+          "patternId": "SonarCSharp_S1210"
+        },
+        {
+          "patternId": "SonarCSharp_S3443"
+        },
+        {
+          "patternId": "SonarCSharp_S3216"
+        },
+        {
+          "patternId": "SonarCSharp_S2996"
+        },
+        {
+          "patternId": "SonarCSharp_S3263"
+        },
+        {
+          "patternId": "SonarCSharp_S3456"
+        },
+        {
+          "patternId": "SonarCSharp_S3449"
+        },
+        {
+          "patternId": "SonarCSharp_S2583"
+        },
+        {
+          "patternId": "SonarCSharp_S3898"
+        },
+        {
+          "patternId": "SonarCSharp_S2123"
+        },
+        {
+          "patternId": "SonarCSharp_S2681"
+        },
+        {
+          "patternId": "SonarCSharp_S3453"
+        },
+        {
+          "patternId": "SonarCSharp_S3220"
+        },
+        {
+          "patternId": "SonarCSharp_S1163"
+        },
+        {
+          "patternId": "SonarCSharp_S2997"
+        },
+        {
+          "patternId": "SonarCSharp_S2757"
+        },
+        {
+          "patternId": "SonarCSharp_S2184"
+        },
+        {
+          "patternId": "SonarCSharp_S2930"
+        },
+        {
+          "patternId": "SonarCSharp_S2275"
+        },
+        {
+          "patternId": "SonarCSharp_S2345"
+        },
+        {
+          "patternId": "SonarCSharp_S2178"
+        },
+        {
+          "patternId": "SonarCSharp_S3457"
+        },
+        {
+          "patternId": "SonarCSharp_S2328"
+        },
+        {
+          "patternId": "SonarCSharp_S3926"
+        },
+        {
+          "patternId": "SonarCSharp_S3168"
+        },
+        {
+          "patternId": "SonarCSharp_S3451"
+        },
+        {
+          "patternId": "SonarCSharp_S1643"
+        },
+        {
+          "patternId": "SonarCSharp_S1944"
+        },
+        {
+          "patternId": "SonarCSharp_S3869"
+        },
+        {
+          "patternId": "SonarCSharp_S1698"
+        },
+        {
+          "patternId": "SonarCSharp_S2223"
+        },
+        {
+          "patternId": "SonarCSharp_S3244"
+        },
+        {
+          "patternId": "SonarCSharp_S2952"
+        },
+        {
+          "patternId": "SonarCSharp_S1313"
+        },
+        {
+          "patternId": "SonarCSharp_S1206"
+        },
+        {
+          "patternId": "SonarCSharp_S3249"
+        },
+        {
+          "patternId": "SonarCSharp_S3237"
+        },
+        {
+          "patternId": "SonarCSharp_S3172"
+        },
+        {
+          "patternId": "SonarCSharp_S1854"
+        },
+        {
+          "patternId": "SonarCSharp_S2696"
+        },
+        {
+          "patternId": "SonarCSharp_S2760"
+        },
+        {
+          "patternId": "SonarCSharp_S2201"
+        },
+        {
+          "patternId": "SonarCSharp_S1449"
+        },
+        {
+          "patternId": "SonarCSharp_S2761"
+        },
+        {
+          "patternId": "SonarCSharp_S3603"
+        },
+        {
+          "patternId": "SonarCSharp_S3241"
+        },
+        {
+          "patternId": "SonarCSharp_S1862"
+        },
+        {
+          "patternId": "SonarCSharp_S3010"
+        },
+        {
+          "patternId": "SonarCSharp_S3444"
+        },
+        {
+          "patternId": "SonarCSharp_S3655"
+        },
+        {
+          "patternId": "SonarCSharp_S1656"
+        },
+        {
+          "patternId": "SonarCSharp_S3247"
+        },
+        {
+          "patternId": "SonarCSharp_S3597"
+        },
+        {
+          "patternId": "SonarCSharp_S3445"
+        },
+        {
+          "patternId": "SonarCSharp_S1244"
+        },
+        {
+          "patternId": "SonarCSharp_S2197"
+        },
+        {
+          "patternId": "SonarCSharp_S2330"
+        },
+        {
+          "patternId": "SonarCSharp_S2259"
+        },
+        {
+          "patternId": "SonarCSharp_S3169"
+        },
+        {
+          "patternId": "SonarCSharp_S3889"
+        },
+        {
+          "patternId": "SonarCSharp_S2931"
+        },
+        {
+          "patternId": "SonarCSharp_S2486"
+        },
+        {
+          "patternId": "SonarCSharp_S2225"
+        }
+      ]
+    },
+    {
+      "toolId": "Prospector",
+      "patterns": [
+        {
+          "patternId": "Prospector_pyflakes"
+        },
+        {
+          "patternId": "Prospector_dodgy"
+        }
+      ]
+    },
+    {
+      "toolId": "TSQLLint",
+      "patterns": [
+        {
+          "patternId": "TSQLLint_full-text"
+        },
+        {
+          "patternId": "TSQLLint_upper-lower"
+        },
+        {
+          "patternId": "TSQLLint_unicode-string"
+        },
+        {
+          "patternId": "TSQLLint_linked-server"
+        },
+        {
+          "patternId": "TSQLLint_data-compression"
+        },
+        {
+          "patternId": "TSQLLint_set-quoted-identifier"
+        },
+        {
+          "patternId": "TSQLLint_cross-database-transaction"
+        },
+        {
+          "patternId": "TSQLLint_non-sargable"
+        },
+        {
+          "patternId": "TSQLLint_disallow-cursors"
+        }
+      ]
+    },
+    {
       "toolId": "Agentlinter",
       "patterns": [
         {
@@ -5312,216 +6169,10 @@
       ]
     },
     {
-      "toolId": "PMD",
+      "toolId": "SQLint",
       "patterns": [
         {
-          "patternId": "PMD_category_java_security_HardCodedCryptoKey"
-        },
-        {
-          "patternId": "PMD_category_vm_errorprone_EmptyForeachStmt"
-        },
-        {
-          "patternId": "PMD_category_apex_security_ApexBadCrypto"
-        },
-        {
-          "patternId": "PMD_category_java_errorprone_EmptyFinalizer"
-        },
-        {
-          "patternId": "PMD_category_java_errorprone_UselessOperationOnImmutable"
-        },
-        {
-          "patternId": "PMD_category_plsql_bestpractices_TomKytesDespair"
-        },
-        {
-          "patternId": "PMD_category_java_errorprone_MethodWithSameNameAsEnclosingClass"
-        },
-        {
-          "patternId": "PMD_category_apex_security_ApexXSSFromURLParam"
-        },
-        {
-          "patternId": "PMD_category_java_errorprone_EqualsNull"
-        },
-        {
-          "patternId": "PMD_category_apex_security_ApexSOQLInjection"
-        },
-        {
-          "patternId": "PMD_category_java_errorprone_JumbledIncrementer"
-        },
-        {
-          "patternId": "PMD_category_apex_security_ApexXSSFromEscapeFalse"
-        },
-        {
-          "patternId": "PMD_category_java_errorprone_UnnecessaryBooleanAssertion"
-        },
-        {
-          "patternId": "PMD_category_apex_security_ApexDangerousMethods"
-        },
-        {
-          "patternId": "PMD_category_ecmascript_errorprone_InnaccurateNumericLiteral"
-        },
-        {
-          "patternId": "PMD_category_java_errorprone_AvoidDecimalLiteralsInBigDecimalConstructor"
-        },
-        {
-          "patternId": "PMD_category_java_errorprone_AvoidCallingFinalize"
-        },
-        {
-          "patternId": "PMD_category_java_errorprone_UnconditionalIfStatement"
-        },
-        {
-          "patternId": "PMD_category_java_errorprone_DontUseFloatTypeForLoopIndices"
-        },
-        {
-          "patternId": "PMD_category_java_errorprone_NonStaticInitializer"
-        },
-        {
-          "patternId": "PMD_category_apex_security_ApexOpenRedirect"
-        },
-        {
-          "patternId": "PMD_category_java_errorprone_JUnitSpelling"
-        },
-        {
-          "patternId": "PMD_category_java_errorprone_AvoidInstanceofChecksInCatchClause"
-        },
-        {
-          "patternId": "PMD_category_vm_errorprone_EmptyIfStmt"
-        },
-        {
-          "patternId": "PMD_category_java_errorprone_JUnitStaticSuite"
-        },
-        {
-          "patternId": "PMD_category_java_multithreading_AvoidThreadGroup"
-        },
-        {
-          "patternId": "PMD_category_java_errorprone_AvoidBranchingStatementAsLastInLoop"
-        },
-        {
-          "patternId": "PMD_category_java_errorprone_ReturnFromFinallyBlock"
-        },
-        {
-          "patternId": "PMD_category_java_errorprone_AssignmentToNonFinalStatic"
-        },
-        {
-          "patternId": "PMD_category_plsql_errorprone_TO_TIMESTAMPWithoutDateFormat"
-        },
-        {
-          "patternId": "PMD_category_jsp_security_IframeMissingSrcAttribute"
-        },
-        {
-          "patternId": "PMD_category_java_errorprone_AvoidMultipleUnaryOperators"
-        },
-        {
-          "patternId": "PMD_category_apex_security_ApexSuggestUsingNamedCred"
-        },
-        {
-          "patternId": "PMD_category_apex_security_ApexInsecureEndpoint"
-        },
-        {
-          "patternId": "PMD_category_java_errorprone_UnnecessaryCaseChange"
-        },
-        {
-          "patternId": "PMD_category_apex_security_ApexSharingViolations"
-        },
-        {
-          "patternId": "PMD_category_jsp_errorprone_JspEncoding"
-        },
-        {
-          "patternId": "PMD_category_pom_errorprone_InvalidDependencyTypes",
-          "parameters": {
-            "validTypes": "pom,jar,maven-plugin,ejb,war,ear,rar,par"
-          }
-        },
-        {
-          "patternId": "PMD_category_ecmascript_errorprone_EqualComparison"
-        },
-        {
-          "patternId": "PMD_category_java_performance_UseStringBufferLength"
-        },
-        {
-          "patternId": "PMD_category_java_errorprone_NonCaseLabelInSwitchStatement"
-        },
-        {
-          "patternId": "PMD_category_xml_errorprone_MistypedCDATASection"
-        },
-        {
-          "patternId": "PMD_category_jsp_bestpractices_NoHtmlComments"
-        },
-        {
-          "patternId": "PMD_category_vf_security_VfUnescapeEl"
-        },
-        {
-          "patternId": "PMD_category_java_errorprone_CheckSkipResult"
-        },
-        {
-          "patternId": "PMD_category_jsp_security_NoUnsanitizedJSPExpression"
-        },
-        {
-          "patternId": "PMD_category_java_performance_StringInstantiation"
-        },
-        {
-          "patternId": "PMD_category_apex_security_ApexCRUDViolation"
-        },
-        {
-          "patternId": "PMD_category_java_multithreading_DontCallThreadRun"
-        },
-        {
-          "patternId": "PMD_category_java_errorprone_MisplacedNullCheck"
-        },
-        {
-          "patternId": "PMD_category_vf_security_VfCsrf"
-        },
-        {
-          "patternId": "PMD_category_plsql_errorprone_TO_DATE_TO_CHAR"
-        },
-        {
-          "patternId": "PMD_category_java_errorprone_DoNotHardCodeSDCard"
-        },
-        {
-          "patternId": "PMD_category_java_errorprone_AvoidAccessibilityAlteration"
-        },
-        {
-          "patternId": "PMD_category_java_errorprone_BrokenNullCheck"
-        },
-        {
-          "patternId": "PMD_category_xsl_performance_AvoidAxisNavigation",
-          "parameters": {
-            "checkSelfDescendantAbreviation": "false"
-          }
-        },
-        {
-          "patternId": "PMD_category_java_errorprone_CompareObjectsWithEquals",
-          "parameters": {
-            "typesThatCompareByReference": "java.lang.Enum,java.lang.Class"
-          }
-        },
-        {
-          "patternId": "PMD_category_java_errorprone_MissingStaticMethodInNonInstantiatableClass",
-          "parameters": {
-            "annotations": "org.springframework.beans.factory.annotation.Autowired,javax.inject.Inject"
-          }
-        },
-        {
-          "patternId": "PMD_category_java_errorprone_UseEqualsToCompareStrings"
-        },
-        {
-          "patternId": "PMD_category_pom_errorprone_ProjectVersionAsDependencyVersion"
-        },
-        {
-          "patternId": "PMD_category_plsql_errorprone_TO_DATEWithoutDateFormat"
-        },
-        {
-          "patternId": "PMD_category_java_performance_StringToString"
-        }
-      ]
-    },
-    {
-      "toolId": "Prospector",
-      "patterns": [
-        {
-          "patternId": "Prospector_pyflakes"
-        },
-        {
-          "patternId": "Prospector_dodgy"
+          "patternId": "SQLint_allIssues"
         }
       ]
     },
@@ -6079,251 +6730,6 @@
       ]
     },
     {
-      "toolId": "PyLintPython3",
-      "patterns": [
-        {
-          "patternId": "PyLintPython3_E0203"
-        },
-        {
-          "patternId": "PyLintPython3_E0102"
-        },
-        {
-          "patternId": "PyLintPython3_E1102"
-        },
-        {
-          "patternId": "PyLintPython3_E1121"
-        },
-        {
-          "patternId": "PyLintPython3_W1301"
-        },
-        {
-          "patternId": "PyLintPython3_E0241"
-        },
-        {
-          "patternId": "PyLintPython3_W0101"
-        },
-        {
-          "patternId": "PyLintPython3_E0107"
-        },
-        {
-          "patternId": "PyLintPython3_E0202"
-        },
-        {
-          "patternId": "PyLintPython3_E1003"
-        },
-        {
-          "patternId": "PyLintPython3_E0302"
-        },
-        {
-          "patternId": "PyLintPython3_E1306"
-        },
-        {
-          "patternId": "PyLintPython3_E0113"
-        },
-        {
-          "patternId": "PyLintPython3_E0301"
-        },
-        {
-          "patternId": "PyLintPython3_W0711"
-        },
-        {
-          "patternId": "PyLintPython3_E0108"
-        },
-        {
-          "patternId": "PyLintPython3_E0604"
-        },
-        {
-          "patternId": "PyLintPython3_W0102"
-        },
-        {
-          "patternId": "PyLintPython3_E0603"
-        },
-        {
-          "patternId": "PyLintPython3_W0150"
-        },
-        {
-          "patternId": "PyLintPython3_E0240"
-        },
-        {
-          "patternId": "PyLintPython3_E0101"
-        },
-        {
-          "patternId": "PyLintPython3_E0110"
-        },
-        {
-          "patternId": "PyLintPython3_E0112"
-        },
-        {
-          "patternId": "PyLintPython3_E0117"
-        },
-        {
-          "patternId": "PyLintPython3_E0211"
-        },
-        {
-          "patternId": "PyLintPython3_E1303"
-        },
-        {
-          "patternId": "PyLintPython3_W0123"
-        },
-        {
-          "patternId": "PyLintPython3_E0106"
-        },
-        {
-          "patternId": "PyLintPython3_E1300"
-        },
-        {
-          "patternId": "PyLintPython3_W1305"
-        },
-        {
-          "patternId": "PyLintPython3_E0105"
-        },
-        {
-          "patternId": "PyLintPython3_E1200"
-        },
-        {
-          "patternId": "PyLintPython3_W0109"
-        },
-        {
-          "patternId": "PyLintPython3_W1306"
-        },
-        {
-          "patternId": "PyLintPython3_E0236"
-        },
-        {
-          "patternId": "PyLintPython3_E0712"
-        },
-        {
-          "patternId": "PyLintPython3_E0710"
-        },
-        {
-          "patternId": "PyLintPython3_E1301"
-        },
-        {
-          "patternId": "PyLintPython3_E0104"
-        },
-        {
-          "patternId": "PyLintPython3_E0702"
-        },
-        {
-          "patternId": "PyLintPython3_E1132"
-        },
-        {
-          "patternId": "PyLintPython3_W0221"
-        },
-        {
-          "patternId": "PyLintPython3_E0701"
-        },
-        {
-          "patternId": "PyLintPython3_E1206"
-        },
-        {
-          "patternId": "PyLintPython3_E0238"
-        },
-        {
-          "patternId": "PyLintPython3_E1126"
-        },
-        {
-          "patternId": "PyLintPython3_E0114"
-        },
-        {
-          "patternId": "PyLintPython3_W0702"
-        },
-        {
-          "patternId": "PyLintPython3_E0100"
-        },
-        {
-          "patternId": "PyLintPython3_W0106"
-        },
-        {
-          "patternId": "PyLintPython3_E0601"
-        },
-        {
-          "patternId": "PyLintPython3_W1307"
-        },
-        {
-          "patternId": "PyLintPython3_E1302"
-        },
-        {
-          "patternId": "PyLintPython3_E1125"
-        },
-        {
-          "patternId": "PyLintPython3_W0622"
-        },
-        {
-          "patternId": "PyLintPython3_E1111"
-        },
-        {
-          "patternId": "PyLintPython3_E1305"
-        },
-        {
-          "patternId": "PyLintPython3_E0103"
-        },
-        {
-          "patternId": "PyLintPython3_W0410"
-        },
-        {
-          "patternId": "PyLintPython3_E0115"
-        },
-        {
-          "patternId": "PyLintPython3_E1304"
-        },
-        {
-          "patternId": "PyLintPython3_E1123"
-        },
-        {
-          "patternId": "PyLintPython3_W0233"
-        },
-        {
-          "patternId": "PyLintPython3_W1303"
-        },
-        {
-          "patternId": "PyLintPython3_W0199"
-        },
-        {
-          "patternId": "PyLintPython3_W0705"
-        },
-        {
-          "patternId": "PyLintPython3_E1124"
-        },
-        {
-          "patternId": "PyLintPython3_E0704"
-        },
-        {
-          "patternId": "PyLintPython3_W0601"
-        },
-        {
-          "patternId": "PyLintPython3_E0239"
-        },
-        {
-          "patternId": "PyLintPython3_E1120"
-        },
-        {
-          "patternId": "PyLintPython3_W1302"
-        },
-        {
-          "patternId": "PyLintPython3_W0222"
-        },
-        {
-          "patternId": "PyLintPython3_E0711"
-        },
-        {
-          "patternId": "PyLintPython3_W1300"
-        },
-        {
-          "patternId": "PyLintPython3_E1205"
-        },
-        {
-          "patternId": "PyLintPython3_E1201"
-        },
-        {
-          "patternId": "PyLintPython3_W0122"
-        },
-        {
-          "patternId": "PyLintPython3_E1127"
-        }
-      ]
-    },
-    {
       "toolId": "Stylelint",
       "patterns": [
         {
@@ -6355,185 +6761,6 @@
     {
       "toolId": "Lizard",
       "patterns": []
-    },
-    {
-      "toolId": "Bandit",
-      "patterns": [
-        {
-          "patternId": "Bandit_B202"
-        },
-        {
-          "patternId": "Bandit_B113"
-        },
-        {
-          "patternId": "Bandit_B311"
-        },
-        {
-          "patternId": "Bandit_B301"
-        },
-        {
-          "patternId": "Bandit_B609"
-        },
-        {
-          "patternId": "Bandit_B506"
-        },
-        {
-          "patternId": "Bandit_B407"
-        },
-        {
-          "patternId": "Bandit_B317"
-        },
-        {
-          "patternId": "Bandit_B102"
-        },
-        {
-          "patternId": "Bandit_B505"
-        },
-        {
-          "patternId": "Bandit_B108"
-        },
-        {
-          "patternId": "Bandit_B608"
-        },
-        {
-          "patternId": "Bandit_B702"
-        },
-        {
-          "patternId": "Bandit_B401"
-        },
-        {
-          "patternId": "Bandit_B406"
-        },
-        {
-          "patternId": "Bandit_B315"
-        },
-        {
-          "patternId": "Bandit_B501"
-        },
-        {
-          "patternId": "Bandit_B107"
-        },
-        {
-          "patternId": "Bandit_B110"
-        },
-        {
-          "patternId": "Bandit_B603"
-        },
-        {
-          "patternId": "Bandit_B201"
-        },
-        {
-          "patternId": "Bandit_B104"
-        },
-        {
-          "patternId": "Bandit_B304"
-        },
-        {
-          "patternId": "Bandit_B601"
-        },
-        {
-          "patternId": "Bandit_B321"
-        },
-        {
-          "patternId": "Bandit_B309"
-        },
-        {
-          "patternId": "Bandit_B606"
-        },
-        {
-          "patternId": "Bandit_B310"
-        },
-        {
-          "patternId": "Bandit_B316"
-        },
-        {
-          "patternId": "Bandit_B105"
-        },
-        {
-          "patternId": "Bandit_B318"
-        },
-        {
-          "patternId": "Bandit_B112"
-        },
-        {
-          "patternId": "Bandit_B405"
-        },
-        {
-          "patternId": "Bandit_B402"
-        },
-        {
-          "patternId": "Bandit_B313"
-        },
-        {
-          "patternId": "Bandit_B320"
-        },
-        {
-          "patternId": "Bandit_B409"
-        },
-        {
-          "patternId": "Bandit_B602"
-        },
-        {
-          "patternId": "Bandit_B307"
-        },
-        {
-          "patternId": "Bandit_B303"
-        },
-        {
-          "patternId": "Bandit_B701"
-        },
-        {
-          "patternId": "Bandit_B403"
-        },
-        {
-          "patternId": "Bandit_B604"
-        },
-        {
-          "patternId": "Bandit_B312"
-        },
-        {
-          "patternId": "Bandit_B502"
-        },
-        {
-          "patternId": "Bandit_B411"
-        },
-        {
-          "patternId": "Bandit_B408"
-        },
-        {
-          "patternId": "Bandit_B308"
-        },
-        {
-          "patternId": "Bandit_B306"
-        },
-        {
-          "patternId": "Bandit_B410"
-        },
-        {
-          "patternId": "Bandit_B314"
-        },
-        {
-          "patternId": "Bandit_B302"
-        },
-        {
-          "patternId": "Bandit_B103"
-        },
-        {
-          "patternId": "Bandit_B319"
-        },
-        {
-          "patternId": "Bandit_B503"
-        },
-        {
-          "patternId": "Bandit_B504"
-        },
-        {
-          "patternId": "Bandit_B305"
-        },
-        {
-          "patternId": "Bandit_B404"
-        }
-      ]
     },
     {
       "toolId": "jackson",
@@ -6682,6 +6909,214 @@
     "cmake/_deps/vscp-build/CMakeFiles/vscp_mdf.dir/compiler_depend.ts",
     "cmake/_deps/vscp-build/CMakeFiles/vscp_sockettcp.dir/compiler_depend.ts",
     "cmake/_deps/vscp-build/CMakeFiles/vscp_util.dir/compiler_depend.ts",
+    "cmake-includes/_deps/spdlog-build/CMakeFiles/spdlog.dir/compiler_depend.ts",
+    "cmake-includes/_deps/vscp-src/contrib/samples/arduino/esp8266/dht11/dht.c",
+    "cmake-includes/_deps/vscp-src/contrib/samples/arduino/esp8266/pir detector/sketch_pir_detector.ino",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/autoself.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/autoself.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/dlgabout.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/dlgabout.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/dlgabout_symbols.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/dlgmain.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/dlgmain.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/dlgnodeinfo.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/dlgnodeinfo.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/dlgnodeinfo_symbols.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/dlgnodelist.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/dlgnodelist.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/dlgnodelist_symbols.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/dlgselectunit.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/dlgselectunit.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/dlgselectunit_symbols.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/dlgsettings.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/dlgsettings.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/dlgsettings_symbols.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/frmmain.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/frmmain.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/frmmain_symbols.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/frmmessagelog.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/frmmessagelog.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/frmmessagelog_symbols.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/frmNode.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/frmNode.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/frmNode_symbols.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/frmselectunit_symbols.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/pictures.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/platform.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/threadvscpwork.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/autoself/threadvscpwork.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/esp8266/blinky/blinky.c",
+    "cmake-includes/_deps/vscp-src/contrib/samples/esp8266/blinky/user_config.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/esp8266/vscp_daemon_connect/user_config.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/esp8266/vscp_daemon_connect/vscptest.c",
+    "cmake-includes/_deps/vscp-src/contrib/samples/fli4lcid/fli4lcidapp.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/fli4lcid/fli4lcidapp.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/fli4lcid/fli4lcidtest.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/fli4lcid/fli4lcidtest.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/fli4lcid/fli4lcidtest_symbols.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/html5/echotest/test.html",
+    "cmake-includes/_deps/vscp-src/contrib/samples/multicast/multicast_listen.c",
+    "cmake-includes/_deps/vscp-src/contrib/samples/multicast/multicast_send.c",
+    "cmake-includes/_deps/vscp-src/contrib/samples/node_js/connect_tcpip_server.js",
+    "cmake-includes/_deps/vscp-src/contrib/samples/node_js/node-red-node-vscp-events/node_events.html",
+    "cmake-includes/_deps/vscp-src/contrib/samples/node_js/node-red-node-vscp-events/node_receive.js",
+    "cmake-includes/_deps/vscp-src/contrib/samples/node_js/node-red-node-vscp-events/package.json",
+    "cmake-includes/_deps/vscp-src/contrib/samples/node_js/node-red-node-vscp-events/README.md",
+    "cmake-includes/_deps/vscp-src/contrib/samples/node_js/receive_tcpip_server.js",
+    "cmake-includes/_deps/vscp-src/contrib/samples/python/client.py",
+    "cmake-includes/_deps/vscp-src/contrib/samples/python/gettempfromyr.py",
+    "cmake-includes/_deps/vscp-src/contrib/samples/python/page_read.py",
+    "cmake-includes/_deps/vscp-src/contrib/samples/python/README.md",
+    "cmake-includes/_deps/vscp-src/contrib/samples/python/read_register.py",
+    "cmake-includes/_deps/vscp-src/contrib/samples/python/send1wvalues.py",
+    "cmake-includes/_deps/vscp-src/contrib/samples/python/send_burst.py",
+    "cmake-includes/_deps/vscp-src/contrib/samples/python/send_pi_cpu_temp.py",
+    "cmake-includes/_deps/vscp-src/contrib/samples/python/send_pi_gpu_temp.py",
+    "cmake-includes/_deps/vscp-src/contrib/samples/python/send_pi_onewire.py",
+    "cmake-includes/_deps/vscp-src/contrib/samples/python/sendvalues.py",
+    "cmake-includes/_deps/vscp-src/contrib/samples/python/smhi/smhi_parse.py",
+    "cmake-includes/_deps/vscp-src/contrib/samples/python/test.py",
+    "cmake-includes/_deps/vscp-src/contrib/samples/python/vscp_class.py",
+    "cmake-includes/_deps/vscp-src/contrib/samples/python/vscpdif.py",
+    "cmake-includes/_deps/vscp-src/contrib/samples/python/vscp_type.py",
+    "cmake-includes/_deps/vscp-src/contrib/samples/python/whoisthere.py",
+    "cmake-includes/_deps/vscp-src/contrib/samples/python/write_register.py",
+    "cmake-includes/_deps/vscp-src/contrib/samples/rest/Linux/README.md",
+    "cmake-includes/_deps/vscp-src/contrib/samples/rest/README.md",
+    "cmake-includes/_deps/vscp-src/contrib/samples/rest/web/index.html",
+    "cmake-includes/_deps/vscp-src/contrib/samples/rest/web/README.md",
+    "cmake-includes/_deps/vscp-src/contrib/samples/rest/windows/README.md",
+    "cmake-includes/_deps/vscp-src/contrib/samples/samples/win32/mfc/CanalDiagnostic/CanalDiagnostic.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/samples/win32/mfc/CanalDiagnostic/CanalDiagnosticDoc.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/samples/win32/mfc/CanalDiagnostic/CanalDiagnosticDoc.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/samples/win32/mfc/CanalDiagnostic/CanalDiagnostic.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/samples/win32/mfc/CanalDiagnostic/CanalDiagnosticView.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/samples/win32/mfc/CanalDiagnostic/CanalDiagnosticView.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/samples/win32/mfc/CanalDiagnostic/ChildFrm.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/samples/win32/mfc/CanalDiagnostic/ChildFrm.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/samples/win32/mfc/CanalDiagnostic/DocumentProperties.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/samples/win32/mfc/CanalDiagnostic/DocumentProperties.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/samples/win32/mfc/CanalDiagnostic/MainFrm.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/samples/win32/mfc/CanalDiagnostic/MainFrm.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/samples/win32/mfc/CanalDiagnostic/NewDocument.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/samples/win32/mfc/CanalDiagnostic/NewDocument.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/samples/win32/mfc/CanalDiagnostic/resource.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/samples/win32/mfc/CanalDiagnostic/SendBurst.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/samples/win32/mfc/CanalDiagnostic/SendBurst.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/samples/win32/mfc/CanalDiagnostic/Splash.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/samples/win32/mfc/CanalDiagnostic/Splash.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/samples/win32/mfc/CanalDiagnostic/StdAfx.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/samples/win32/mfc/CanalDiagnostic/StdAfx.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/samples/win32/mfc/loggerwnd/dlgfilter.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/samples/win32/mfc/loggerwnd/dlgfilter.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/samples/win32/mfc/loggerwnd/loggerwnd.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/samples/win32/mfc/loggerwnd/loggerwnddlg.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/samples/win32/mfc/loggerwnd/loggerwnddlg.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/samples/win32/mfc/loggerwnd/loggerwnd.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/samples/win32/mfc/loggerwnd/resource.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/samples/win32/mfc/loggerwnd/StdAfx.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/samples/win32/mfc/loggerwnd/StdAfx.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/server/resource.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/server/server.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/server/serverDlg.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/server/serverDlg.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/server/server.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/server/StdAfx.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/server/StdAfx.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/smstools/doalarm.py",
+    "cmake-includes/_deps/vscp-src/contrib/samples/smstools/README.md",
+    "cmake-includes/_deps/vscp-src/contrib/samples/testinterface/testinterfaceapp.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/testinterface/testinterfaceapp.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/testinterface/testinterface.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/testinterface/testinterface.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/testsuite/simplebutton/OptionDialog.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/testsuite/simplebutton/OptionDialog.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/testsuite/simplebutton/resource.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/testsuite/simplebutton/simplebutton.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/testsuite/simplebutton/simplebutton.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/testsuite/simpledimmer/OptionDialog.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/testsuite/simpledimmer/OptionDialog.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/testsuite/simpledimmer/resource.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/testsuite/simpledimmer/simpledimmer.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/testsuite/simpledimmer/simpledimmer.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/testsuite/simplelamp/OptionDialog.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/testsuite/simplelamp/OptionDialog.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/testsuite/simplelamp/resource.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/testsuite/simplelamp/simplelamp.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/testsuite/simplelamp/simplelamp.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/twilio/sendsms.sh",
+    "cmake-includes/_deps/vscp-src/contrib/samples/vscpbutton/configuration.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/vscpbutton/configuration.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/vscpbutton/configuration_symbols.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/vscpbutton/vscpbuttonapp.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/vscpbutton/vscpbuttonapp.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/vscpbutton/vscpbutton.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/vscpbutton/vscpbutton.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/vscpbutton/vscpbutton_symbols.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/vscpsimnode/defaultsettings.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/vscpsimnode/defaultsettings.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/vscpsimnode/defaultsettings_symbols.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/vscpsimnode/dlgsimulatedvscpnode.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/vscpsimnode/dlgsimulatedvscpnode.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/vscpsimnode/dlgsimulatedvscpnode_symbols.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/vscpsimnode/vscpsimnodeapp.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/vscpsimnode/vscpsimnodeapp.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/websockets/testapplets.html",
+    "cmake-includes/_deps/vscp-src/contrib/samples/websockets/vscp_testapplet.html",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/CanalDiagnostic/CanalDiagnostic.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/CanalDiagnostic/CanalDiagnosticDoc.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/CanalDiagnostic/CanalDiagnosticDoc.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/CanalDiagnostic/CanalDiagnostic.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/CanalDiagnostic/CanalDiagnosticView.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/CanalDiagnostic/CanalDiagnosticView.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/CanalDiagnostic/ChildFrm.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/CanalDiagnostic/ChildFrm.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/CanalDiagnostic/DocumentProperties.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/CanalDiagnostic/DocumentProperties.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/CanalDiagnostic/MainFrm.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/CanalDiagnostic/MainFrm.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/CanalDiagnostic/NewDocument.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/CanalDiagnostic/NewDocument.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/CanalDiagnostic/resource.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/CanalDiagnostic/SendBurst.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/CanalDiagnostic/SendBurst.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/CanalDiagnostic/Splash.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/CanalDiagnostic/Splash.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/CanalDiagnostic/StdAfx.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/CanalDiagnostic/StdAfx.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/loggerwnd/dlgfilter.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/loggerwnd/dlgfilter.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/loggerwnd/loggerwnd.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/loggerwnd/loggerwnddlg.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/loggerwnd/loggerwnddlg.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/loggerwnd/loggerwnd.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/loggerwnd/resource.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/loggerwnd/StdAfx.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/loggerwnd/StdAfx.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/vc6_simple_button/resource.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/vc6_simple_button/StdAfx.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/vc6_simple_button/StdAfx.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/vc6_simple_button/vc6_simple_button.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/vc6_simple_button/vc6_simple_buttonDlg.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/vc6_simple_button/vc6_simple_buttonDlg.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/vc6_simple_button/vc6_simple_button.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/vc6_simple_lamp/resource.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/vc6_simple_lamp/StdAfx.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/vc6_simple_lamp/StdAfx.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/vc6_simple_lamp/vc6_simple_lamp.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/vc6_simple_lamp/vc6_simple_lampDlg.cpp",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/vc6_simple_lamp/vc6_simple_lampDlg.h",
+    "cmake-includes/_deps/vscp-src/contrib/samples/win32/mfc/vc6_simple_lamp/vc6_simple_lamp.h",
+    "cmake-includes/_deps/vscp-src/contrib/vscp_analyzer_windows/vscp_analyzer/MainForm.Designer.cs",
+    "cmake-includes/_deps/vscp-src/contrib/vscp_analyzer_windows/vscp_analyzer/Properties/Resources.Designer.cs",
+    "cmake-includes/_deps/vscp-src/contrib/vscp_analyzer_windows/vscp_analyzer/Properties/Settings.Designer.cs",
+    "cmake-includes/_deps/vscp-src/tests/tables-remote-class/test_tables_remote_class.cpp",
+    "cmake-includes/_deps/vscp-src/tests/vscphelper/test_vscphelper.cpp",
+    "cmake-includes/_deps/vscp-src/third-party/sqlite3/Replace.cs",
+    "cmake-includes/_deps/vscp-src/third-party/sqlite3/sqlite3ext.h",
+    "cmake-includes/_deps/vscp-src/third-party/sqlite3/sqlite3rc.h",
+    "cmake-includes/_deps/vscp-src/third-party/sqlite3/tea/generic/tclsqlite3.c",
+    "cmake-includes/_deps/vscp-src/third-party/sqlite3/tea/win/nmakehlp.c",
     "tests/noop/noop.cpp",
     "tests/tables-remote-class/test_tables_remote_class.cpp",
     "tests/vscphelper/test_vscphelper.cpp"

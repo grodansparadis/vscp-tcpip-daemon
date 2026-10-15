@@ -123,8 +123,10 @@ FetchContent_Declare(
   # there is no need to clone the repository. A pinned source tarball avoids
   # fetching ~1.2GB of git history plus ~400MB of submodules that this project
   # never uses.
-  URL https://codeload.github.com/grodansparadis/vscp/tar.gz/6b76083bc75a759bfa19a568aabad2ff41cda5bc
-  URL_HASH SHA256=63595c85fd7350b42069d7528fb8801f333ddbdee432393121adb7d5f6d93fdf
+  # Get URL_HASH
+  # curl -sL https://codeload.github.com/grodansparadis/vscp/tar.gz/<commit> | sha256sum
+  URL https://codeload.github.com/grodansparadis/vscp/tar.gz/e73fcb72c458f2de748c6affa8ec2675eaf4af8b
+  URL_HASH SHA256=ceae4462c57f0973bfaf65244751829c99d8b4bb14073f735fab927de3f9c1bf
   ${VSCP_FETCH_CONTENT_OPTIONS}
 )
 # Make the VSCP sources available without adding its standalone library targets
@@ -210,6 +212,9 @@ endif()
 # ---- Build the vscpd executable ----
 add_executable(vscpd ${VSCPD_SOURCES})
 set_target_properties(vscpd PROPERTIES OUTPUT_NAME "vscpd")
+if(WIN32)
+    set_target_properties(vscpd PROPERTIES OUTPUT_NAME "tcpip-vscpd")
+endif()
 
 # ---- Build the password-hash utility ----
 add_executable(mk_password_hash
@@ -289,7 +294,7 @@ if(WIN32)
         message(FATAL_ERROR "No usable pthreads target found for MSVC. Install the PThreads4W/pthread dependency (for example via vcpkg) before building.")
     endif()
 
-    target_link_libraries(vscpd PRIVATE iphlpapi netapi32)
+    target_link_libraries(vscpd PRIVATE iphlpapi netapi32 advapi32)
     target_link_libraries(vscpd PRIVATE dlfcn-win32::dl)
 
     if(MSVC)

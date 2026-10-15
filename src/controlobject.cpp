@@ -525,9 +525,9 @@ CControlObject::run(void)
             // Save time
             timespec_get(&old_now, TIME_UTC);
 
-            // if (!doAutomation(pClientItem)) {
-            //     spdlog::error("Failed to send automation events!");
-            // }
+            if (!doAutomation(pClientItem)) {
+                spdlog::error("Failed to send automation events!");
+            }
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(500));

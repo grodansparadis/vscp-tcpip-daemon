@@ -73,7 +73,9 @@
 #include <vscphelper.h>
 
 #include <deque>
+#include <mutex>
 #include <string>
+#include <vector>
 
 #include <spdlog/async.h>
 #include <spdlog/sinks/basic_file_sink.h>
@@ -94,6 +96,54 @@ uint8_t __vscp_key[32] = { 0x2d, 0xbb, 0x07, 0x9a, 0x38, 0x98, 0x5a, 0xf0, 0x0e,
 
 // Control object
 CControlObject *gpobj;
+
+#ifdef WIN32
+static char serviceName[] = "tcpip-vscpd";
+static SERVICE_STATUS_HANDLE serviceStatusHandle = nullptr;
+static SERVICE_STATUS serviceStatus{};
+static std::mutex serviceMutex;
+static bool serviceStopRequested = false;
+static CControlObject* serviceControl = nullptr;
+static int serviceArgc = 0;
+static char** serviceArgv = nullptr;
+static int serviceResult = EXIT_FAILURE;
+
+static bool
+reportServiceStatus(DWORD state, DWORD error = NO_ERROR)
+{
+  serviceStatus.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
+  serviceStatus.dwCurrentState = state;
+  serviceStatus.dwControlsAccepted = state == SERVICE_RUNNING ?
+    SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN : 0;
+  serviceStatus.dwWin32ExitCode = error;
+  serviceStatus.dwWaitHint =
+    state == SERVICE_START_PENDING || state == SERVICE_STOP_PENDING ? 30000 : 0;
+  serviceStatus.dwCheckPoint = serviceStatus.dwWaitHint ? serviceStatus.dwCheckPoint + 1 : 0;
+  if (!SetServiceStatus(serviceStatusHandle, &serviceStatus)) {
+    spdlog::error("SetServiceStatus failed: {}", GetLastError());
+    return false;
+  }
+  return true;
+}
+
+static DWORD WINAPI
+serviceHandler(DWORD control, DWORD, LPVOID, LPVOID)
+{
+  std::lock_guard<std::mutex> lock(serviceMutex);
+  switch (control) {
+    case SERVICE_CONTROL_STOP:
+    case SERVICE_CONTROL_SHUTDOWN:
+      serviceStopRequested = true;
+      if (serviceControl) serviceControl->m_bQuit = true;
+      return reportServiceStatus(SERVICE_STOP_PENDING) ? NO_ERROR : GetLastError();
+    case SERVICE_CONTROL_INTERROGATE:
+      return reportServiceStatus(serviceStatus.dwCurrentState,
+                                 serviceStatus.dwWin32ExitCode) ? NO_ERROR : GetLastError();
+    default:
+      return ERROR_CALL_NOT_IMPLEMENTED;
+  }
+}
+#endif
 
 // Forward declarations
 void
@@ -249,13 +299,15 @@ setupSignalHandlers()
 // The one and only app. object
 //
 
-int
-main(int argc, char **argv)
+static int
+runDaemon(int argc, char **argv)
 {
   int opt = 0;
   std::string rootFolder; // Folder where VSCP files & folders will be located
   std::string strcfgfile; // Points to XML configuration file
+#ifndef WIN32
   pid_t sid = 0;
+#endif
 
   char *value = getenv("VSCP_ENABLE_UDP_DEBUG");
   if (value != NULL) {
@@ -319,22 +371,20 @@ main(int argc, char **argv)
 
       case 'g':
         copyleft();
-        exit(0);
-        break;
+        return EXIT_SUCCESS;
 
       case 'v':
         fprintf(stderr, "%s\n", VSCPD_DISPLAY_VERSION);
-        exit(0);
-        break;
+        return EXIT_SUCCESS;
 
       default:
       case 'h':
         help(argv[0]);
-        exit(-1);
+        return EXIT_FAILURE;
     }
   }
 
-  console->info("Starting the VSCP MQTT daemon...");
+  console->info("Starting the VSCP TCP/IP daemon...");
   console->info("Configfile = {}", strcfgfile);
 
 
@@ -377,8 +427,25 @@ main(int argc, char **argv)
 #endif
     spdlog::drop_all();
     spdlog::shutdown();
-    exit(EXIT_FAILURE);
+    delete gpobj;
+    gpobj = nullptr;
+    return EXIT_FAILURE;
   }
+
+  bool success = true;
+#ifdef WIN32
+  if (serviceStatusHandle) {
+    std::lock_guard<std::mutex> lock(serviceMutex);
+    serviceControl = gpobj;
+    if (serviceStopRequested) {
+      gpobj->m_bQuit = true;
+    }
+    else if (!reportServiceStatus(SERVICE_RUNNING)) {
+      gpobj->m_bQuit = true;
+      success = false;
+    }
+  }
+#endif
 
   // Console log
   // auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
@@ -433,25 +500,34 @@ main(int argc, char **argv)
   console->debug("vscpd: run.");
 
   if (!gpobj->run()) {
+    success = false;
     console->critical("vscpd: Unable to start the vscpd application. Exiting.");
 #ifndef WIN32
     unlink("/var/run/vscpd.pid");
 #endif
-    spdlog::drop_all();
-    spdlog::shutdown();
-    exit(EXIT_FAILURE);
   }
+
+#ifdef WIN32
+  if (serviceStatusHandle) {
+    std::lock_guard<std::mutex> lock(serviceMutex);
+    if (!reportServiceStatus(SERVICE_STOP_PENDING)) success = false;
+  }
+#endif
 
   console->debug("vscpd: cleanup.");
 
   if (!gpobj->cleanup()) {
     console->critical("vscpd: Unable to clean up the vscpd application.");
-    spdlog::drop_all();
-    spdlog::shutdown();
-    exit(EXIT_FAILURE);
+    success = false;
   }
 
   console->debug("vscpd: Deleting the control object.");
+#ifdef WIN32
+  {
+    std::lock_guard<std::mutex> lock(serviceMutex);
+    serviceControl = nullptr;
+  }
+#endif
   delete gpobj;
 
 #ifndef WIN32
@@ -464,7 +540,67 @@ main(int argc, char **argv)
   spdlog::drop_all();
   spdlog::shutdown();
 
-  exit(EXIT_SUCCESS);
+  return success ? EXIT_SUCCESS : EXIT_FAILURE;
+}
+
+#ifdef WIN32
+static void WINAPI
+serviceMain(DWORD, LPSTR*)
+{
+  serviceStatusHandle = RegisterServiceCtrlHandlerExA(serviceName, serviceHandler, nullptr);
+  if (!serviceStatusHandle) {
+    spdlog::error("RegisterServiceCtrlHandlerEx failed: {}", GetLastError());
+    return;
+  }
+  {
+    std::lock_guard<std::mutex> lock(serviceMutex);
+    if (!reportServiceStatus(SERVICE_START_PENDING)) return;
+  }
+  serviceResult = runDaemon(serviceArgc, serviceArgv);
+  std::lock_guard<std::mutex> lock(serviceMutex);
+  reportServiceStatus(SERVICE_STOPPED,
+                      serviceResult == EXIT_SUCCESS ? NO_ERROR : ERROR_PROCESS_ABORTED);
+}
+#endif
+
+int
+main(int argc, char** argv)
+{
+#ifdef WIN32
+  bool consoleMode = false;
+  std::vector<char*> arguments(argv, argv + argc);
+  char standalone[] = "-s";
+  for (int i = 1; i < argc; ++i) {
+    if (!strcmp(argv[i], "--console")) {
+      arguments[i] = standalone;
+      consoleMode = true;
+    }
+    else if (!strcmp(argv[i], "-s") || !strcmp(argv[i], "-h") ||
+             !strcmp(argv[i], "-v") || !strcmp(argv[i], "-g")) {
+      consoleMode = true;
+    }
+    else if (!strcmp(argv[i], "-c") || !strcmp(argv[i], "-r") ||
+             !strcmp(argv[i], "-k") || !strcmp(argv[i], "-d")) {
+      ++i;
+    }
+  }
+  arguments.push_back(nullptr);
+  if (consoleMode) return runDaemon(argc, arguments.data());
+  serviceArgc = argc;
+  serviceArgv = arguments.data();
+  SERVICE_TABLE_ENTRYA table[] = {
+    {serviceName, serviceMain},
+    {nullptr, nullptr}
+  };
+  if (!StartServiceCtrlDispatcherA(table)) {
+    fprintf(stderr, "Service dispatcher failed (%lu). Use --console for interactive execution.\n",
+            static_cast<unsigned long>(GetLastError()));
+    return EXIT_FAILURE;
+  }
+  return serviceResult;
+#else
+  return runDaemon(argc, argv);
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -529,6 +665,9 @@ help(char *szPrgname)
   fprintf(stderr, "\t-h\tThis help message.\n");
   fprintf(stderr, "\t-v\tPrint version. \n");
   fprintf(stderr, "\t-s\tStandalone (don't run as daemon). \n");
+#ifdef WIN32
+  fprintf(stderr, "\t--console\tRun interactively instead of as a Windows service.\n");
+#endif
   fprintf(stderr, "\t-r\tSpecify VSCP root folder (default:%s). \n", VSCPD_DEFAULT_ROOT_FOLDER);
   fprintf(stderr, "\t-c\tSpecify a configuration file (with path). \n");
   fprintf(stderr, "\t-k\t32 byte encryption key string in hex format. \n");
