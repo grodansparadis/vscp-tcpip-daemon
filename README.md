@@ -12,6 +12,13 @@
 
 A central VSCP daemon that exports a VSCP tcp/ip link interface and handles level I and level II drivers.
 
+Incoming events immediately wake the TCP/IP server's event loop to distribute
+them to client queues, without waiting for a timer or blocking on the main
+receive-queue semaphore. Each pass processes at most the queue size observed
+at its start. The 100 ms timer remains a fallback for failed wakeups.
+Clients in `RCVLOOP` mode send queued events on wakeup or polling; other clients
+retrieve them with `RETR`.
+
 ## Windows service
 
 The Windows daemon executable is `tcpip-vscpd.exe` and can run as a Windows service.

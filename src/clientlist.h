@@ -56,6 +56,7 @@
 #include <vscpdatetime.h>
 
 #include <deque>
+#include <functional>
 #include <list>
 
 /// Forward declarations for classes and structs used in CClientItem
@@ -634,7 +635,9 @@ class CClientList {
 
     /*!
         Add an event to the client output queue if capacity is available.
-        @param pEvent Event to enqueue; ownership transfers on success
+        @param pEvent Heap-allocated event to enqueue; ownership transfers on
+          success, including its payload. The caller must not access or delete
+          it after successful enqueue.
         @return True if the event was queued
     */
     bool enqueueReceiveEvent(vscpEvent* pEvent);
@@ -654,6 +657,9 @@ class CClientList {
 
     /// Signal that the client main receive queue should be processed.
     void notifyClientMainReceiveQueueEvent(void);
+
+    /// Install or clear a non-blocking notifier; it must not access this queue.
+    void setMainReceiveQueueNotifier(std::function<void()> notifier);
 
     /*!
         Get the size of the client list
@@ -720,6 +726,8 @@ class CClientList {
         Mutex for the client main receive queue
      */
     pthread_mutex_t m_mutex_ClientMainReceiveQueue;
+
+    std::function<void()> m_mainReceiveQueueNotifier;
 
     /*!
         Semaphore that is signaled when workerthread

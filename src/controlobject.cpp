@@ -73,6 +73,7 @@
 #endif
 
 #include <algorithm>
+#include <chrono>
 #include <deque>
 #include <fstream>
 #include <list>
@@ -80,6 +81,7 @@
 #include <set>
 #include <vector>
 #include <string>
+#include <thread>
 
 #include "version.h"
 
@@ -528,35 +530,7 @@ CControlObject::run(void)
             // }
         }
 
-        // Wait for semaphore indicating events have been sent to all clients
-        int rv = m_clientList.waitForClientMainReceiveQueueEvent(500);
-        if (rv == -1) {
-            if (errno == ETIMEDOUT) {
-                continue;
-            }
-            spdlog::error("Error waiting for output queue event: {}",
-                          strerror(errno));
-            break;
-        }
-
-        //----------------------------------------------------------------------
-        //                         Event received here
-        //                   from one of the incoming source
-        //----------------------------------------------------------------------
-
-        //vscpEvent* pev = pClientItem->getEventFromSendQueue(true);
-        vscpEvent* pev = m_clientList.getEventFromClientMainReceiveQueue(true);
-        if (NULL == pev) {
-            continue;
-        }
-
-        // Process the received event here
-        m_clientList.sendEventAllClients(pev,pev->obid);
-
-        vscp_deleteEvent(pev);
-
-        // mg_mgr_poll(&mgr, 100); // Infinite event loop, blocks for upto 100ms
-        //  unless there is network activity
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
     } // while
 

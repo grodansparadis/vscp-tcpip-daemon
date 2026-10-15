@@ -31,10 +31,12 @@
 //
 
 #include <list>
+#include <new>
 #include <string>
 
 #include <arpa/inet.h>
 #include <canal-macro.h>
+#include <errno.h>
 #include <netinet/in.h>
 #include <signal.h>
 #include <stdlib.h>
@@ -128,10 +130,48 @@ memmem(const void* haystack,
 // }
 
 static void
+processMainReceiveQueue(CTcpipSrv* server)
+{
+    CClientList& clientList = server->getControlObject()->getClientList();
+    // Limit each pass to the current queue size so producers cannot starve I/O.
+    for (size_t remaining = clientList.getMainReceiveQueueSize();
+         remaining > 0 && server->isWorking();
+         --remaining) {
+        if (-1 == clientList.waitForClientMainReceiveQueueEvent(0)) {
+            if (errno == ETIMEDOUT || errno == EAGAIN) {
+                break;
+            }
+            if (errno == EINTR) {
+                continue;
+            }
+            spdlog::error("TCP/IP timer: error waiting for receive queue event: {}",
+                          strerror(errno));
+            break;
+        }
+
+        vscpEvent* pev = clientList.getEventFromClientMainReceiveQueue(true);
+        if (nullptr == pev) {
+            spdlog::error("TCP/IP timer: receive queue signaled but empty");
+            break;
+        }
+
+        clientList.sendEventAllClients(pev, pev->obid);
+        vscp_deleteEvent_v2(&pev);
+    }
+}
+
+static void
 timer_fn(void* arg)
 {
-    struct mg_mgr* mgr       = (struct mg_mgr*)arg;
-    CControlObject* pCtrlObj = (CControlObject*)mgr->userdata;
+    auto* mgr = static_cast<struct mg_mgr*>(arg);
+    auto* server = static_cast<CTcpipSrv*>(mgr->userdata);
+    if (nullptr == server || nullptr == server->getControlObject()) {
+        spdlog::error("TCP/IP timer: missing server or control object");
+        return;
+    }
+
+    // Startup backlog and failed wakeups still get a retry.
+    processMainReceiveQueue(server);
 
     // iterate through all active connections
     for (struct mg_connection* conn = mgr->conns; conn != NULL;
@@ -1071,7 +1111,6 @@ CTcpipSrv::handleClientMeasurement(struct mg_connection* conn)
                     return;
                 }
 
-                vscp_deleteEvent_v2(&pEvent);
             }
             else {
                 write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
@@ -1107,7 +1146,6 @@ CTcpipSrv::handleClientMeasurement(struct mg_connection* conn)
                 return;
             }
 
-            vscp_deleteEvent_v2(&pEvent);
         }
     }
     else { // Level II
@@ -1166,7 +1204,6 @@ CTcpipSrv::handleClientMeasurement(struct mg_connection* conn)
                 return;
             }
 
-            vscp_deleteEvent_v2(&pEvent);
         }
         else { // string & Level II
 
@@ -1213,7 +1250,6 @@ CTcpipSrv::handleClientMeasurement(struct mg_connection* conn)
                 return;
             }
 
-            vscp_deleteEvent_v2(&pEvent);
         }
     }
 
@@ -1305,7 +1341,7 @@ CTcpipSrv::isVerified(struct mg_connection* conn)
 void
 CTcpipSrv::handleClientSend(struct mg_connection* conn)
 {
-    vscpEvent event;
+    vscpEvent event{};
 
     // Check that conn is valid
     if (NULL == conn) {
@@ -1683,8 +1719,18 @@ CTcpipSrv::handleClientSend(struct mg_connection* conn)
         event.obid = pClientItem->getClientID();
     }
 
-    // send event
-    if (!m_pCtrlObj->getClientList().enqueueReceiveEvent(&event)) {
+    // Transfer the payload to a heap event owned by the queue on success.
+    vscpEvent* queuedEvent = new (std::nothrow) vscpEvent(event);
+    if (nullptr == queuedEvent) {
+        delete[] event.pdata;
+        spdlog::error("handleClientSend: unable to allocate queued event");
+        write(conn, MSG_INTERNAL_MEMORY_ERROR, sizeof(MSG_INTERNAL_MEMORY_ERROR) - 1);
+        return;
+    }
+    event.pdata = nullptr;
+
+    if (!m_pCtrlObj->getClientList().enqueueReceiveEvent(queuedEvent)) {
+        vscp_deleteEvent_v2(&queuedEvent);
         write(conn, MSG_BUFFER_FULL, strlen(MSG_BUFFER_FULL));
         return;
     }
@@ -3424,6 +3470,12 @@ tcpip_event_handler(struct mg_connection* conn, int ev, void* ev_data)
         }
     }
     else if (ev == MG_EV_WAKEUP || ev == MG_EV_POLL) {
+        if (ev == MG_EV_WAKEUP && conn->is_listening &&
+            !conn->is_closing) {
+            processMainReceiveQueue(server);
+            return;
+        }
+
         auto* pClientItem = static_cast<CClientItem*>(conn->fn_data);
         if (conn->is_listening || conn->is_closing ||
             nullptr == pClientItem || !pClientItem->isConnected() ||
@@ -3492,7 +3544,11 @@ tcpipWorkerThread(void* pdata)
 
     // Initialize the wakeup mechanism for the Mongoose event manager. This
     // allows other threads to wake up the event loop when needed.
-    mg_wakeup_init(&ptcpipsrv->m_mgr);
+    if (!mg_wakeup_init(&ptcpipsrv->m_mgr)) {
+        spdlog::error("TCP/IP server: failed to initialize wakeup mechanism");
+        mg_mgr_free(&ptcpipsrv->m_mgr);
+        return nullptr;
+    }
 
     // // Add a timer to the Mongoose event manager
     mg_timer_add(&ptcpipsrv->m_mgr,
@@ -3511,14 +3567,25 @@ tcpipWorkerThread(void* pdata)
                      nullptr); // Create server connection
     if (conn == NULL) {
         MG_INFO(("SERVER cant' open a connection"));
+        mg_mgr_free(&ptcpipsrv->m_mgr);
         return nullptr;
     }
+
+    pobj->getClientList().setMainReceiveQueueNotifier(
+      [ptcpipsrv, connectionId = conn->id]() {
+          if (!mg_wakeup(&ptcpipsrv->m_mgr, connectionId, "x", 1)) {
+              spdlog::error("TCP/IP server: failed to wake main receive queue");
+          }
+      });
+    processMainReceiveQueue(ptcpipsrv);
 
     // Event loop
     while (ptcpipsrv->isWorking()) {
         mg_mgr_poll(&ptcpipsrv->m_mgr, 1000); // Poll the event manager
     }
 
+    // Clearing the notifier waits for in-flight notifications before freeing.
+    pobj->getClientList().setMainReceiveQueueNotifier({});
     mg_mgr_free(&ptcpipsrv->m_mgr); // Free the event manager resources
 
     spdlog::debug("clientWorkerThread: Client worker thread exiting.");

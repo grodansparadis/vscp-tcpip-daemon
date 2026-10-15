@@ -440,6 +440,19 @@ CClientList::enqueueReceiveEvent(vscpEvent* pEvent)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// getMainReceiveQueueSize
+//
+
+size_t
+CClientList::getMainReceiveQueueSize(void)
+{
+    pthread_mutex_lock(&m_mutex_ClientMainReceiveQueue);
+    size_t size = m_clientMainReceiveQueue.size();
+    pthread_mutex_unlock(&m_mutex_ClientMainReceiveQueue);
+    return size;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // getEventFromClientMainReceiveQueue
 //
 
@@ -484,6 +497,20 @@ CClientList::notifyClientMainReceiveQueueEvent(void)
 #endif
         spdlog::error("Unable to signal the client main receive queue");
     }
+
+    pthread_mutex_lock(&m_mutex_ClientMainReceiveQueue);
+    if (m_mainReceiveQueueNotifier) {
+        m_mainReceiveQueueNotifier();
+    }
+    pthread_mutex_unlock(&m_mutex_ClientMainReceiveQueue);
+}
+
+void
+CClientList::setMainReceiveQueueNotifier(std::function<void()> notifier)
+{
+    pthread_mutex_lock(&m_mutex_ClientMainReceiveQueue);
+    m_mainReceiveQueueNotifier = notifier;
+    pthread_mutex_unlock(&m_mutex_ClientMainReceiveQueue);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -882,9 +909,9 @@ CClientList::sendEventToClient(CClientItem* pClientItem, vscpEvent* pEvent)
 
             if (!mg_wakeup(
                   &pClientItem->getControlObject()->getTcpipSrv().m_mgr,
-                  pClientItem->getConnection()->id,
-                  "x",
-                  1)) {
+                  pClientItem->getConnection()->id, // Identifies conn
+                  nullptr,
+                  0)) {
                 // The queue owns the event; polling can retry delivery.
                 spdlog::error(
                   "sendEventToClient - Failed to wake event manager");
