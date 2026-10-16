@@ -125,8 +125,8 @@ FetchContent_Declare(
   # never uses.
   # Get URL_HASH
   # curl -sL https://codeload.github.com/grodansparadis/vscp/tar.gz/<commit> | sha256sum
-  URL https://codeload.github.com/grodansparadis/vscp/tar.gz/e73fcb72c458f2de748c6affa8ec2675eaf4af8b
-  URL_HASH SHA256=ceae4462c57f0973bfaf65244751829c99d8b4bb14073f735fab927de3f9c1bf
+  URL https://codeload.github.com/grodansparadis/vscp/tar.gz/911239f8fc7a5f084fe3435c6c7f2ee31e9f4c90
+  URL_HASH SHA256=a5e1c8154f22139082f857901343580dd510b8fc58c7cfb9d23d6e269cca24fa
   ${VSCP_FETCH_CONTENT_OPTIONS}
 )
 # Make the VSCP sources available without adding its standalone library targets
@@ -183,6 +183,7 @@ set(VSCPD_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/vscpd.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/controlobject.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/tcpipsrv.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/measurement-command.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/interfacelist.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/userlist.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/devicethread.cpp"

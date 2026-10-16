@@ -64,6 +64,7 @@
 #include <vscphelper.h>
 
 #include "controlobject.h"
+#include "measurement-command.h"
 #include "vscp-binary-protocol.h"
 #include "tcpipsrv.h"
 #include "version.h"
@@ -839,8 +840,9 @@ CTcpipSrv::commandHandler(struct mg_connection* conn,
         try {
             handleClientMeasurement(conn);
         }
-        catch (...) {
-            spdlog::error("TCPIP: Exception occurred handleClientMeasurement");
+        catch (const std::exception& error) {
+            spdlog::error("TCPIP: handleClientMeasurement: {}", error.what());
+            write(conn, MSG_INTERNAL_MEMORY_ERROR, sizeof(MSG_INTERNAL_MEMORY_ERROR) - 1);
         }
     }
 
@@ -1354,37 +1356,12 @@ CTcpipSrv::handleIncomingData(struct mg_connection* conn)
 ///////////////////////////////////////////////////////////////////////////////
 // handleClientMeasurement
 //
-// format,level,vscp-measurement-type,value,unit,guid,sensoridx,zone,subzone,dest-guid
-//
-// format                   float|string|0|1 - float=0, string=1.
-// level                    level2|1|level1|0  1 = VSCP Level I event, 2 = VSCP
-// Level II event. vscp-measurement-type    A valid vscp measurement type. value
-// A floating point value. (use $ prefix for variable followed by name) unit
-// Optional unit for this type. Default = 0. guid                     Optional
-// GUID (or "-"). Default is "-". sensoridx                Optional sensor
-// index. Default is 0. zone                     Optional zone. Default is 0.
-// subzone                  Optional subzone- Default is 0.
-// dest-guid                Optional destination GUID. For Level I over Level
-// II.
+// class,type,value,[unit],[index],[zone],[subzone],[guid],[timestamp_ns]
 //
 
 void
 CTcpipSrv::handleClientMeasurement(struct mg_connection* conn)
 {
-    std::string str;
-    double value = 0;
-    cguid guid;     // Initialized to zero
-    cguid destguid; // Initialized to zero
-    long level = VSCP_LEVEL2;
-    long unit  = 0;
-    long vscptype;
-    long sensoridx   = 0;
-    long zone        = 0;
-    long subzone     = 0;
-    long eventFormat = 0; // float
-    uint8_t data[VSCP_MAX_DATA];
-    uint16_t sizeData;
-
     // Check that conn is valid
     if (NULL == conn) {
         spdlog::info("Connection is NULL.");
@@ -1414,366 +1391,47 @@ CTcpipSrv::handleClientMeasurement(struct mg_connection* conn)
         return;
     }
 
-    std::deque<std::string> tokens;
-    vscp_split(tokens, getCurrentCommand(), ",");
-
-    // * * * event format * * *
-
-    // Get event format (float | string | 0 | 1 - float=0, string=1.)
-    if (tokens.empty()) {
-        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+    auto user = pClientItem->getUserItem();
+    if (!pClientItem->isAuthenticated() || !user) {
+        write(conn, MSG_NOT_ACCREDITED, strlen(MSG_NOT_ACCREDITED));
+        return;
+    }
+    if (!user->isUserAllowed(VSCP_USER_RIGHT_ALLOW_SEND_EVENT)) {
+        write(conn, MSG_NO_RIGHTS_ERROR, strlen(MSG_NO_RIGHTS_ERROR));
         return;
     }
 
-    str = tokens.front();
-    tokens.pop_front();
-
-    vscp_trim(str);
-    vscp_makeUpper(str);
-
-    // Handle float=0
-    if ('0' == str[0]) {
-        eventFormat = 0;
-    }
-    // Handle string=1
-    else if ('1' == str[0]) {
-        eventFormat = 1;
-    }
-    else if (str == "STRING") {
-        eventFormat = 1;
-    }
-    else if (str == "FLOAT") {
-        eventFormat = 0;
-    }
-    else {
+    vscpEventEx measurement{};
+    auto guid = pClientItem->getInterfaceGUID();
+    if (!parseMeasurementCommand(getCurrentCommand(), guid.getGUID(), measurement)) {
         write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
         return;
     }
-
-    // * * * Level * * *
-
-    if (tokens.empty()) {
-        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+    if (!user->isUserAllowedToSendEvent(measurement.vscp_class,
+                                       measurement.vscp_type)) {
+        write(conn, MSG_MOT_ALLOWED_TO_SEND_EVENT,
+              strlen(MSG_MOT_ALLOWED_TO_SEND_EVENT));
         return;
     }
 
-    str = tokens.front();
-    tokens.pop_front();
-
-    vscp_trim(str);
-    vscp_makeUpper(str);
-
-    if ('0' == str[0]) {
-        level = VSCP_LEVEL1;
-    }
-    else if ('1' == str[0]) {
-        level = VSCP_LEVEL2;
-    }
-    else if (str == "LEVEL1") {
-        level = VSCP_LEVEL1;
-    }
-    else if (str == "LEVEL2") {
-        level = VSCP_LEVEL2;
-    }
-    else {
-        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+    vscpEvent* event = nullptr;
+    if (!vscp_newEvent(&event)) {
+        write(conn, MSG_INTERNAL_MEMORY_ERROR, strlen(MSG_INTERNAL_MEMORY_ERROR));
         return;
     }
-
-    // * * * vscp-measurement-type * * *
-    if (tokens.empty()) {
-        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+    if (!vscp_convertEventExToEvent(event, &measurement)) {
+        vscp_deleteEvent_v2(&event);
+        write(conn, MSG_INTERNAL_MEMORY_ERROR, strlen(MSG_INTERNAL_MEMORY_ERROR));
         return;
     }
-
-    str = tokens.front();
-    tokens.pop_front();
-    vscptype = vscp_readStringValue(str);
-
-    // * * * value * * *
-    if (tokens.empty()) {
-        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+    event->obid = pClientItem->getClientID();
+    if (!m_pCtrlObj->getClientList().enqueueReceiveEvent(event)) {
+        vscp_deleteEvent_v2(&event);
+        write(conn, MSG_BUFFER_FULL, strlen(MSG_BUFFER_FULL));
         return;
     }
-
-    str = tokens.front();
-    tokens.pop_front();
-    vscp_trim(str);
-
-    value = std::stod(str);
-
-    // * * * unit * * *
-
-    if (!tokens.empty()) {
-        str = tokens.front();
-        tokens.pop_front();
-        unit = vscp_readStringValue(str);
-    }
-
-    // * * * guid * * *
-
-    if (!tokens.empty()) {
-
-        str = tokens.front();
-        tokens.pop_front();
-        vscp_trim(str);
-
-        // If empty set to default.
-        if (0 == str.length())
-            str = "-";
-        guid.getFromString(str);
-    }
-
-    // * * * sensor index * * *
-
-    if (!tokens.empty()) {
-        str = tokens.front();
-        tokens.pop_front();
-        vscp_trim(str);
-
-        sensoridx = vscp_readStringValue(str);
-    }
-
-    // * * * zone * * *
-
-    if (!tokens.empty()) {
-
-        str = tokens.front();
-        tokens.pop_front();
-        vscp_trim(str);
-
-        zone = vscp_readStringValue(str);
-        ;
-        zone &= 0xff;
-    }
-
-    // * * * subzone * * *
-
-    if (!tokens.empty()) {
-
-        str = tokens.front();
-        tokens.pop_front();
-        vscp_trim(str);
-
-        subzone = vscp_readStringValue(str);
-        subzone &= 0xff;
-    }
-
-    // * * * destguid * * *
-
-    if (!tokens.empty()) {
-
-        str = tokens.front();
-        tokens.pop_front();
-        vscp_trim(str);
-
-        // If empty set to default.
-        if (0 == str.length())
-            str = ("-");
-        destguid.getFromString(str);
-    }
-
-    // Range checks
-    if (VSCP_LEVEL1 == level) {
-        if (unit > 3)
-            unit = 0;
-        if (sensoridx > 7)
-            unit = 0;
-        if (vscptype > 512)
-            vscptype -= 512;
-    }
-    else { // VSCP_LEVEL2
-        if (unit > 255)
-            unit &= 0xff;
-        if (sensoridx > 255)
-            sensoridx &= 0xff;
-    }
-
-    if (1 == level) { // Level I
-
-        if (0 == eventFormat) {
-
-            // * * * Floating point * * *
-
-            if (vscp_convertFloatToFloatEventData(data,
-                                                  &sizeData,
-                                                  value,
-                                                  unit,
-                                                  sensoridx)) {
-                if (sizeData > 8)
-                    sizeData = 8;
-
-                vscpEvent* pEvent = new vscpEvent;
-                if (NULL == pEvent) {
-                    write(conn,
-                          MSG_INTERNAL_MEMORY_ERROR,
-                          strlen(MSG_INTERNAL_MEMORY_ERROR));
-                    return;
-                }
-
-                pEvent->pdata     = NULL;
-                pEvent->head      = VSCP_PRIORITY_NORMAL;
-                pEvent->timestamp = 0; // Let interface fill in
-                                       // Will fill in date/time block also
-                guid.writeGUID(pEvent->GUID);
-                pEvent->sizeData = sizeData;
-                if (sizeData > 0) {
-                    pEvent->pdata = new uint8_t[sizeData];
-                    memcpy(pEvent->pdata, data, sizeData);
-                }
-                pEvent->vscp_class = VSCP_CLASS1_MEASUREMENT;
-                pEvent->vscp_type  = vscptype;
-
-                // send the event
-                if (!m_pCtrlObj->getClientList().enqueueReceiveEvent(pEvent)) {
-                    vscp_deleteEvent_v2(&pEvent);
-                    write(conn,
-                          MSG_UNABLE_TO_SEND_EVENT,
-                          strlen(MSG_UNABLE_TO_SEND_EVENT));
-                    return;
-                }
-
-            }
-            else {
-                write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
-            }
-        }
-        else {
-
-            // * * * String * * *
-
-            vscpEvent* pEvent = new vscpEvent;
-            if (NULL == pEvent) {
-                write(conn,
-                      MSG_INTERNAL_MEMORY_ERROR,
-                      strlen(MSG_INTERNAL_MEMORY_ERROR));
-                return;
-            }
-
-            pEvent->pdata = NULL;
-
-            if (!vscp_makeStringMeasurementEvent(pEvent,
-                                                 value,
-                                                 unit,
-                                                 sensoridx)) {
-                write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
-            }
-
-            // send the event
-            if (!m_pCtrlObj->getClientList().enqueueReceiveEvent(pEvent)) {
-                vscp_deleteEvent_v2(&pEvent);
-                write(conn,
-                      MSG_UNABLE_TO_SEND_EVENT,
-                      strlen(MSG_UNABLE_TO_SEND_EVENT));
-                return;
-            }
-
-        }
-    }
-    else { // Level II
-
-        if (0 == eventFormat) { // float and Level II
-
-            // * * * Floating point * * *
-
-            vscpEvent* pEvent = new vscpEvent;
-            if (NULL == pEvent) {
-                write(conn,
-                      MSG_INTERNAL_MEMORY_ERROR,
-                      strlen(MSG_INTERNAL_MEMORY_ERROR));
-                return;
-            }
-
-            pEvent->pdata = NULL;
-
-            pEvent->obid      = 0;
-            pEvent->head      = VSCP_PRIORITY_NORMAL;
-            pEvent->timestamp = 0; // Let interface fill in timestamp
-                                   // Will fill in date/time block also
-            guid.writeGUID(pEvent->GUID);
-            pEvent->head       = 0;
-            pEvent->vscp_class = VSCP_CLASS2_MEASUREMENT_FLOAT;
-            pEvent->vscp_type  = vscptype;
-            pEvent->sizeData   = 12;
-
-            data[0] = sensoridx;
-            data[1] = zone;
-            data[2] = subzone;
-            data[3] = unit;
-
-            memcpy(data + 4, (uint8_t*)&value, 8); // copy in double
-            uint64_t temp = VSCP_UINT64_SWAP_ON_LE(*(data + 4));
-            memcpy(data + 4, (void*)&temp, 8);
-
-            // Copy in data
-            pEvent->pdata = new uint8_t[4 + 8];
-            if (NULL == pEvent->pdata) {
-                write(conn,
-                      MSG_INTERNAL_MEMORY_ERROR,
-                      strlen(MSG_INTERNAL_MEMORY_ERROR));
-                delete pEvent;
-                return;
-            }
-
-            memcpy(pEvent->pdata, data, 4 + 8);
-
-            // send the event
-            if (!m_pCtrlObj->getClientList().enqueueReceiveEvent(pEvent)) {
-                vscp_deleteEvent_v2(&pEvent);
-                write(conn,
-                      MSG_UNABLE_TO_SEND_EVENT,
-                      strlen(MSG_UNABLE_TO_SEND_EVENT));
-                return;
-            }
-
-        }
-        else { // string & Level II
-
-            // * * * String * * *
-
-            vscpEvent* pEvent = new vscpEvent;
-            pEvent->pdata     = NULL;
-
-            pEvent->obid      = 0;
-            pEvent->head      = VSCP_PRIORITY_NORMAL;
-            pEvent->timestamp = 0; // Let interface fill in
-                                   // Will fill in date/time block also
-            guid.writeGUID(pEvent->GUID);
-            pEvent->head       = 0;
-            pEvent->vscp_class = VSCP_CLASS2_MEASUREMENT_STR;
-            pEvent->vscp_type  = vscptype;
-            pEvent->sizeData   = 12;
-
-            std::string strValue = vscp_str_format("%f", value);
-
-            data[0] = sensoridx;
-            data[1] = zone;
-            data[2] = subzone;
-            data[3] = unit;
-
-            pEvent->pdata = new uint8_t[4 + strValue.length()];
-            if (NULL == pEvent->pdata) {
-                write(conn,
-                      MSG_INTERNAL_MEMORY_ERROR,
-                      strlen(MSG_INTERNAL_MEMORY_ERROR));
-                delete pEvent;
-                return;
-            }
-            memcpy(data + 4,
-                   strValue.c_str(),
-                   strValue.length()); // copy in double
-
-            // send the event
-            if (!m_pCtrlObj->getClientList().enqueueReceiveEvent(pEvent)) {
-                vscp_deleteEvent_v2(&pEvent);
-                write(conn,
-                      MSG_UNABLE_TO_SEND_EVENT,
-                      strlen(MSG_UNABLE_TO_SEND_EVENT));
-                return;
-            }
-
-        }
-    }
+    pClientItem->getStatistics().cntReceiveFrames++;
+    pClientItem->getStatistics().cntReceiveData += measurement.sizeData;
 
     write(conn, MSG_OK, strlen(MSG_OK));
 }
@@ -3824,11 +3482,21 @@ CTcpipSrv::handleClientHelp(struct mg_connection* conn)
     else if (commandStartsWith("measurement", true)) {
         std::string str = "'MEASUREMENT' Post measurement event.\r\n";
         str +=
-          "Syntax: measurement class,type,value,[unit],[index],[guid].\r\n";
+          "Syntax: measurement class,type,value,[unit],[index],[zone],"
+          "[subzone],[guid],[timestamp_ns]\r\n";
         str += "Example: measurement "
-               "10,6,23.5,1,0,00:00:00:00:00:00:00:00:00:00:00:00\r\n";
+               "10,6,23.5,1\r\n";
         str +=
-          "Default unit=0, Default index=0. Default GUID=interface GUID.\r\n";
+          "Defaults: unit/index/zone/subzone=0, GUID=interface GUID, "
+          "timestamp_ns=now. Empty optional fields use defaults.\r\n"
+          "Prefix a UTC ISO datetime with @ for timestamp_ns, e.g. "
+          "@2026-10-16T08:00:00.123456789Z.\r\n"
+          "Classes: 10-14, 60-64, 65-69, 70-74, 85-89, 1040, 1060.\r\n"
+          "10-14: integer literals use signed integer coding, decimal/exponent "
+          "values use float32. Unit 0-3, index 0-7, no zones.\r\n"
+          "65-69/85-89: normalized integer, unit 0-3, index/zones 0-255.\r\n"
+          "60-64/70-74: float64/float32, unit/index/zones must be zero.\r\n"
+          "1040/1060: string/float64, unit/index/zones 0-255.\r\n";
         write(conn, (const char*)str.c_str(), str.length());
     }
     else if (commandStartsWith("binary", true)) {

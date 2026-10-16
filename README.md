@@ -66,6 +66,57 @@ To use a later commit:
 If the new VSCP commit adds, renames, or removes source files that vscpd
 compiles, update the source list in `CMakeLists.txt` to match.
 
+## Measurement command
+
+Authenticated TCP clients with SEND permission can post a measurement using:
+
+```text
+measurement class,type,value,[unit],[index],[zone],[subzone],[guid],[timestamp_ns]
+```
+
+`class`, `type`, and the decimal numeric `value` are mandatory. Trailing optional
+fields can be omitted; empty fields select their defaults. Unit, sensor index,
+zone and subzone default to zero. GUID defaults to the connection's interface
+GUID (also selected by `-`). The timestamp defaults to the current Unix time in
+nanoseconds. An explicit timestamp is an unsigned 64-bit nanosecond count, or
+`@` followed by a UTC ISO datetime such as
+`@2026-10-16T08:00:00.123456789Z`. Fractional seconds may contain 1-9 digits.
+The UTC suffix may be `Z`, `+00:00`, or omitted; other offsets are rejected.
+Dates before the Unix epoch and timestamps beyond the unsigned 64-bit range
+are rejected. Explicit zero is preserved.
+
+The class selects the wire encoding, including the reserved X1-X4 variants:
+
+| Classes | Value encoding | Metadata limits |
+| --- | --- | --- |
+| 10-14 (MEASUREMENT/X1-X4) | Signed integer for integer literals; IEEE-754 float32 for decimal/exponent notation | Unit 0-3, index 0-7; zone/subzone must be zero |
+| 60-64 (MEASUREMENT64/X1-X4) | IEEE-754 float64 | Unit/index/zone/subzone must be zero |
+| 65-69 (MEASUREZONE/X1-X4), 85-89 (SETVALUEZONE/X1-X4) | Normalized integer: signed mantissa of up to 3 bytes and decimal exponent -127 to 127 | Unit 0-3; index/zone/subzone 0-255 |
+| 70-74 (MEASUREMENT32/X1-X4) | IEEE-754 float32 | Unit/index/zone/subzone must be zero |
+| 1040 (MEASUREMENT_STR) | Original numeric text, zero terminated, at most 483 characters | Unit/index/zone/subzone 0-255 |
+| 1060 (MEASUREMENT_FLOAT) | IEEE-754 float64 | Unit/index/zone/subzone 0-255 |
+
+Integers in classes 10-14 must fit a signed 56-bit value. Floating point values
+must be finite and fit the target precision; values that underflow to zero are
+rejected. Normalized values must be exactly representable within the mantissa
+and exponent limits. Class, type, and metadata accept decimal or `0x` hexadecimal
+notation. Level I types are 0-255; Level II types are 0-65535.
+
+```text
+measurement 10,6,23.5,1
+measurement 65,6,23.5,1,2,3,4
+measurement 1060,6,23.5,1,2,3,4,,@2026-10-16T08:00:00Z
+```
+
+Invalid input returns a parameter error without sending an event. Both SEND
+permission and the user's allowed class/type rules apply. Success queues an
+event with the sender's client ID and updates receive statistics. This syntax
+replaces the legacy `format,level,type,value,...` command.
+
+Configure with `-DVSCPD_BUILD_TESTS=ON`, build `measurement_test`, then run
+`ctest --test-dir build -R '^measurement$' --output-on-failure` for encoding,
+timestamp, validation, permission and TCP-handler regression tests.
+
 ## Binary TCP mode
 
 Send `BINARY\r\n` to switch a connection to

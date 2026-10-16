@@ -27,6 +27,15 @@ endif()
 target_link_libraries(binaryprotocol_test PRIVATE vscpd_test_objects)
 add_test(NAME binaryprotocol COMMAND binaryprotocol_test)
 
+add_executable(measurement_test measurement.cpp)
+if(MSVC)
+    target_compile_options(measurement_test PRIVATE /UNDEBUG)
+else()
+    target_compile_options(measurement_test PRIVATE -UNDEBUG)
+endif()
+target_link_libraries(measurement_test PRIVATE vscpd_test_objects)
+add_test(NAME measurement COMMAND measurement_test)
+
 # Black-box tests that start the real daemon and talk to it over TCP
 if(NOT WIN32)
     add_executable(binaryserver_test binaryserver.cpp)

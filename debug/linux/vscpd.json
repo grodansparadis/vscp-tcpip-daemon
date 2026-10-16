@@ -63,12 +63,12 @@
 
 
   "tcpip": {
-    "interface-address": "127.0.0.1:9598",
+    "interface-address": "tls://127.0.0.1:9598",
     "_comment": "If ssl is used, configure the SSL options below otherwise remove this section",
     "ssl-options": {
-      "cafile": "",
-      "certfile": "",
-      "keyfile": "",
+      "cafile": "/home/akhe/development/VSCP/vscp-tcpip-daemon/install/certs/server.pem",
+      "certfile": "/home/akhe/development/VSCP/vscp-tcpip-daemon/install/certs/server.pem",
+      "keyfile": "/home/akhe/development/VSCP/vscp-tcpip-daemon/install/certs/server.key",
       "name": ""
     }
   },

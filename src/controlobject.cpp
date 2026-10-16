@@ -574,7 +574,8 @@ CControlObject::addClient(CClientItem* pClientItem, cguid& guid)
 bool
 CControlObject::doAutomation(CClientItem* pClientItem)
 {
-    vscpEventEx ex;
+    vscpEventEx ex{};
+    memcpy(ex.GUID, m_guid.getGUID(), 16);
 
     // Send VSCP_CLASS1_INFORMATION,
     // Type=9/VSCP_TYPE_INFORMATION_NODE_HEARTBEAT
@@ -585,9 +586,6 @@ CControlObject::doAutomation(CClientItem* pClientItem)
     ex.vscp_class = VSCP_CLASS1_INFORMATION;
     ex.vscp_type  = VSCP_TYPE_INFORMATION_NODE_HEARTBEAT;
     ex.sizeData   = 3;
-
-    // GUID
-    memcpy(ex.data + VSCP_CAPABILITY_OFFSET_GUID, m_guid.getGUID(), 16);
 
     ex.data[0] = 0; // index
     ex.data[1] = 0; // zone
@@ -607,9 +605,6 @@ CControlObject::doAutomation(CClientItem* pClientItem)
     ex.vscp_type  = VSCP2_TYPE_INFORMATION_HEART_BEAT;
     ex.sizeData   = 64;
 
-    // GUID
-    memcpy(ex.data + VSCP_CAPABILITY_OFFSET_GUID, m_guid.getGUID(), 16);
-
     memset(ex.data, 0, sizeof(ex.data));
     memcpy(ex.data,
            m_strServerName.c_str(),
@@ -628,9 +623,6 @@ CControlObject::doAutomation(CClientItem* pClientItem)
     ex.vscp_class = VSCP_CLASS1_PROTOCOL;
     ex.vscp_type  = VSCP_TYPE_PROTOCOL_SEGCTRL_HEARTBEAT;
     ex.sizeData   = 5;
-
-    // GUID
-    memcpy(ex.data + VSCP_CAPABILITY_OFFSET_GUID, m_guid.getGUID(), 16);
 
     time_t tnow;
     time(&tnow);
@@ -1371,13 +1363,17 @@ CControlObject::sendEvent(CClientItem* pClientItem, vscpEvent* peventToSend)
         destguid.setAt(15, 0);
 
         spdlog::debug("Level I event over Level II "
-                      "dest = %s device = %s",
-                      destguid.toString().c_str(),
-                      pClientItem->getDeviceName().c_str());
+                      "dest = {} device = {}",
+                      destguid.toString(),
+                      pClientItem->getDeviceName());
 
-        if (!m_clientList.sendEventToClient(destguid, pEvent)) {
-            spdlog::error("Failed to send Level I event over Level II to dest = %s",
-                          destguid.toString().c_str());
+        if (m_clientList.sendEventToClient(destguid, pEvent)) {
+            bSent = true;
+        }
+        else {
+            spdlog::debug("Level I event over Level II: dest = {} not local, "
+                          "broadcasting",
+                          destguid.toString());
         }
 
         // Find client
@@ -1409,9 +1405,22 @@ CControlObject::sendEvent(CClientItem* pClientItem, vscpEvent* peventToSend)
         // pthread_mutex_unlock(&m_clientList.m_mutexItemList);
     }
 
-    if (!bSent) {
+    if (bSent) {
+        vscp_deleteEvent_v2(&pEvent);
+    }
+    else {
 
-        pClientItem->addEventToSendQueue(pEvent);
+        // Post to the main receive queue so the event is distributed to all
+        // other clients (the originating client is excluded through obid).
+        uint16_t sizeData = pEvent->sizeData;
+        if (!m_clientList.enqueueReceiveEvent(pEvent)) {
+            vscp_deleteEvent_v2(&pEvent);
+            pClientItem->getStatistics().cntOverruns++;
+            spdlog::error("sendEvent - main receive queue full");
+            return false;
+        }
+        pClientItem->getStatistics().cntReceiveFrames++;
+        pClientItem->getStatistics().cntReceiveData += sizeData;
         // pthread_mutex_lock(&m_mutex_ClientOutputQueue);
         // m_clientOutputQueue.push_back(pEvent);
 
