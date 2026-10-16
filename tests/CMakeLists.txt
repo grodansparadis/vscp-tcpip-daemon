@@ -8,6 +8,7 @@ target_include_directories(vscpd_test_objects PUBLIC
 )
 target_compile_definitions(vscpd_test_objects PUBLIC
     $<TARGET_PROPERTY:vscpd,COMPILE_DEFINITIONS>
+    MG_TLS=MG_TLS_OPENSSL
 )
 target_link_libraries(vscpd_test_objects PUBLIC
     $<TARGET_PROPERTY:vscpd,LINK_LIBRARIES>
@@ -33,6 +34,21 @@ if(NOT WIN32)
     add_dependencies(binaryserver_test vscpd)
     add_test(NAME binaryserver COMMAND binaryserver_test $<TARGET_FILE:vscpd>)
     set_tests_properties(binaryserver PROPERTIES TIMEOUT 120)
+
+    add_executable(tlsremote_test
+        tlsremote.cpp
+        "${vscp_SOURCE_DIR}/src/vscp/common/vscpremotetcpif.cpp"
+    )
+    target_link_libraries(tlsremote_test PRIVATE vscpd_test_objects)
+    target_compile_definitions(tlsremote_test PRIVATE MG_TLS=MG_TLS_OPENSSL)
+    add_dependencies(tlsremote_test vscpd)
+    add_test(NAME tlsremote
+        COMMAND tlsremote_test
+                $<TARGET_FILE:vscpd>
+                "${PROJECT_SOURCE_DIR}/install/certs/tcpip_server.crt"
+                "${PROJECT_SOURCE_DIR}/install/certs/tcpip_server.key"
+    )
+    set_tests_properties(tlsremote PROPERTIES TIMEOUT 120)
 
     find_package(Python3 COMPONENTS Interpreter)
     if(Python3_Interpreter_FOUND)

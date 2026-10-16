@@ -122,7 +122,7 @@ On Linux and macOS they are registered with CTest as well:
 
 ```bash
 cmake -S . -B build -DVSCPD_BUILD_TESTS=ON
-cmake --build build --target binaryprotocol_test binaryserver_test
+cmake --build build --target binaryprotocol_test binaryserver_test tlsremote_test
 ctest --test-dir build --output-on-failure
 
 # Python suite: start a private daemon...
@@ -136,6 +136,12 @@ When the Python suite tests a running daemon, set `VSCP_READER_USER` and
 `VSCP_READER_PASSWORD` to a user that only has `receive-events` rights to
 enable the rights test. Set `VSCP_KEEP_TEMP=1` to keep the temporary daemon
 folder, including `vscpd.log`, after a run.
+
+The `tlsremote` CTest uses `vscpremotetcpif.cpp` and
+`vscpremotetcpif.h` from the fetched VSCP repository. It starts a TLS-enabled
+daemon using the certificates in `install/certs/`, then verifies explicit TLS
+mode, the `stcp://` endpoint prefix, authenticated `NOOP` and `VERSION`
+commands, and rejection of a plain TCP connection to the TLS port.
 
 ### Binary frame format
 

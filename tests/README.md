@@ -8,3 +8,5 @@ binaryserver.cpp - CTest test (binaryserver) that starts vscpd and tests the bin
 binary_server/ - Python unittest suite for the binary protocol against a started or running vscpd.
                  Run: python3 binary_server/test_binary_server.py --vscpd <path-to-vscpd>
                  Needs the 'cryptography' and 'pynacl' Python modules.
+tlsremote.cpp - CTest test (tlsremote) that starts a TLS-enabled vscpd and
+                validates TLS communication using vscpremotetcpif from VSCP.

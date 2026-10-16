@@ -569,6 +569,25 @@ class CTcpipSrv {
     mg_tls_opts& getTlsOpts() { return m_tcpip_tls_opts; }
 
     /*!
+        Set TLS option contents while retaining their storage for the lifetime
+        of the server.
+    */
+    void setTlsOptions(const std::string& ca,
+                      const std::string& cert,
+                      const std::string& key,
+                      const std::string& name)
+    {
+        m_tls_ca = ca;
+        m_tls_cert = cert;
+        m_tls_key = key;
+        m_tls_name = name;
+        m_tcpip_tls_opts.ca = mg_str(m_tls_ca.c_str());
+        m_tcpip_tls_opts.cert = mg_str(m_tls_cert.c_str());
+        m_tcpip_tls_opts.key = mg_str(m_tls_key.c_str());
+        m_tcpip_tls_opts.name = mg_str(m_tls_name.c_str());
+    }
+
+    /*!
         Getter/setter for control object
     */
     void setControlObjectPointer(CControlObject* pobj) { m_pCtrlObj = pobj; };
@@ -642,6 +661,10 @@ class CTcpipSrv {
        and cert, whilst clients only ca and/or possibly name.
     */
     mg_tls_opts m_tcpip_tls_opts;
+    std::string m_tls_ca;
+    std::string m_tls_cert;
+    std::string m_tls_key;
+    std::string m_tls_name;
 
     
 

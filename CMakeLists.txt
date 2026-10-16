@@ -212,6 +212,7 @@ endif()
 # ---- Build the vscpd executable ----
 add_executable(vscpd ${VSCPD_SOURCES})
 set_target_properties(vscpd PROPERTIES OUTPUT_NAME "vscpd")
+target_compile_definitions(vscpd PRIVATE MG_TLS=MG_TLS_OPENSSL)
 if(WIN32)
     set_target_properties(vscpd PROPERTIES OUTPUT_NAME "tcpip-vscpd")
 endif()

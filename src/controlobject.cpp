@@ -2169,15 +2169,30 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
 
         if (jj.contains("ssl-options") && jj["ssl-options"].is_object()) {
             const json& jjj = jj["ssl-options"];
-            std::string str;
-            get_string(jjj, "cafile", str);
-            m_tcpipSrv.getTlsOpts().ca = mg_str(str.c_str());
-            get_string(jjj, "certfile", str);
-            m_tcpipSrv.getTlsOpts().cert = mg_str(str.c_str());
-            get_string(jjj, "keyfile", str);
-            m_tcpipSrv.getTlsOpts().key = mg_str(str.c_str());
-            get_string(jjj, "name", str);
-            m_tcpipSrv.getTlsOpts().name = mg_str(str.c_str());
+            std::string ca;
+            std::string cert;
+            std::string key;
+            std::string name;
+            get_string(jjj, "cafile", ca);
+            get_string(jjj, "certfile", cert);
+            get_string(jjj, "keyfile", key);
+            get_string(jjj, "name", name);
+            auto read_tls_file = [](const std::string& path) {
+                if (path.empty()) {
+                    return std::string();
+                }
+                std::ifstream file(path, std::ios::binary);
+                if (!file) {
+                    spdlog::error("ReadConfig: Unable to read TLS file '{}'.", path);
+                    return std::string();
+                }
+                return std::string((std::istreambuf_iterator<char>(file)),
+                                   std::istreambuf_iterator<char>());
+            };
+            m_tcpipSrv.setTlsOptions(read_tls_file(ca),
+                                     read_tls_file(cert),
+                                     read_tls_file(key),
+                                     name);
         }
         else {
             spdlog::debug("ReadConfig: TCP/IP 'ssl-options' object missing or "
