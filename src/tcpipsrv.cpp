@@ -65,9 +65,9 @@
 
 #include "controlobject.h"
 #include "measurement-command.h"
-#include "vscp-binary-protocol.h"
 #include "tcpipsrv.h"
 #include "version.h"
+#include "vscp-binary-protocol.h"
 
 extern CControlObject* gpobj;
 
@@ -146,8 +146,9 @@ processMainReceiveQueue(CTcpipSrv* server)
             if (errno == EINTR) {
                 continue;
             }
-            spdlog::error("TCP/IP timer: error waiting for receive queue event: {}",
-                          strerror(errno));
+            spdlog::error(
+              "TCP/IP timer: error waiting for receive queue event: {}",
+              strerror(errno));
             break;
         }
 
@@ -165,7 +166,7 @@ processMainReceiveQueue(CTcpipSrv* server)
 static void
 timer_fn(void* arg)
 {
-    auto* mgr = static_cast<struct mg_mgr*>(arg);
+    auto* mgr    = static_cast<struct mg_mgr*>(arg);
     auto* server = static_cast<CTcpipSrv*>(mgr->userdata);
     if (nullptr == server || nullptr == server->getControlObject()) {
         spdlog::error("TCP/IP timer: missing server or control object");
@@ -309,9 +310,10 @@ CTcpipSrv::write(struct mg_connection* conn, const char* buf, size_t len)
 
     if (pClientItem->isBinaryMode()) {
         bool success = len >= 3 && std::string(buf, 3) == "+OK";
-        return writeBinaryReply(conn, pClientItem->getBinaryCommand(),
-                                 success ? VSCP_ERROR_SUCCESS :
-                                           VSCP_ERROR_NOT_AUTHORIZED);
+        return writeBinaryReply(conn,
+                                pClientItem->getBinaryCommand(),
+                                success ? VSCP_ERROR_SUCCESS
+                                        : VSCP_ERROR_NOT_AUTHORIZED);
     }
 
     if (!mg_send(conn, buf, len)) {
@@ -836,13 +838,16 @@ CTcpipSrv::commandHandler(struct mg_connection* conn,
     //                             Measurement
     //*********************************************************************
 
-    else if (commandStartsWith("measurement", true)) {
+    else if (commandStartsWith("measurement", true) ||
+             commandStartsWith("m", true)) {
         try {
             handleClientMeasurement(conn);
         }
         catch (const std::exception& error) {
             spdlog::error("TCPIP: handleClientMeasurement: {}", error.what());
-            write(conn, MSG_INTERNAL_MEMORY_ERROR, sizeof(MSG_INTERNAL_MEMORY_ERROR) - 1);
+            write(conn,
+                  MSG_INTERNAL_MEMORY_ERROR,
+                  sizeof(MSG_INTERNAL_MEMORY_ERROR) - 1);
         }
     }
 
@@ -860,12 +865,14 @@ CTcpipSrv::commandHandler(struct mg_connection* conn,
 
 bool
 CTcpipSrv::writeBinaryFrame(struct mg_connection* conn,
-                           std::vector<uint8_t> frame)
+                            std::vector<uint8_t> frame)
 {
     auto* client = static_cast<CClientItem*>(conn->fn_data);
     std::vector<uint8_t> wire;
-    if (!vscp_binary::encode(std::move(frame), client->getBinaryEncryption(),
-                             m_pCtrlObj->getSystemKey(nullptr), wire) ||
+    if (!vscp_binary::encode(std::move(frame),
+                             client->getBinaryEncryption(),
+                             m_pCtrlObj->getSystemKey(nullptr),
+                             wire) ||
         !mg_send(conn, wire.data(), wire.size())) {
         spdlog::error("TCP/IP binary: failed to serialize or send frame");
         conn->is_closing = 1;
@@ -876,14 +883,18 @@ CTcpipSrv::writeBinaryFrame(struct mg_connection* conn,
 
 bool
 CTcpipSrv::writeBinaryReply(struct mg_connection* conn,
-                           uint16_t command,
-                           uint16_t error,
-                           const std::vector<uint8_t>& arguments)
+                            uint16_t command,
+                            uint16_t error,
+                            const std::vector<uint8_t>& arguments)
 {
     std::vector<uint8_t> frame(7 + arguments.size(), 0);
-    if (VSCP_ERROR_SUCCESS != vscp_writeReplyToFrame(
-          frame.data(), frame.size(), command, error,
-          arguments.empty() ? nullptr : arguments.data(), arguments.size())) {
+    if (VSCP_ERROR_SUCCESS !=
+        vscp_writeReplyToFrame(frame.data(),
+                               frame.size(),
+                               command,
+                               error,
+                               arguments.empty() ? nullptr : arguments.data(),
+                               arguments.size())) {
         spdlog::error("TCP/IP binary: failed to build reply");
         conn->is_closing = 1;
         return false;
@@ -897,7 +908,7 @@ CTcpipSrv::enqueueBinaryEvent(struct mg_connection* conn,
                               const std::vector<uint8_t>& frame)
 {
     auto* client = static_cast<CClientItem*>(conn->fn_data);
-    auto user = client->getUserItem();
+    auto user    = client->getUserItem();
     if (!client->isAuthenticated() || !user ||
         !user->isUserAllowed(VSCP_USER_RIGHT_ALLOW_SEND_EVENT)) {
         return VSCP_ERROR_NOT_AUTHORIZED;
@@ -915,19 +926,19 @@ CTcpipSrv::enqueueBinaryEvent(struct mg_connection* conn,
         vscp_deleteEvent_v2(&event);
         return VSCP_ERROR_PARAMETER;
     }
-    bool allowed = user->isUserAllowedToSendEvent(event->vscp_class,
-                                                 event->vscp_type);
+    bool allowed =
+      user->isUserAllowedToSendEvent(event->vscp_class, event->vscp_type);
     if (event->vscp_class == VSCP_CLASS1_PROTOCOL) {
         allowed = allowed &&
-          user->isUserAllowed(VSCP_USER_RIGHT_ALLOW_SEND_L1CTRL_EVENT);
+                  user->isUserAllowed(VSCP_USER_RIGHT_ALLOW_SEND_L1CTRL_EVENT);
     }
     if (event->vscp_class == VSCP_CLASS2_PROTOCOL) {
         allowed = allowed &&
-          user->isUserAllowed(VSCP_USER_RIGHT_ALLOW_SEND_L2CTRL_EVENT);
+                  user->isUserAllowed(VSCP_USER_RIGHT_ALLOW_SEND_L2CTRL_EVENT);
     }
     if (event->vscp_class == VSCP_CLASS2_HLO) {
-        allowed = allowed &&
-          user->isUserAllowed(VSCP_USER_RIGHT_ALLOW_SEND_HLO_EVENT);
+        allowed =
+          allowed && user->isUserAllowed(VSCP_USER_RIGHT_ALLOW_SEND_HLO_EVENT);
     }
     if (!allowed) {
         vscp_deleteEvent_v2(&event);
@@ -949,7 +960,7 @@ CTcpipSrv::enqueueBinaryEvent(struct mg_connection* conn,
 
 void
 CTcpipSrv::handleBinaryFrame(struct mg_connection* conn,
-                            const std::vector<uint8_t>& frame)
+                             const std::vector<uint8_t>& frame)
 {
     using vscp_binary::append;
     using vscp_binary::read16;
@@ -959,14 +970,17 @@ CTcpipSrv::handleBinaryFrame(struct mg_connection* conn,
         std::vector<uint8_t> confirmation;
         append(confirmation, read16(frame.data() + 1), 4);
         append(confirmation, read16(frame.data() + frame.size() - 2), 2);
-        writeBinaryReply(conn, 0xffff, enqueueBinaryEvent(conn, frame),
+        writeBinaryReply(conn,
+                         0xffff,
+                         enqueueBinaryEvent(conn, frame),
                          confirmation);
         return;
     }
     if (type == 15 && frame.size() == 13 &&
         read16(frame.data() + 1) == 0xffff) {
         if (read16(frame.data() + 3) != VSCP_ERROR_SUCCESS) {
-            spdlog::warn("TCP/IP binary: client reported event delivery failure");
+            spdlog::warn(
+              "TCP/IP binary: client reported event delivery failure");
         }
         return;
     }
@@ -979,50 +993,83 @@ CTcpipSrv::handleBinaryFrame(struct mg_connection* conn,
     uint16_t command = read16(frame.data() + 1);
     client->setBinaryCommand(command);
     const uint8_t* arg = frame.data() + 3;
-    size_t length = frame.size() - 5;
-    auto user = client->getUserItem();
-    uint32_t right = 0;
+    size_t length      = frame.size() - 5;
+    auto user          = client->getUserItem();
+    uint32_t right     = 0;
     switch (command) {
-        case 5: right = VSCP_USER_RIGHT_ALLOW_SEND_EVENT; break;
-        case 6: case 7: case 8: right = VSCP_USER_RIGHT_ALLOW_RCV_EVENT; break;
-        case 14: right = VSCP_USER_RIGHT_ALLOW_SETGUID; break;
-        case 17: case 18: right = VSCP_USER_RIGHT_ALLOW_SETFILTER; break;
-        case 19: right = VSCP_USER_RIGHT_ALLOW_INTERFACE; break;
-        case 20: right = VSCP_USER_RIGHT_ALLOW_TEST; break;
-        case 22: right = VSCP_USER_RIGHT_ALLOW_SHUTDOWN; break;
-        case 23: right = VSCP_USER_RIGHT_ALLOW_RESTART; break;
+        case 5:
+            right = VSCP_USER_RIGHT_ALLOW_SEND_EVENT;
+            break;
+        case 6:
+        case 7:
+        case 8:
+            right = VSCP_USER_RIGHT_ALLOW_RCV_EVENT;
+            break;
+        case 14:
+            right = VSCP_USER_RIGHT_ALLOW_SETGUID;
+            break;
+        case 17:
+        case 18:
+            right = VSCP_USER_RIGHT_ALLOW_SETFILTER;
+            break;
+        case 19:
+            right = VSCP_USER_RIGHT_ALLOW_INTERFACE;
+            break;
+        case 20:
+            right = VSCP_USER_RIGHT_ALLOW_TEST;
+            break;
+        case 22:
+            right = VSCP_USER_RIGHT_ALLOW_SHUTDOWN;
+            break;
+        case 23:
+            right = VSCP_USER_RIGHT_ALLOW_RESTART;
+            break;
     }
-    bool publicCommand = command <= 4 || command == 16 ||
-                         command == 21 || command == 24;
-    if (!publicCommand &&
-        (!client->isAuthenticated() || !user ||
-         (right && !user->isUserAllowed(right)))) {
+    bool publicCommand =
+      command <= 4 || command == 16 || command == 21 || command == 24;
+    if (!publicCommand && (!client->isAuthenticated() || !user ||
+                           (right && !user->isUserAllowed(right)))) {
         writeBinaryReply(conn, command, VSCP_ERROR_NOT_AUTHORIZED);
         return;
     }
 
-    uint16_t error = VSCP_ERROR_SUCCESS;
+    uint16_t error        = VSCP_ERROR_SUCCESS;
     uint16_t replyCommand = command;
     std::vector<uint8_t> reply;
     switch (command) {
-        case 0: case 1: case 4: case 7: case 8: case 9: case 10:
-        case 11: case 12: case 13: case 15: case 16: case 22: case 23: case 24:
+        case 0:
+        case 1:
+        case 4:
+        case 7:
+        case 8:
+        case 9:
+        case 10:
+        case 11:
+        case 12:
+        case 13:
+        case 15:
+        case 16:
+        case 22:
+        case 23:
+        case 24:
             if (length != 0) {
                 writeBinaryReply(conn, command, VSCP_ERROR_PARAMETER);
                 return;
             }
             break;
-        default: break;
+        default:
+            break;
     }
     switch (command) {
-        case 0: break;
+        case 0:
+            break;
         case 1:
             conn->is_draining = 1;
             client->setReceiveLoop(false);
             break;
         case 2: {
             std::string credentials(reinterpret_cast<const char*>(arg), length);
-            size_t colon = credentials.find(':');
+            size_t colon         = credentials.find(':');
             std::string username = credentials.substr(0, colon);
             if (username.empty() || username.size() > 64 ||
                 credentials.find('\0') != std::string::npos ||
@@ -1033,13 +1080,15 @@ CTcpipSrv::handleBinaryFrame(struct mg_connection* conn,
             }
             client->resetAuthentication();
             client->setReceiveLoop(false);
-            client->setUserItem(m_pCtrlObj->getUserList().getUser(username.c_str()));
+            client->setUserItem(
+              m_pCtrlObj->getUserList().getUser(username.c_str()));
             client->setBinaryLoginDeadline(mg_millis() + 30000);
             if (colon != std::string::npos) {
                 setCurrentCommand(credentials.substr(colon + 1));
                 bool authenticated = handleClientPassword(conn);
                 client->setBinaryLoginDeadline(0);
-                if (!authenticated) conn->is_draining = 1;
+                if (!authenticated)
+                    conn->is_draining = 1;
                 return;
             }
             break;
@@ -1050,7 +1099,8 @@ CTcpipSrv::handleBinaryFrame(struct mg_connection* conn,
                 error = VSCP_ERROR_PARAMETER;
                 break;
             }
-            setCurrentCommand(std::string(reinterpret_cast<const char*>(arg), length));
+            setCurrentCommand(
+              std::string(reinterpret_cast<const char*>(arg), length));
             {
                 bool hadUser = client->getUserItem() != nullptr ||
                                client->getBinaryLoginDeadline() != 0;
@@ -1076,7 +1126,7 @@ CTcpipSrv::handleBinaryFrame(struct mg_connection* conn,
                 error = VSCP_ERROR_PARAMETER;
                 break;
             }
-            std::vector<uint8_t> event{0x10};
+            std::vector<uint8_t> event{ 0x10 };
             event.insert(event.end(), arg, arg + length);
             event.resize(event.size() + 2);
             vscp_binary::setCrc(event);
@@ -1085,47 +1135,64 @@ CTcpipSrv::handleBinaryFrame(struct mg_connection* conn,
         }
         case 6: {
             if ((length != 0 && length != 2) || client->isReceiveLoopActive()) {
-                error = client->isReceiveLoopActive() ?
-                          VSCP_ERROR_UNSUPPORTED : VSCP_ERROR_PARAMETER;
+                error = client->isReceiveLoopActive() ? VSCP_ERROR_UNSUPPORTED
+                                                      : VSCP_ERROR_PARAMETER;
                 break;
             }
             size_t count = length ? read16(arg) : 1;
-            if (count == 0) count = 1;
+            if (count == 0)
+                count = 1;
             size_t sent = 0;
             while (sent < count) {
                 vscpEvent* event = client->getEventFromSendQueue();
-                if (!event) break;
-                std::vector<uint8_t> encoded(vscp_getFrameSizeFromEvent(event), 0);
-                bool ok = vscp_writeEventToFrame(encoded.data(), encoded.size(),
-                                                 0, event);
+                if (!event)
+                    break;
+                std::vector<uint8_t> encoded(vscp_getFrameSizeFromEvent(event),
+                                             0);
+                bool ok = vscp_writeEventToFrame(encoded.data(),
+                                                 encoded.size(),
+                                                 0,
+                                                 event);
                 vscp_deleteEvent_v2(&event);
                 if (!ok) {
-                    spdlog::error("TCP/IP binary: failed to serialize queued event");
+                    spdlog::error(
+                      "TCP/IP binary: failed to serialize queued event");
                     error = VSCP_ERROR_INTERNAL;
                     break;
                 }
-                std::vector<uint8_t> body(encoded.begin() + 1, encoded.end() - 2);
-                if (!writeBinaryReply(conn, command, VSCP_ERROR_SUCCESS, body)) return;
+                std::vector<uint8_t> body(encoded.begin() + 1,
+                                          encoded.end() - 2);
+                if (!writeBinaryReply(conn, command, VSCP_ERROR_SUCCESS, body))
+                    return;
                 ++sent;
             }
-            if (error == VSCP_ERROR_SUCCESS && sent) return;
-            if (!sent && error == VSCP_ERROR_SUCCESS) error = VSCP_ERROR_RCV_EMPTY;
+            if (error == VSCP_ERROR_SUCCESS && sent)
+                return;
+            if (!sent && error == VSCP_ERROR_SUCCESS)
+                error = VSCP_ERROR_RCV_EMPTY;
             break;
         }
-        case 7: case 8:
+        case 7:
+        case 8:
             client->setReceiveLoop(command == 7);
             client->setActivityTimestamp(vscp_getMsTimeStamp());
             break;
         case 9:
-            append(reply, client->isReceiveLoopActive() ? 0 :
-                            client->getClientSendQueueSize(), 4);
+            append(reply,
+                   client->isReceiveLoopActive()
+                     ? 0
+                     : client->getClientSendQueueSize(),
+                   4);
             break;
         case 10:
-            if (!client->isReceiveLoopActive()) client->clearSendQueue();
+            if (!client->isReceiveLoopActive())
+                client->clearSendQueue();
             break;
         case 11: {
             auto& stats = client->getStatistics();
-            append(reply, 0, 4); append(reply, 0, 4); append(reply, 0, 4);
+            append(reply, 0, 4);
+            append(reply, 0, 4);
+            append(reply, 0, 4);
             append(reply, stats.cntReceiveData, 4);
             append(reply, stats.cntReceiveFrames, 4);
             append(reply, stats.cntTransmitData, 4);
@@ -1145,9 +1212,12 @@ CTcpipSrv::handleBinaryFrame(struct mg_connection* conn,
             reply.push_back(0);
             break;
         }
-        case 13: append(reply, client->getClientID(), 4); break;
+        case 13:
+            append(reply, client->getClientID(), 4);
+            break;
         case 14:
-            if (length != 16) error = VSCP_ERROR_PARAMETER;
+            if (length != 16)
+                error = VSCP_ERROR_PARAMETER;
             else {
                 cguid guid;
                 guid.getFromArray(arg);
@@ -1165,7 +1235,8 @@ CTcpipSrv::handleBinaryFrame(struct mg_connection* conn,
             append(reply, VSCPD_VERSION_PATCH, 2);
             append(reply, 0, 4);
             break;
-        case 17: case 18: {
+        case 17:
+        case 18: {
             if ((command == 17 && length != 21 && length != 42) ||
                 (command == 18 && length != 21) || arg[0] > 7 ||
                 (length == 42 && arg[21] > 7)) {
@@ -1175,15 +1246,15 @@ CTcpipSrv::handleBinaryFrame(struct mg_connection* conn,
             auto& filter = client->getFilter();
             if (command == 17) {
                 filter.filter_priority = arg[0];
-                filter.filter_class = read16(arg + 1);
-                filter.filter_type = read16(arg + 3);
+                filter.filter_class    = read16(arg + 1);
+                filter.filter_type     = read16(arg + 3);
                 std::copy(arg + 5, arg + 21, filter.filter_GUID);
             }
             if (command == 18 || length == 42) {
-                const uint8_t* mask = arg + (command == 18 ? 0 : 21);
+                const uint8_t* mask  = arg + (command == 18 ? 0 : 21);
                 filter.mask_priority = mask[0];
-                filter.mask_class = read16(mask + 1);
-                filter.mask_type = read16(mask + 3);
+                filter.mask_class    = read16(mask + 1);
+                filter.mask_type     = read16(mask + 3);
                 std::copy(mask + 5, mask + 21, filter.mask_GUID);
             }
             break;
@@ -1195,43 +1266,53 @@ CTcpipSrv::handleBinaryFrame(struct mg_connection* conn,
                 break;
             }
             replyCommand = command + arg[0];
-            auto& list = m_pCtrlObj->getClientList();
+            auto& list   = m_pCtrlObj->getClientList();
             list.lockClientItemList();
             auto& items = list.getItemList();
-            if (arg[0] == 0) append(reply, items.size(), 2);
+            if (arg[0] == 0)
+                append(reply, items.size(), 2);
             else {
                 uint16_t index = read16(arg + 1);
-                if (index >= items.size()) error = VSCP_ERROR_PARAMETER;
+                if (index >= items.size())
+                    error = VSCP_ERROR_PARAMETER;
                 else {
                     auto* item = items[index];
                     append(reply, index, 2);
                     if (arg[0] == 1) {
-                        auto interfaceGuid = item->getInterfaceGUID();
+                        auto interfaceGuid  = item->getInterfaceGUID();
                         const uint8_t* guid = interfaceGuid.getGUID();
                         reply.insert(reply.end(), guid, guid + 16);
                         std::string name = item->getDeviceName();
-                        reply.insert(reply.end(), name.begin(),
-                                     name.begin() + std::min<size_t>(63, name.size()));
+                        reply.insert(reply.end(),
+                                     name.begin(),
+                                     name.begin() +
+                                       std::min<size_t>(63, name.size()));
                         reply.resize(82, 0);
                     }
-                    else item->setOpen(arg[0] == 3);
+                    else
+                        item->setOpen(arg[0] == 3);
                 }
             }
             list.unlockClientItemList();
             break;
         }
         case 21:
-            if (length != 0 && length != 8) error = VSCP_ERROR_PARAMETER;
+            if (length != 0 && length != 8)
+                error = VSCP_ERROR_PARAMETER;
             else {
                 uint8_t capabilities[8];
                 if (!m_pCtrlObj->getVscpCapabilities(capabilities)) {
                     error = VSCP_ERROR_INTERNAL;
                 }
-                else reply.assign(std::rbegin(capabilities), std::rend(capabilities));
+                else
+                    reply.assign(std::rbegin(capabilities),
+                                 std::rend(capabilities));
             }
             break;
-        case 22: case 23:
-            if (!writeBinaryReply(conn, command, error)) return;
+        case 22:
+        case 23:
+            if (!writeBinaryReply(conn, command, error))
+                return;
 #ifdef WIN32
             m_pCtrlObj->m_bQuit = true;
 #else
@@ -1250,7 +1331,9 @@ CTcpipSrv::handleBinaryFrame(struct mg_connection* conn,
             break;
     }
     if (error != VSCP_ERROR_SUCCESS) {
-        spdlog::warn("TCP/IP binary: command {} failed with error {}", command, error);
+        spdlog::warn("TCP/IP binary: command {} failed with error {}",
+                     command,
+                     error);
         reply.clear();
     }
     writeBinaryReply(conn, replyCommand, error, reply);
@@ -1303,7 +1386,8 @@ CTcpipSrv::handleIncomingData(struct mg_connection* conn)
                 discardBinaryInput(conn, sync ? sync - input.buf : input.len);
                 continue;
             }
-            if (input.len < vscp_binary::headerSize + 1) return;
+            if (input.len < vscp_binary::headerSize + 1)
+                return;
             size_t length = 0;
             if (!vscp_binary::parseHeader(input.buf, length)) {
                 discardBinaryInput(conn, 1);
@@ -1316,10 +1400,12 @@ CTcpipSrv::handleIncomingData(struct mg_connection* conn)
                 return;
             }
             std::vector<uint8_t> wire(input.buf + vscp_binary::headerSize,
-                                      input.buf + vscp_binary::headerSize + length);
+                                      input.buf + vscp_binary::headerSize +
+                                        length);
             std::vector<uint8_t> frame;
             if (!vscp_binary::decode(std::move(wire),
-                                     m_pCtrlObj->getSystemKey(nullptr), frame)) {
+                                     m_pCtrlObj->getSystemKey(nullptr),
+                                     frame)) {
                 // The length may be corrupt, so search from the next byte.
                 discardBinaryInput(conn, 1);
                 continue;
@@ -1331,18 +1417,23 @@ CTcpipSrv::handleIncomingData(struct mg_connection* conn)
             handleBinaryFrame(conn, frame);
         }
         else {
-            auto* eol = static_cast<uint8_t*>(memmem(input.buf, input.len, "\r\n", 2));
+            auto* eol =
+              static_cast<uint8_t*>(memmem(input.buf, input.len, "\r\n", 2));
             if (!eol) {
                 if (input.len >= 2048) {
                     spdlog::error("TCP/IP input: command exceeds line limit");
-                    write(conn, MSG_PARAMETER_ERROR, sizeof(MSG_PARAMETER_ERROR) - 1);
+                    write(conn,
+                          MSG_PARAMETER_ERROR,
+                          sizeof(MSG_PARAMETER_ERROR) - 1);
                     conn->is_draining = 1;
                 }
                 return;
             }
             size_t length = eol - input.buf;
             if (length >= 2048) {
-                write(conn, MSG_PARAMETER_ERROR, sizeof(MSG_PARAMETER_ERROR) - 1);
+                write(conn,
+                      MSG_PARAMETER_ERROR,
+                      sizeof(MSG_PARAMETER_ERROR) - 1);
                 conn->is_draining = 1;
                 return;
             }
@@ -1403,25 +1494,32 @@ CTcpipSrv::handleClientMeasurement(struct mg_connection* conn)
 
     vscpEventEx measurement{};
     auto guid = pClientItem->getInterfaceGUID();
-    if (!parseMeasurementCommand(getCurrentCommand(), guid.getGUID(), measurement)) {
+    if (!parseMeasurementCommand(getCurrentCommand(),
+                                 guid.getGUID(),
+                                 measurement)) {
         write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
         return;
     }
     if (!user->isUserAllowedToSendEvent(measurement.vscp_class,
-                                       measurement.vscp_type)) {
-        write(conn, MSG_MOT_ALLOWED_TO_SEND_EVENT,
+                                        measurement.vscp_type)) {
+        write(conn,
+              MSG_MOT_ALLOWED_TO_SEND_EVENT,
               strlen(MSG_MOT_ALLOWED_TO_SEND_EVENT));
         return;
     }
 
     vscpEvent* event = nullptr;
     if (!vscp_newEvent(&event)) {
-        write(conn, MSG_INTERNAL_MEMORY_ERROR, strlen(MSG_INTERNAL_MEMORY_ERROR));
+        write(conn,
+              MSG_INTERNAL_MEMORY_ERROR,
+              strlen(MSG_INTERNAL_MEMORY_ERROR));
         return;
     }
     if (!vscp_convertEventExToEvent(event, &measurement)) {
         vscp_deleteEvent_v2(&event);
-        write(conn, MSG_INTERNAL_MEMORY_ERROR, strlen(MSG_INTERNAL_MEMORY_ERROR));
+        write(conn,
+              MSG_INTERNAL_MEMORY_ERROR,
+              strlen(MSG_INTERNAL_MEMORY_ERROR));
         return;
     }
     event->obid = pClientItem->getClientID();
@@ -1904,7 +2002,9 @@ CTcpipSrv::handleClientSend(struct mg_connection* conn)
     if (nullptr == queuedEvent) {
         delete[] event.pdata;
         spdlog::error("handleClientSend: unable to allocate queued event");
-        write(conn, MSG_INTERNAL_MEMORY_ERROR, sizeof(MSG_INTERNAL_MEMORY_ERROR) - 1);
+        write(conn,
+              MSG_INTERNAL_MEMORY_ERROR,
+              sizeof(MSG_INTERNAL_MEMORY_ERROR) - 1);
         return;
     }
     event.pdata = nullptr;
@@ -2034,7 +2134,8 @@ CTcpipSrv::sendOneEventFromQueue(struct mg_connection* conn, bool bStatusMsg)
         if (pClientItem->isBinaryMode()) {
             std::vector<uint8_t> frame(vscp_getFrameSizeFromEvent(pev), 0);
             if (!vscp_writeEventToFrame(frame.data(), frame.size(), 0, pev)) {
-                spdlog::error("TCP/IP binary: failed to serialize outgoing event");
+                spdlog::error(
+                  "TCP/IP binary: failed to serialize outgoing event");
                 vscp_deleteEvent_v2(&pev);
                 conn->is_closing = 1;
                 return false;
@@ -2745,9 +2846,9 @@ CTcpipSrv::handleClientPassword(struct mg_connection* conn)
 
     if (!pUserItem->validatePassword(strPassword)) {
 
-        std::string strErr = vscp_str_format(
-          ("[TCP/IP srv] User [%s] not allowed to connect.\n"),
-          (const char*)pUserItem->getUserName().c_str());
+        std::string strErr =
+          vscp_str_format(("[TCP/IP srv] User [%s] not allowed to connect.\n"),
+                          (const char*)pUserItem->getUserName().c_str());
 
         spdlog::error("%s", strErr.c_str());
         write(conn, MSG_PASSWORD_ERROR, strlen(MSG_PASSWORD_ERROR));
@@ -3481,9 +3582,8 @@ CTcpipSrv::handleClientHelp(struct mg_connection* conn)
     }
     else if (commandStartsWith("measurement", true)) {
         std::string str = "'MEASUREMENT' Post measurement event.\r\n";
-        str +=
-          "Syntax: measurement class,type,value,[unit],[index],[zone],"
-          "[subzone],[guid],[timestamp_ns]\r\n";
+        str += "Syntax: measurement class,type,value,[unit],[index],[zone],"
+               "[subzone],[guid],[timestamp_ns]\r\n";
         str += "Example: measurement "
                "10,6,23.5,1\r\n";
         str +=
@@ -3637,8 +3737,7 @@ tcpip_event_handler(struct mg_connection* conn, int ev, void* ev_data)
         server->handleIncomingData(conn);
     }
     else if (ev == MG_EV_WAKEUP || ev == MG_EV_POLL) {
-        if (ev == MG_EV_WAKEUP && conn->is_listening &&
-            !conn->is_closing) {
+        if (ev == MG_EV_WAKEUP && conn->is_listening && !conn->is_closing) {
             processMainReceiveQueue(server);
             return;
         }
@@ -3647,8 +3746,8 @@ tcpip_event_handler(struct mg_connection* conn, int ev, void* ev_data)
         if (ev == MG_EV_POLL && !conn->is_listening && nullptr != pClientItem) {
             server->checkBinaryReceiveTimeout(conn, mg_millis());
         }
-        if (conn->is_listening || conn->is_closing ||
-            nullptr == pClientItem || !pClientItem->isConnected() ||
+        if (conn->is_listening || conn->is_closing || nullptr == pClientItem ||
+            !pClientItem->isConnected() ||
             !pClientItem->isReceiveLoopActive()) {
             return;
         }
@@ -3708,7 +3807,7 @@ tcpipWorkerThread(void* pdata)
     // struct mg_mgr mgr; // Event manager
     struct mg_connection* conn;
 
-    mg_log_set(MG_LL_INFO);         // Set log level
+    mg_log_set(MG_LL_INFO); // Set log level
     crcInit();
     mg_mgr_init(&ptcpipsrv->m_mgr); // Initialize event manager
     ptcpipsrv->m_mgr.userdata = pdata;

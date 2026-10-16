@@ -156,7 +156,8 @@ class CTcpipSrv {
     /// Destructor
     ~CTcpipSrv();
 
-    bool writeBinaryFrame(struct mg_connection* conn, std::vector<uint8_t> frame);
+    bool writeBinaryFrame(struct mg_connection* conn,
+                          std::vector<uint8_t> frame);
     bool writeBinaryReply(struct mg_connection* conn,
                           uint16_t command,
                           uint16_t error,
@@ -573,17 +574,17 @@ class CTcpipSrv {
         of the server.
     */
     void setTlsOptions(const std::string& ca,
-                      const std::string& cert,
-                      const std::string& key,
-                      const std::string& name)
+                       const std::string& cert,
+                       const std::string& key,
+                       const std::string& name)
     {
-        m_tls_ca = ca;
-        m_tls_cert = cert;
-        m_tls_key = key;
-        m_tls_name = name;
-        m_tcpip_tls_opts.ca = mg_str(m_tls_ca.c_str());
+        m_tls_ca              = ca;
+        m_tls_cert            = cert;
+        m_tls_key             = key;
+        m_tls_name            = name;
+        m_tcpip_tls_opts.ca   = mg_str(m_tls_ca.c_str());
         m_tcpip_tls_opts.cert = mg_str(m_tls_cert.c_str());
-        m_tcpip_tls_opts.key = mg_str(m_tls_key.c_str());
+        m_tcpip_tls_opts.key  = mg_str(m_tls_key.c_str());
         m_tcpip_tls_opts.name = mg_str(m_tls_name.c_str());
     }
 
@@ -594,7 +595,6 @@ class CTcpipSrv {
     CControlObject* getControlObject(void) { return m_pCtrlObj; };
 
   public:
-
     /*!
         Mongoose event manager for handling TCP/IP connections.
         This manager is responsible for managing all network events,
@@ -643,17 +643,15 @@ class CTcpipSrv {
        If ca is set but cert is NULL, then only server authentication is
        performed.
 
-       cert - Our own
-        certificate; an mg_str. If NULL, then we don't authenticate ourselves to
-       the other peer.
+       cert - Our own certificate; an mg_str. If NULL, then we don't
+       authenticate ourselves to the other peer.
 
+       key - Our own private key; an mg_str. Sometimes, a certificate and its
+       key are bundled in a single PEM file, in which case the values for cert
+       and key could be the same
 
-       key - Our own private key; an mg_str. Sometimes, a
-       certificate and its key are bundled in a single PEM file, in which case
-       the values for cert and key could be the same
-
-       name - Server name; an
-       mg_str. If not empty, enable server name verification.
+       name - Server name; an mg_str. If not empty, enable server name
+       verification.
 
         NOTE: if both ca and cert are set, then two-way (mutual) TLS
        authentication is enabled, both sides authenticate each other. Usually,
@@ -665,9 +663,6 @@ class CTcpipSrv {
     std::string m_tls_cert;
     std::string m_tls_key;
     std::string m_tls_name;
-
-    
-
 
     // Saved return value for last sockettcp operation
     size_t m_rv;

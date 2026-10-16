@@ -61,14 +61,19 @@
 
   ],
 
-
+  
   "tcpip": {
-    "interface-address": "tls://127.0.0.1:9598",
-    "_comment": "If ssl is used, configure the SSL options below otherwise remove this section",
-    "ssl-options": {
-      "cafile": "/home/akhe/development/VSCP/vscp-tcpip-daemon/install/certs/server.pem",
-      "certfile": "/home/akhe/development/VSCP/vscp-tcpip-daemon/install/certs/server.pem",
+    "interface-address": "tcp://127.0.0.1:9598",
+    "_comment1": "If ssl is used, configure the SSL options below otherwise remove this section",
+    "_comment2": "The certificate and key paths exist and match. I’d use server.crt for certfile",
+    "_comment3": "and server.key for keyfile; server.pem includes the certificate and key together.",
+    "_comment4": "Leave cafile empty unless you intend to verify client certificates (mutual TLS). ",
+    "_comment5": "name can remain empty for this server listener.",
+    "_ssl-options": {
+      "cafile": "",
+      "certfile": "/home/akhe/development/VSCP/vscp-tcpip-daemon/install/certs/server.crt",
       "keyfile": "/home/akhe/development/VSCP/vscp-tcpip-daemon/install/certs/server.key",
+      "cafile": "",
       "name": ""
     }
   },
