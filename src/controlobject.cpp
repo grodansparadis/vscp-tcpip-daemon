@@ -321,8 +321,8 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
 
     // Root folder must exist
     if (!vscp_fileExists(m_rootFolder.c_str())) {
-        spdlog::error("The specified rootfolder does not exist (%s).",
-                      (const char*)m_rootFolder.c_str());
+        spdlog::error("The specified rootfolder does not exist ({}).",
+                      m_rootFolder.c_str());
         return false;
     }
 
@@ -331,9 +331,8 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
 
     // A configuration file must be available
     if (!vscp_fileExists(strcfgfile.c_str())) {
-        printf("No configuration file. Can't initialize!.");
-        spdlog::error("No configuration file. Can't initialize!. Path=%s",
-                      strcfgfile.c_str());
+        spdlog::error("No configuration file. Can't initialize!. Path={}",
+                      strcfgfile);
         return false;
     }
 
@@ -350,7 +349,7 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
         if (!readConfiguration(strcfgfile)) {
             spdlog::error(
               "Unable to open/parse configuration file. Can't initialize! "
-              "Path =%s",
+              "Path ={}",
               strcfgfile.c_str());
             return false;
         }
@@ -378,7 +377,7 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
     }
 #endif
 
-    spdlog::debug("Using configuration file: %s", strcfgfile.c_str());
+    spdlog::debug("Using configuration file: {}", strcfgfile);
 
     //==========================================================================
     //                           Add driver user
@@ -835,14 +834,14 @@ CControlObject::startDeviceWorkerThreads(void)
         pDeviceItem = *it;
         if (NULL != pDeviceItem) {
 
-            spdlog::debug("Controlobject: [Driver] - Preparing: %s ",
+            spdlog::debug("Controlobject: [Driver] - Preparing: {}",
                           pDeviceItem->getName().c_str());
 
             // Just start if enabled
             if (!pDeviceItem->isEnabled())
                 continue;
 
-            spdlog::debug("Controlobject: [Driver] - Starting: %s ",
+            spdlog::debug("Controlobject: [Driver] - Starting: {}",
                           pDeviceItem->getName().c_str());
 
             // Start  the driver logic
@@ -2314,10 +2313,10 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
                                           true,
                                           drv["translation"].get<uint32_t>())) {
                     spdlog::error(
-                      "Level I driver not added name=%s. Path does not "
-                      "exist. - [%s]",
-                      strName.c_str(),
-                      drv["path"].get<std::string>().c_str());
+                      "Level I driver not added name={}. Path does not "
+                      "exist. - [{}]",
+                      strName,
+                      drv["path"].get<std::string>());
                 }
             }
         }
@@ -2358,10 +2357,10 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
                                           VSCP_DRIVER_LEVEL2,
                                           true)) {
                     spdlog::error(
-                      "Level II driver not added name=%s. Path does not "
-                      "exist. - [%s]",
-                      strName.c_str(),
-                      drv["path-driver"].get<std::string>().c_str());
+                      "Level II driver not added name={}. Path does not "
+                      "exist. - [{}]",
+                      strName,
+                      drv["path-driver"].get<std::string>());
                 }
             }
         }

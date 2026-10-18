@@ -1,0 +1,105 @@
+name: Debian & Raspberry Pi packages
+
+on:
+  push:
+    branches: [ master, main ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: debian-packages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.target }} ${{ matrix.distro }} (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        distro: [ bookworm, trixie ]
+        target: [ debian, raspberrypi-64, raspberrypi-32 ]
+        include:
+          # Debian / Ubuntu-style x86_64 PCs and servers
+          - target: debian
+            arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-24.04
+          # Raspberry Pi OS 64-bit (Pi 3/4/5, Zero 2 W) - native arm64 runner
+          - target: raspberrypi-64
+            arch: arm64
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
+          # Raspberry Pi OS 32-bit (armhf, ARMv7+: Pi 2/3/4/5, Zero 2 W) - emulated
+          - target: raspberrypi-32
+            arch: armhf
+            platform: linux/arm/v7
+            runner: ubuntu-24.04
+            qemu: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up QEMU
+        if: matrix.qemu
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm
+
+      - name: Build .deb in debian:${{ matrix.distro }} (${{ matrix.platform }})
+        run: |
+          docker run --rm \
+            --platform ${{ matrix.platform }} \
+            -v "${GITHUB_WORKSPACE}:/src" \
+            -w /src \
+            debian:${{ matrix.distro }} \
+            bash scripts/ci/build-deb.sh ${{ matrix.distro }}
+          ls -l dist
+
+      - name: Verify package installs
+        run: |
+          docker run --rm \
+            --platform ${{ matrix.platform }} \
+            -v "${GITHUB_WORKSPACE}/dist:/dist:ro" \
+            debian:${{ matrix.distro }} \
+            bash -c 'set -e
+              apt-get update -qq
+              DEBIAN_FRONTEND=noninteractive apt-get install -y /dist/*.deb
+              dpkg -s vscp-tcpip-daemon
+              test -x /usr/sbin/vscpd
+              ldd /usr/sbin/vscpd | (! grep "not found")'
+
+      - name: Upload package
+        uses: actions/upload-artifact@v7
+        with:
+          name: vscpd-${{ matrix.target }}-${{ matrix.distro }}-${{ matrix.arch }}
+          path: dist/*.deb
+          if-no-files-found: error
+
+  release:
+    name: Publish Debian & Raspberry Pi packages
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download all packages
+        uses: actions/download-artifact@v8
+        with:
+          path: dist
+          pattern: vscpd-*
+          merge-multiple: true
+
+      - name: Attach packages to GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: dist/*.deb

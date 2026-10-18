@@ -173,7 +173,7 @@ CDeviceItem::startDriver(CControlObject* pCtrlObject)
 {
     // Just start if enabled
     if (!m_bEnable) {
-        spdlog::info("[Driver %s] Start - VSCP driver is disabled.",
+        spdlog::info("[Driver {}] Start - VSCP driver is disabled.",
                      m_strName.c_str());
         return true;
     }
@@ -186,7 +186,7 @@ CDeviceItem::startDriver(CControlObject* pCtrlObject)
     m_pObj = pCtrlObject;
 
     if (pthread_create(&m_deviceThreadHandle, NULL, deviceThread, this)) {
-        spdlog::error("[Driver %s] - Unable to start the device thread.",
+        spdlog::error("[Driver {}] - Unable to start the device thread.",
                       m_strName.c_str());
         return false;
     }
@@ -206,14 +206,14 @@ CDeviceItem::stopDriver()
 {
     if (m_bEnable) {
         setQuit(true);
-        spdlog::info("Driver {}: Driver asked to stop operation.",
+        spdlog::info("[Driver {}] - Driver asked to stop operation.",
                      m_strName.c_str());
 
         pthread_mutex_lock(&m_mutexdeviceThread);
         pthread_join(m_deviceThreadHandle, NULL);
         pthread_mutex_unlock(&m_mutexdeviceThread);
 
-        spdlog::error("CDeviceItem: Driver stopping. [{}]",
+        spdlog::error("[Driver {}] - Driver stopping.",
                       m_strName.c_str());
     }
     else {
@@ -318,7 +318,7 @@ CDeviceList::addItem(const std::string& strName,
         }
         else {
             spdlog::error(
-              "Driver '%s' is not available at this path %s. Dropped!",
+              "Driver '{}' is not available at this path '{}'. Dropped!",
               strName.c_str(),
               strPath.c_str());
 

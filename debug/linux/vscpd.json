@@ -81,12 +81,12 @@
   "drivers": {
     "level1": [
       {
-        "enable": false,
+        "enable": true,
         "name": "logger",
         "config": "/tmp/canallog.txt",
         "flags": 1,
         "translation": 2,
-        "path": "/var/lib/vscp/drivers/level1/vscpl1drv-logger.so",
+        "path": "/home/akhe/development/VSCP/vscpl1drv-logger/linux/vscpl1drv-logger.so.1.1.1",
         "guid": "FF:FF:FF:FF:FF:FF:FF:F5:01:00:00:00:00:00:00:00"        
       }
     ],
@@ -95,14 +95,14 @@
         "enable": false,
         "name": "lmsensors",
         "path-driver": "/var/lib/vscp/drivers/level2/vscpl2drv-lmsensors.so",
-        "path-config": "/var/lib/vscp/vscpd/lmsensors.json",
+        "path-config": "/home/akhe/development/VSCP/vscpl2drv-socketcan/debug/linux/socketcan.json",
         "guid": "FF:FF:FF:FF:FF:FF:FF:F5:02:00:00:00:00:00:00:02"
       },
       {
-        "enable": false,
+        "enable": true,
         "name": "socketcan",
-        "path-driver": "/var/lib/vscp/drivers/level2/vscpl2drv-socketcan.so",
-        "path-config": "/var/lib/vscp/vscpd/socketcan.json",
+        "path-driver": "/home/akhe/development/VSCP/vscpl2drv-socketcan/build/libvscpl2drv-socketcan.so",
+        "path-config": "/home/akhe/development/VSCP/vscpl2drv-socketcan/debug/linux/socketcan.json",
         "guid": "FF:FF:FF:FF:FF:FF:FF:F5:02:00:00:00:00:00:00:03"
       },
       {

@@ -449,7 +449,7 @@ set(CPACK_PACKAGE_DESCRIPTION
     "The VSCP TCP/IP Daemon (vscpd) is the main control centre for the VSCP
 (Very Simple Control Protocol) framework. It provides a TCP/IP interface
 for connected clients and drivers.")
-set(CPACK_PACKAGE_VERSION          "${VSCPD_VERSION_MAJOR}")
+set(CPACK_PACKAGE_VERSION          "${VSCPD_VERSION_MAJOR}.${VSCPD_VERSION_MINOR}.${VSCPD_VERSION_PATCH}")
 set(CPACK_PACKAGE_VERSION_MAJOR    "${VSCPD_VERSION_MAJOR}")
 set(CPACK_PACKAGE_VERSION_MINOR    "${VSCPD_VERSION_MINOR}")
 set(CPACK_PACKAGE_VERSION_PATCH    "${VSCPD_VERSION_PATCH}")
@@ -473,8 +473,15 @@ set(CPACK_SOURCE_IGNORE_FILES
 # ---- DEB (Linux) ----
 set(CPACK_DEBIAN_PACKAGE_SECTION      "net")
 set(CPACK_DEBIAN_PACKAGE_PRIORITY     "optional")
-set(CPACK_DEBIAN_PACKAGE_DEPENDS
-    "libssl3 | libssl1.1")
+# Let dpkg-shlibdeps compute the exact runtime dependencies for the target
+# distribution/architecture (e.g. libssl3 vs libssl3t64) when available.
+find_program(VSCPD_DPKG_SHLIBDEPS dpkg-shlibdeps)
+if(VSCPD_DPKG_SHLIBDEPS)
+    set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+else()
+    set(CPACK_DEBIAN_PACKAGE_DEPENDS
+        "libssl3 | libssl1.1")
+endif()
 set(CPACK_DEBIAN_PACKAGE_SUGGESTS     "mosquitto")
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER   "${CPACK_PACKAGE_CONTACT}")
 set(CPACK_DEBIAN_FILE_NAME            DEB-DEFAULT)

@@ -248,7 +248,7 @@ CClientItem::getEventFromSendQueue(bool bRemove)
     }
     else {
         // No event in the send queue
-        spdlog::debug("getEventFromSendQueue: No event in the send queue");
+        //spdlog::debug("getEventFromSendQueue: No event in the send queue");
     }
     pthread_mutex_unlock(&m_mutexSendQueue);
 

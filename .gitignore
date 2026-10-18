@@ -48,3 +48,7 @@ build/
 build_cmake_test/
 cmake/_deps/
 cmake-includes/_deps/
+
+# CI Debian package build output (scripts/ci/build-deb.sh)
+/build-deb/
+/dist/

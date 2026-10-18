@@ -115,7 +115,7 @@ int main( int argc, char *argv[] )
        return -1;
    }
 
-   printf("\nListen for multicast events on a VSCP multicast channel %s:%d.\n",
+   printf("\nListen for multicast events on a VSCP multicast channel %s:{}.\n",
             DEFAULT_GROUP, DEFAULT_PORT );
    printf("usage: mclistner group port interface\n");
    printf("CTRL+C to terminate.\n\n");
@@ -156,13 +156,13 @@ int main( int argc, char *argv[] )
                      buf[ VSCP_MULTICAST_PACKET0_POS_VSCP_SIZE_LSB ];
 
         printf( "Multicast frame received from ");
-        printf( "%s,\tport=%d - ", peer, ntohs( addr.sin_port ) );
-        printf( "\tclass=%d,type=%d\n", vscp_class, vscp_type );
+        printf( "%s,\tport={} - ", peer, ntohs( addr.sin_port ) );
+        printf( "\tclass={},type={}\n", vscp_class, vscp_type );
 
         // Calculate & check CRC
         crc crcnew = crcFast( (unsigned char const *)buf + 1,
                             nbytes - 1 );
-        printf("Calculated size=%d (%d) CRC=%04X ", (int)calcFrameSize, nbytes, (int)crcnew );
+        printf("Calculated size={} ({}) CRC=%04X ", (int)calcFrameSize, nbytes, (int)crcnew );
         if ( crcnew ) {
             printf("\a * * * This frame is BAD or not a VSCP frame! * * * \n");
         }
@@ -171,24 +171,24 @@ int main( int argc, char *argv[] )
         }
 
         if ( bDumpData ) {
-            printf("Size of frame=%d.\nFrame=", nbytes );
+            printf("Size of frame={}.\nFrame=", nbytes );
             for ( int i=0; i<nbytes; i++ ) {
                 printf("%02X ", buf[i] );
             }
             printf("\n");
-            printf("Class=%d, Type=%d data size=%d\n",
+            printf("Class={}, Type={} data size={}\n",
                     ( ( buf[VSCP_MULTICAST_PACKET0_POS_VSCP_CLASS_MSB] >> 8) & 0x0f ) +
                         buf[VSCP_MULTICAST_PACKET0_POS_VSCP_CLASS_LSB],
                     ( ( buf[VSCP_MULTICAST_PACKET0_POS_VSCP_TYPE_MSB] >> 8) & 0x0f ) +
                         buf[VSCP_MULTICAST_PACKET0_POS_VSCP_TYPE_LSB],
                     ( ( buf[VSCP_MULTICAST_PACKET0_POS_VSCP_SIZE_MSB] >> 8) & 0x0f ) +
                         buf[VSCP_MULTICAST_PACKET0_POS_VSCP_SIZE_LSB] );
-            printf("Year=%d, Month=%d Day=%d ",
+            printf("Year={}, Month={} Day={} ",
                     ( buf[VSCP_MULTICAST_PACKET0_POS_YEAR_MSB] << 8 ) +
                     buf[VSCP_MULTICAST_PACKET0_POS_YEAR_LSB],
                     buf[VSCP_MULTICAST_PACKET0_POS_MONTH],
                     buf[VSCP_MULTICAST_PACKET0_POS_DAY] );
-            printf("Hour=%d, Minute=%d Second=%d \n",
+            printf("Hour={}, Minute={} Second={} \n",
                             buf[VSCP_MULTICAST_PACKET0_POS_HOUR],
                             buf[VSCP_MULTICAST_PACKET0_POS_MINUTE],
                             buf[VSCP_MULTICAST_PACKET0_POS_SECOND] );

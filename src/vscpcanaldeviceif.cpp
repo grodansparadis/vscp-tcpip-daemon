@@ -28,12 +28,12 @@
 #include <string>
 
 #include <dlfcn.h>
-#include <syslog.h>
 #include <stdlib.h>
 #include <unistd.h>
 
 #include <expat.h>
 #include <json.hpp> // Needs C++11  -std=c++11
+#include "spdlog/spdlog.h"
 
 #include <canal.h>
 #include <canal_macro.h>
@@ -49,8 +49,6 @@ using json = nlohmann::json;
 
 VscpCanalDeviceIf::VscpCanalDeviceIf()
 {
-    // Open syslog
-
     m_strPath.clear();
     m_strParameter.clear();
     m_openHandle  = 0;
@@ -60,7 +58,7 @@ VscpCanalDeviceIf::VscpCanalDeviceIf()
 
 VscpCanalDeviceIf::~VscpCanalDeviceIf()
 {
-    // Close syslog
+    
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -77,14 +75,14 @@ VscpCanalDeviceIf::init()
     // Load dynamic library
     m_hdll = dlopen(m_strPath.c_str(), RTLD_LAZY);
     if (!m_hdll) {
-        SYSLOG(LOG_ERR,
-               "Devicethread: Unable to load dynamic library. path = %s",
+        spdlog::error(
+               "Devicethread: Unable to load dynamic library. path = {}",
                m_strPath.c_str());
         return CANAL_ERROR_PARAMETER;
     }
 
     // Now find methods in library
-    SYSLOG(LOG_INFO, "Loading level I driver: %s", m_strPath.c_str());
+    spdlog::info( "Loading level I driver: {}", m_strPath.c_str());
 
     // * * * * CANAL OPEN * * * *
     m_proc_CanalOpen = (LPFNDLL_CANALOPEN)dlsym(m_hdll, "CanalOpen");
@@ -92,8 +90,8 @@ VscpCanalDeviceIf::init()
 
     if (dlsym_error) {
         // Free the library
-        SYSLOG(LOG_DEBUG,
-               "%s : Unable to get dl entry for CanalOpen.",
+        spdlog::debug(
+               "{} : Unable to get dl entry for CanalOpen.",
                m_strPath.c_str());
         return CANAL_ERROR_LIBRARY;
     }
@@ -103,8 +101,8 @@ VscpCanalDeviceIf::init()
     dlsym_error       = dlerror();
     if (dlsym_error) {
         // Free the library
-        SYSLOG(LOG_ERR,
-               "%s: Unable to get dl entry for CanalClose.",
+        spdlog::error(
+               "{}: Unable to get dl entry for CanalClose.",
                m_strPath.c_str());
         dlclose(m_hdll);
         return CANAL_ERROR_LIBRARY;
@@ -116,8 +114,8 @@ VscpCanalDeviceIf::init()
     dlsym_error = dlerror();
     if (dlsym_error) {
         // Free the library
-        SYSLOG(LOG_ERR,
-               "%s: Unable to get dl entry for CanalGetLevel.",
+        spdlog::error(
+               "{}: Unable to get dl entry for CanalGetLevel.",
                m_strPath.c_str());
         dlclose(m_hdll);
         return CANAL_ERROR_LIBRARY;
@@ -128,8 +126,8 @@ VscpCanalDeviceIf::init()
     dlsym_error      = dlerror();
     if (dlsym_error) {
         // Free the library
-        SYSLOG(LOG_ERR,
-               "%s: Unable to get dl entry for CanalSend.",
+        spdlog::error(
+               "{}: Unable to get dl entry for CanalSend.",
                m_strPath.c_str());
         dlclose(m_hdll);
         return CANAL_ERROR_LIBRARY;
@@ -141,8 +139,8 @@ VscpCanalDeviceIf::init()
     dlsym_error = dlerror();
     if (dlsym_error) {
         // Free the library
-        SYSLOG(LOG_ERR,
-               "%s: Unable to get dl entry for CanalDataAvailable.",
+        spdlog::error(
+               "{}: Unable to get dl entry for CanalDataAvailable.",
                m_strPath.c_str());
         dlclose(m_hdll);
         return CANAL_ERROR_LIBRARY;
@@ -153,8 +151,8 @@ VscpCanalDeviceIf::init()
     dlsym_error         = dlerror();
     if (dlsym_error) {
         // Free the library
-        SYSLOG(LOG_ERR,
-               "%s: Unable to get dl entry for CanalReceive.",
+        spdlog::error(
+               "{}: Unable to get dl entry for CanalReceive.",
                m_strPath.c_str());
         dlclose(m_hdll);
         return CANAL_ERROR_LIBRARY;
@@ -166,8 +164,8 @@ VscpCanalDeviceIf::init()
     dlsym_error = dlerror();
     if (dlsym_error) {
         // Free the library
-        SYSLOG(LOG_ERR,
-               "%s: Unable to get dl entry for CanalGetStatus.",
+        spdlog::error(
+               "{}: Unable to get dl entry for CanalGetStatus.",
                m_strPath.c_str());
         dlclose(m_hdll);
         return CANAL_ERROR_LIBRARY;
@@ -179,8 +177,8 @@ VscpCanalDeviceIf::init()
     dlsym_error = dlerror();
     if (dlsym_error) {
         // Free the library
-        SYSLOG(LOG_ERR,
-               "%s: Unable to get dl entry for CanalGetStatistics.",
+        spdlog::error(
+               "{}: Unable to get dl entry for CanalGetStatistics.",
                m_strPath.c_str());
         dlclose(m_hdll);
         return CANAL_ERROR_LIBRARY;
@@ -192,8 +190,8 @@ VscpCanalDeviceIf::init()
     dlsym_error = dlerror();
     if (dlsym_error) {
         // Free the library
-        SYSLOG(LOG_ERR,
-               "%s: Unable to get dl entry for CanalSetFilter.",
+        spdlog::error(
+               "{}: Unable to get dl entry for CanalSetFilter.",
                m_strPath.c_str());
         dlclose(m_hdll);
         return CANAL_ERROR_LIBRARY;
@@ -204,8 +202,8 @@ VscpCanalDeviceIf::init()
     dlsym_error         = dlerror();
     if (dlsym_error) {
         // Free the library
-        SYSLOG(LOG_ERR,
-               "%s: Unable to get dl entry for CanalSetMask.",
+        spdlog::error(
+               "{}: Unable to get dl entry for CanalSetMask.",
                m_strPath.c_str());
         dlclose(m_hdll);
         return CANAL_ERROR_LIBRARY;
@@ -217,8 +215,8 @@ VscpCanalDeviceIf::init()
     dlsym_error = dlerror();
     if (dlsym_error) {
         // Free the library
-        SYSLOG(LOG_ERR,
-               "%s: Unable to get dl entry for CanalGetVersion.",
+        spdlog::error(
+               "{}: Unable to get dl entry for CanalGetVersion.",
                m_strPath.c_str());
         dlclose(m_hdll);
         return CANAL_ERROR_LIBRARY;
@@ -230,8 +228,8 @@ VscpCanalDeviceIf::init()
     dlsym_error = dlerror();
     if (dlsym_error) {
         // Free the library
-        SYSLOG(LOG_ERR,
-               "%s: Unable to get dl entry for CanalGetDllVersion.",
+        spdlog::error(
+               "{}: Unable to get dl entry for CanalGetDllVersion.",
                m_strPath.c_str());
         dlclose(m_hdll);
         return CANAL_ERROR_LIBRARY;
@@ -243,8 +241,8 @@ VscpCanalDeviceIf::init()
     dlsym_error = dlerror();
     if (dlsym_error) {
         // Free the library
-        SYSLOG(LOG_ERR,
-               "%s: Unable to get dl entry for CanalGetVendorString.",
+        spdlog::error(
+               "{}: Unable to get dl entry for CanalGetVendorString.",
                m_strPath.c_str());
         dlclose(m_hdll);
         return CANAL_ERROR_LIBRARY;
@@ -259,8 +257,8 @@ VscpCanalDeviceIf::init()
       (LPFNDLL_CANALBLOCKINGSEND)dlsym(m_hdll, "CanalBlockingSend");
     dlsym_error = dlerror();
     if (dlsym_error) {
-        SYSLOG(LOG_ERR,
-               "%s: Unable to get dl entry for CanalBlockingSend. Probably "
+        spdlog::error(
+               "{}: Unable to get dl entry for CanalBlockingSend. Probably "
                "Generation 1 driver.",
                m_strPath.c_str());
         m_proc_CanalBlockingSend = NULL;
@@ -271,8 +269,8 @@ VscpCanalDeviceIf::init()
       (LPFNDLL_CANALBLOCKINGRECEIVE)dlsym(m_hdll, "CanalBlockingReceive");
     dlsym_error = dlerror();
     if (dlsym_error) {
-        SYSLOG(LOG_ERR,
-               "%s: Unable to get dl entry for CanalBlockingReceive. "
+        spdlog::error(
+               "{}: Unable to get dl entry for CanalBlockingReceive. "
                "Probably Generation 1 driver.",
                m_strPath.c_str());
         m_proc_CanalBlockingReceive = NULL;
@@ -283,8 +281,8 @@ VscpCanalDeviceIf::init()
       (LPFNDLL_CANALGETDRIVERINFO)dlsym(m_hdll, "CanalGetDriverInfo");
     dlsym_error = dlerror();
     if (dlsym_error) {
-        SYSLOG(LOG_ERR,
-               "%s: Unable to get dl entry for CanalGetDriverInfo. "
+        spdlog::error(
+               "{}: Unable to get dl entry for CanalGetDriverInfo. "
                "Probably Generation 1 driver.",
                m_strPath.c_str());
         m_proc_CanalGetdriverInfo = NULL;
@@ -426,7 +424,7 @@ VscpCanalDeviceIf::CanalOpen()
 
     // Check if the driver opened properly
     if (m_openHandle <= 0) {
-        SYSLOG(LOG_ERR,
+        spdlog::error(
                "Failed to open driver. Will not use it! %ld [%s] ",
                m_openHandle,
                m_strPath.c_str());

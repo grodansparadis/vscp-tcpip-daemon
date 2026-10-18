@@ -402,3 +402,28 @@ cmake -S . -B build
 cmake --build build
 sudo cmake --install build
 ```
+
+### Prebuilt Debian and Raspberry Pi packages
+
+The [Debian & Raspberry Pi packages](.github/workflows/debian-packages.yml)
+workflow builds `.deb` packages for Debian 12 (bookworm) and 13 (trixie), and
+the matching Raspberry Pi OS releases:
+
+| Target                  | Architecture | Hardware                          |
+|-------------------------|--------------|-----------------------------------|
+| Debian                  | `amd64`      | x86_64 PCs and servers            |
+| Raspberry Pi OS 64-bit  | `arm64`      | Pi 3, 4, 5, 400, 500, Zero 2 W    |
+| Raspberry Pi OS 32-bit  | `armhf`      | Pi 2, 3, 4, 5, Zero 2 W (ARMv7+)  |
+
+The packages are available as workflow artifacts and are attached to the GitHub
+release for `v*` tags. Install with:
+
+```bash
+sudo apt install ./vscp-tcpip-daemon_<version>_<codename>_<arch>.deb
+```
+
+To build the same package locally inside a container:
+
+```bash
+docker run --rm -v "$PWD:/src" -w /src debian:bookworm scripts/ci/build-deb.sh bookworm
+```

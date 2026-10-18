@@ -122,28 +122,28 @@ int main( int argc, char *argv[] )
                        buf[VSCP_MULTICAST_PACKET0_POS_VSCP_TYPE_LSB];
 
         printf( "Announce frame received from ");
-        printf( "%s,\tport=%d - ", peer, ntohs( addr.sin_port ) );
-        printf( "\tclass=%d,type=%d\n", vscp_class, vscp_type );
+        printf( "%s,\tport={} - ", peer, ntohs( addr.sin_port ) );
+        printf( "\tclass={},type={}\n", vscp_class, vscp_type );
 
         if ( bDumpData ) {
-            printf("Size of frame=%d.\nFrame=", nbytes );
+            printf("Size of frame={}.\nFrame=", nbytes );
             for ( int i=0; i<nbytes; i++ ) {
                 printf("%02X ", buf[i] );
             }
             printf("\n");
-            printf("Class=%d, Type=%d data size=%d\n",
+            printf("Class={}, Type={} data size={}\n",
                     ( ( buf[VSCP_MULTICAST_PACKET0_POS_VSCP_CLASS_MSB] >> 8) & 0x0f ) +
                         buf[VSCP_MULTICAST_PACKET0_POS_VSCP_CLASS_LSB],
                     ( ( buf[VSCP_MULTICAST_PACKET0_POS_VSCP_TYPE_MSB] >> 8) & 0x0f ) +
                         buf[VSCP_MULTICAST_PACKET0_POS_VSCP_TYPE_LSB],
                     ( ( buf[VSCP_MULTICAST_PACKET0_POS_VSCP_SIZE_MSB] >> 8) & 0x0f ) +
                         buf[VSCP_MULTICAST_PACKET0_POS_VSCP_SIZE_LSB] );
-            printf("Year=%d, Month=%d Day=%d ",
+            printf("Year={}, Month={} Day={} ",
                     ( buf[VSCP_MULTICAST_PACKET0_POS_YEAR_MSB] << 8 ) +
                     buf[VSCP_MULTICAST_PACKET0_POS_YEAR_LSB],
                     buf[VSCP_MULTICAST_PACKET0_POS_MONTH],
                     buf[VSCP_MULTICAST_PACKET0_POS_DAY] );
-            printf("Hour=%d, Minute=%d Second=%d \n",
+            printf("Hour={}, Minute={} Second={} \n",
                             buf[VSCP_MULTICAST_PACKET0_POS_HOUR],
                             buf[VSCP_MULTICAST_PACKET0_POS_MINUTE],
                             buf[VSCP_MULTICAST_PACKET0_POS_SECOND] );
