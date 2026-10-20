@@ -10,7 +10,10 @@
 ![VSCP Logo](https://github.com/grodansparadis/vscp-logo/blob/master/logo_100.png)
 
 
-A central VSCP daemon that exports a VSCP tcp/ip link interface and handles level I and level II drivers.
+Full documentation is [here](https://grodansparadis.github.io/vscp-tcpip-daemon/#/)
+
+
+A central VSCP daemon/server that exports a VSCP tcp/ip link interface and handles level I and level II drivers.
 
 Incoming events immediately wake the TCP/IP server's event loop to distribute
 them to client queues, without waiting for a timer or blocking on the main

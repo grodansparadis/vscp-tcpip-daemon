@@ -1,97 +1,173 @@
-# Introduction to the VSCP MQTT Daemon Software
+# Introduction to the VSCP TCP/IP Daemon
 
-The VSCP MQTT daemon is an interface software that sits between low level devices and the higher end device world. It can also connect to other VSCP servers and hardware nodes forming large and complex systems. The low end devices may be VSCP enabled or other types of devices thant know nothing about VSCP. The driver system of VSCP serve as a hardware abstraction layer that makes it possible to connect to anything that is out there. 
+The VSCP TCP/IP daemon is an open-source server in the [VSCP & Friends](https://www.vscp.org) project. It connects devices and services that use VSCP with higher-level applications and transports, especially MQTT.
 
-Two sorts of drivers are available, **Level I** and **Level II**, with slightly different capabilities. It is easy to construct new drivers and there are plenty of sample code on how to do so available.
+Devices do not need to understand VSCP themselves. A driver can translate a device's native protocol into VSCP events, providing a hardware abstraction layer between the device and the rest of the system. The daemon can also connect to other VSCP servers and hardware nodes, allowing you to build larger systems from independent components.
 
-From version 15.0 The VSCP MQTT MQTT daemon work tightly together with a local or remote MQTT broker. It can be looked on as a low lever interface for the MQTT and higher end world. 
+The daemon supports two driver interfaces:
 
-Functionality that previously was incorporated in the VSCP MQTT daemon is now available as drivers. So now the built in web-server with websocket interfaces etc is instead a driver. Also the tcp/ip interface is available as a driver.
+- **Level I drivers** connect lower-level devices and use the CANAL interface.
+- **Level II drivers** work with the full VSCP event format and its 128-bit GUIDs.
 
-A new versioning system is now used. Instead of a major.minor.patch versioning we now use year.month.patch. The path number is updated with each repository checkin and year and month is two digit items.
+Both interfaces make it possible to add support for new hardware. Sample drivers are available in the VSCP project repositories.
 
-## Overview
+Since version 15.0, the daemon works with a local or remote MQTT broker and can act as a low-level bridge between devices and the MQTT ecosystem.
 
-![](./images/vscpd_connection_overview.png)
+Some functions that were built into earlier versions of the VSCP TCP/IP daemon are now provided by installable drivers. For example, the web server and WebSocket interfaces are available through a driver, as is the VSCP Link Protocol TCP/IP interface.
 
-In the picture above a setup is shown from VSCP's point of view. The VSCP MQTT daemon is shown subscribing/publishing to a specific MQTT broker. In reality this can be several MQTT brokers and one or several arbitrary subscriptions/publishing topics to each.
+VSCP versions use the format `year.month.patch` rather than `major.minor.patch`. The year and month are written as two digits, and the final number identifies the patch release.
 
-A bridge to another MQTT broker that connects two of them together is also shown. Bridging is a good way to secure data into specific physical/logical domains. There can also be any number of bridges.
+## The VSCP Link Protocol
 
-Now imagine a low end node connected to the level I interface of the VSCP MQTT daemon. If it delivers a temperature event this event can pass through the VSCP MQTT daemon and get published to the MQTT broker. A widget on an internal web page widget can subscribe to events of this type and show the current temperature in it's presentation interface.
+The VSCP Link Protocol (also called the VSCP TCP/IP Link Protocol) is a lightweight, text-based protocol for communication between a client and a VSCP node or server over TCP/IP. It is used by full servers as well as small embedded Ethernet or Wi-Fi nodes that expose VSCP functions over a network.
 
-The other way around is when a web widget user push a button and a VSCP event is sent over websocket to the broker and the topic it is sent over is subscribed to by a level II driver which light up a Bluetooth lamp in the bedroom when it detects the event.
+A VSCP event carries structured information rather than a device-specific message. Its fields include the event's priority, class, type, source GUID, timestamp, and data. Because all VSCP devices use this shared event model, they can exchange information without needing to understand one another's hardware protocols.
 
-Note that the abstraction of a temperature and a button pressed is preserved all the way from the user interface to the low level driver. Its is thus very easy to replace the Bluetooth lamp with for example a Zigbee lamp.
+### How it works
 
-Only websocket connection is shown to the MQTT broker but of course higher level clients can subscribe/publish from/to it at whish. The Bluetooth/Zigbee lamp could be connected here equally well as behind the VSCP MQTT daemon and a driver. Where a node fits best depends on the the setup and what one think is best.
+The protocol uses a simple command-and-response format, similar to POP3. You can test it with a script, a program, or a plain-text client such as `telnet`:
+
+- The client sends a command as a single line of text terminated by CR/LF.
+- The server responds with `+OK` on success or `-OK` on failure. It may add a short description after ` - `.
+- Commands that return data send one or more data lines, followed by a final `+OK` or `-OK` status line.
+
+The default TCP port is **9598**. A device may also offer the interface on other ports or network interfaces.
+
+A short session might look like this:
+
+```
+telnet localhost 9598
++OK - Success.
+user admin
++OK - User name accepted, password please.
+pass secret
++OK - Success.
+send 0,20,3,,,,-,0,1,35
++OK - Success.
+retr 1
+0,20,3,0,,1729448400000000000,FF:FF:FF:FF:FF:FF:FF:FE:00:05:93:8C:02:20:00:01,0,1,35
++OK - Success.
+quit
++OK - Success.
+```
+
+An event is written as comma-separated fields in this order: `head,class,type,obid,datetime,timestamp,GUID,data0,data1,...`. If the GUID is `-` or empty, the interface uses its own GUID. For new implementations, leave `datetime` empty and provide `timestamp` as a 64-bit Unix timestamp in nanoseconds. The older `datetime` and microsecond timestamp format remains supported for compatibility.
+
+### Common commands
+
+| Command | Description |
+| :------ | :---------- |
+| `USER` / `PASS` | Log in with a username and password. |
+| `CHALLENGE` | Get a session ID, used for challenge-based login. |
+| `NOOP` | Do nothing; useful for checking that the connection is alive. |
+| `SEND` | Send an event. |
+| `RETR [n]` | Retrieve one or more events from the client's input queue. |
+| `RCVLOOP` / `QUITLOOP` | Start or stop a mode in which the server pushes events to the client as soon as they arrive, so the client does not need to poll. |
+| `CDTA` / `CHKDATA` | Get the number of events waiting in the input queue. |
+| `CLRA` / `CLRALL` | Clear all events in the input queue. |
+| `SFLT` / `SMSK` | Set the filter and mask that select which events the client receives. |
+| `GGID` / `SGID` | Get or set the GUID of the channel. |
+| `CHID`, `STAT`, `INFO` | Get the channel ID, statistics or status information. |
+| `VERS`, `WCYD` | Get the interface version, or ask what the server can do. |
+| `HELP`, `QUIT` | Show help, or close the connection. |
+
+Implementations can add their own commands; by convention, custom command names start with `X` (for example, `XMYCOMMAND`).
+
+### Security and access control
+
+Each user account can be restricted in several ways:
+
+- **Allowed hosts** – the addresses or networks the user may connect from (wildcards such as `192.168.1.*` are allowed).
+- **Privilege level** – a value from 0 (lowest) to 15 (highest) that determines which commands the user may run.
+- **Allowed events** – the events the user may send.
+- **Receive filter and mask** – the events the user will receive.
+
+Connections can be protected with TLS when the server is configured for it. For small embedded devices where TLS is impractical, the specification also describes a lighter AES-128/192/256 encryption scheme.
+
+### Using the Link Protocol with the daemon
+
+In version 15.0 and later, the Link Protocol server is no longer built into the daemon:
+
+- To let clients connect to the daemon using the Link Protocol, install the [vscpl2drv-tcpipsrv driver](https://github.com/grodansparadis/vscpl2drv-tcpipsrv).
+- To connect the daemon to another server or node that already provides the Link Protocol, use the [vscpl2drv-tcpiplink driver](https://github.com/grodansparadis/vscpl2drv-tcpiplink).
+
+A public test server is available at `vscp1.vscp.org:9598` (username `vscp`, password `secret`), so you can try the protocol with `telnet vscp1.vscp.org 9598`.
+
+For the full command reference, response formats and examples, see the [VSCP TCP/IP link protocol specification](https://grodansparadis.github.io/vscp-doc-spec/#/./vscp_tcpiplink) and the documentation for each driver.
+
+## System overview
+
+![Overview of the daemon exchanging VSCP events with devices and an MQTT broker](./images/vscpd_connection_overview.png)
+
+The diagram shows how the daemon exchanges messages with an MQTT broker: it publishes events to the broker and subscribes to selected topics to receive events. A deployment can connect to multiple brokers and use as many topics as needed.
+
+For example, a low-level node can send a temperature reading to a Level I driver. The driver passes it to the daemon as a VSCP event, which the daemon can publish to MQTT. A web application can subscribe and display the reading.
+
+Events can also travel in the other direction. When a user presses a button in a web interface, the interface can publish an event to MQTT. A Level II driver can receive the event and switch on a Bluetooth lamp. Because the event describes the intended action rather than a specific lamp protocol, you can replace the lamp with a Zigbee device without changing the interface.
+
+Clients can also connect directly to an MQTT broker. Place each device or service on the transport and interface that best fits its needs.
 
 ## Drivers
 
-![](./images/vscpd_drv_structure.png)
+![Level I and Level II drivers connecting the daemon to devices and services](./images/vscpd_drv_structure.png)
 
-Both level I drivers and level II drivers each define a separate connection to a MQTT broker. Each can subscribe to VSCP events from any number of topics and publish VSCP events to any number of topics. It is thus easy to set up systems that work as a event hub and at the same time log and debug data and possibly do many other things with events.
+Level I and Level II drivers connect the daemon to different devices and services. Depending on the driver, they can expose a WebSocket interface, communicate over an RS-485 bus, or use SocketCAN and network transports. Each driver has its own capabilities and configuration.
 
-## Why the new setup?
+## Features changed since version 14.0
 
-MQTT have so much code and infrastructure in place that it is impossible to ignore. It would also be very stupid not to use the good things that are available. Better to work together and reuse work of others efforts.
+For version 15.0, the daemon was rewritten in standard C++. Several features that were built into version 14.0 were removed or moved to installable drivers. The current daemon primarily connects VSCP transports to MQTT.
 
-MQTT is not a IoT protocol even if many wrongly state that it is. It is however a IoT **transport** protocol. A job it does very well. 
+## Features changed since version 14.0
 
-VSCP on the other hand is a IoT protocol. Yes even a framework with all tools available. The combination MQTT + VSCP is just good match.  By combining them a lot of work can be reused. Important for a small project like VSCP. 
+There now is two daemons/servers. This server ([vscp-tcpip-daemon](https://github.com/grodansparadis/vscp-tcpip-daemon)) and the MQTT oriented [vscp-mqtt-daemon](https://github.com/grodansparadis/vscp-mqtt-daemon). If you mainly work with MQTT the later is probably the one you need.
 
-Take for example the VSCP tcp/ip interface. It does it's job well and is still (abd will be) valid for many VSCP devices. But MQTT can do the same thing also in a nice way. Adding security and tools and a lot more.
+### TCP/IP interface
 
-Another example is the VSCP [websockets ws1 and ws2 protocols](https://grodansparadis.github.io/vscp-doc-spec/#/./vscp_websocket). Both are constructed mainly as interfaces between sensors and user interface components that needs to be kept updated. MQTT also have a websocket interface defined and it can in a nice way do the same job as the VSCP variants.
+In version 14.0, the TCP/IP interface was part of the daemon. To provide the VSCP Link Protocol interface with version 15.0 or later, install the [vscpl2drv-tcpipsrv driver](https://github.com/grodansparadis/vscpl2drv-tcpipsrv).
 
-Also there is now a focus on the lower end of things in the VSCP development. Others projects do higher level stuff better. [Node-red](https://nodered.org/) for example is a good project for this such of things and there are plenty of others. For node-red there are two VSCP tools available. Checkout [node-red-contrib-vscp](https://flows.nodered.org/node/node-red-contrib-vscp) and [node-red-contrib-vscp-tcp](https://flows.nodered.org/node/node-red-contrib-vscp-tcp).
+To connect to another device that provides a VSCP TCP/IP interface, use the [vscpl2drv-tcpiplink driver](https://github.com/grodansparadis/vscpl2drv-tcpiplink). This can connect the current daemon to a system running version 14.0 or to a lower-level Ethernet node that exports the interface.
 
-## Removed functionality in the new version of the VSCP MQTT daemon
+### Web server, WebSockets and REST
 
-Not only was all code rewritten to use standard c++ in the transition from version 14.0 to 15.0 a lot of functionality was also removed. This software now amainly server as a gatway between VSCP transports and a MQTT broker.
+Version 14.0 included a web server with server-side Lua and JavaScript support, WebSocket protocols ws1 and ws2, and a REST interface. This functionality is now available through the [vscpl2drv-websrv driver](https://github.com/grodansparadis/vscpl2drv-websrv).
 
-A lot of the old functionality has been moved to installable drivers instead.
+### Decision matrix
 
-### tcp/ip interface
-In the 14.0 version of VSCP MQTT daemon the tcp/ip interface was a central piece. If you still need it, install the driver [vscpl2drv-tcpipsrv](https://github.com/grodansparadis/vscpl2drv-tcpipsrv).
-
-If you want to connect to another device with a VSCP tcp/ip interface you can use the driver [vscpl2drv-tcpiplink](https://github.com/grodansparadis/vscpl2drv-tcpiplink). This makes it possible to connect the new VSCP MQTT daemon to a machine with 14.0 installed or a more lower end ethernet node with the tcp/ip interface exported.
-
-### Web-server, websockets, REST
-In the 14.0 version of VSCP MQTT daemon a webserver with server side LUA and javascript support and with websocket (ws1 and ws2) and a REST interface was available. Well there was a lot more also. If you miss this donät despair. The functionality is now available as a driver. Go to the [vscpl2drv-websrv](https://github.com/grodansparadis/vscpl2drv-websrv) repository for more info on how to install and use.
-
-### Decision Matrix
-Has been removed. Use [node-red](https://nodered.org/) instead. There may be a driver with this functionality available in the future. Check out [vscpl2drv-dm](https://github.com/grodansparadis/vscpl2drv-dm) or better yet help out to build the functionality.
+The decision matrix feature has been removed. Consider using [Node-RED](https://nodered.org/) instead. Drivers related to this functionality may be available in the [vscpl2drv-dm repository](https://github.com/grodansparadis/vscpl2drv-dm); check its documentation for current status and usage.
 
 ### Tables
-Has been removed. Use [node-red](https://nodered.org/) instead. There may be a driver with this functionality available in the future. Check out [vscpl2drv-table](https://github.com/grodansparadis/vscpl2drv-table) or better yet help out to build the functionality.
+
+The tables feature has been removed. Consider using [Node-RED](https://nodered.org/) instead. A related driver may be available in the [vscpl2drv-table repository](https://github.com/grodansparadis/vscpl2drv-table); check its documentation for current status and usage.
 
 ### Remote variables
-Has been removed. There may be a driver with this functionality available in the future. Check out [vscpl2drv-variable](https://github.com/grodansparadis/vscpl2drv-variable)) or better yet help out to build the functionality.
 
-### Was it more...?
-Probably. If you miss something you can't live without, version 14 can still be run and be used. You can also take on the effort to build a driver for that thing. 
+Remote variables have been removed from the daemon. A related driver may be available in the [vscpl2drv-variable repository](https://github.com/grodansparadis/vscpl2drv-variable); check its documentation for current status and usage.
+
+### Using a removed feature?
+
+If you need a feature that is no longer built in, you can continue using version 14.0 or provide the feature through a driver in the current architecture.
 
 ## Support
-If you find a bug open an issue [here](https://github.com/grodansparadis/vscp/issues)
 
-If you want to discuss anything VSCP related go [here](https://github.com/grodansparadis/vscp/discussions)
+To report a bug, [open an issue](https://github.com/grodansparadis/vscp/issues). For general VSCP discussions, visit [GitHub Discussions](https://github.com/grodansparadis/vscp/discussions).
 
-All docs for VSCP stuff can be found [here](https://docs.vscp.org/) where the [specification](https://grodansparadis.github.io/vscp-doc-spec/#/) probably is the most important. It state the truth almost always. If the real world behave differently it is the world that is wrong not the specification. Well in most cases...
+Find documentation for VSCP projects at [docs.vscp.org](https://docs.vscp.org/). For protocol details, see the [VSCP specification](https://grodansparadis.github.io/vscp-doc-spec/#/).
 
-## Thanks
-First a big thanks to my [sponsors](https://github.com/sponsors/grodansparadis) and [here](https://vscp.org). Support them please. Every cent is valuable and there support has helped me and the project a lot.
+## Acknowledgements
 
-The a big thank you to the following project that this code is built upon
+Thank you to our [sponsors](https://github.com/sponsors/grodansparadis) and to everyone who supports the project at [vscp.org](https://vscp.org). Your support helps keep VSCP development moving forward.
 
-* The excellent [nlohmann json parser](https://github.com/nlohmann/json)
-* The excellent [libexpat xml library](https://github.com/libexpat/libexpat)
-* The excellent [mosquitto library](https://github.com/eclipse/mosquitto)
-* The excellent [spdlog library](https://github.com/gabime/spdlog)
-* The excellent [civetweb project](https://github.com/civetweb/civetweb)
-* The excellent [mustache library](https://github.com/janl/mustache.js)
-* And all other code I used to build this on.
+The daemon also uses these open-source projects:
 
-_Great things are built on the shoulders of giants. Thank you!_
+- [nlohmann JSON](https://github.com/nlohmann/json)
+- [Expat](https://github.com/libexpat/libexpat)
+- [Eclipse Mosquitto](https://github.com/eclipse/mosquitto)
+- [spdlog](https://github.com/gabime/spdlog)
+- [CivetWeb](https://github.com/civetweb/civetweb)
+- [Mustache.js](https://github.com/janl/mustache.js)
+
+We thank the teams and contributors who maintain these projects.
+
+_Great things are built on the shoulders of giants._
 
 [filename](./bottom_copyright.md ':include')

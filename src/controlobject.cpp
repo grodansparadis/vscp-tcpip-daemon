@@ -2107,9 +2107,9 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
     // This is done in the constructor
     if (j.contains("guid") && j["guid"].is_string()) {
         m_guid.getFromString(j["guid"].get<std::string>());
-        spdlog::debug("ReadConfig: Read top-level 'guid'.");
+        spdlog::debug("ReadConfig: Read top-level GUID={}.", m_guid.toString());
     }
-    else {
+    else {  
         spdlog::debug(
           "ReadConfig: 'guid' not found or invalid, using default GUID.");
     }
@@ -2121,7 +2121,7 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
         get_string(g, "servername", m_strServerName);
         if (g.contains("guid") && g["guid"].is_string()) {
             m_guid.getFromString(g["guid"].get<std::string>());
-            spdlog::debug("ReadConfig: Read general 'guid'.");
+            spdlog::debug("ReadConfig: Read general 'guid' GUID={}.", m_guid.toString() );
         }
         if (g.contains("clientbuffersize") &&
             g["clientbuffersize"].is_number_integer()) {

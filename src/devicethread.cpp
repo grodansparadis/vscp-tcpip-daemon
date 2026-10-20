@@ -1020,7 +1020,6 @@ deviceLevel2WriteThread(void* pData)
         // Wait until there is something to send
         if ((-1 == pClientItem->waitForSendQueueEvent(500)) &&
             errno == ETIMEDOUT) {
-            spdlog::error("deviceLevel2WriteThread - Waiting for ");
             continue;
         }
 
