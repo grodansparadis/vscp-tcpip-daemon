@@ -20,7 +20,7 @@ jobs:
       - name: Install dependencies (Homebrew)
         run: |
           brew update
-          brew install cmake ninja openssl expat mosquitto zlib curl libsodium
+          brew install cmake ninja openssl expat zlib curl libsodium
 
       - name: Configure (CMake)
         run: |
