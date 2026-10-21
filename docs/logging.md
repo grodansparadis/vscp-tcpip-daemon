@@ -1,6 +1,12 @@
 # Logging
 
-System messages like errors, warnings and notifications from the VSCP tcp/ip daemon is logged to syslog. This means you can find this information in the syslog file
+System messages like errors, warnings and notifications from the VSCP tcp/ip daemon is logged to tyhe console, to a file, syslog and UDP each enabled separatly in the configuration file. 
+
+## Log file
+The default location for the log filr on Linux is _/var/log/vscp_ and you can find the logfile information there.
+
+
+This means you can u
 
     /var/log/syslog
 

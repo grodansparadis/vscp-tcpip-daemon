@@ -117,15 +117,6 @@ Level I and Level II drivers connect the daemon to different devices and service
 
 For version 15.0, the daemon was rewritten in standard C++. Several features that were built into version 14.0 were removed or moved to installable drivers. The current daemon primarily connects VSCP transports to MQTT.
 
-## Features changed since version 14.0
-
-There now is two daemons/servers. This server ([vscp-tcpip-daemon](https://github.com/grodansparadis/vscp-tcpip-daemon)) and the MQTT oriented [vscp-mqtt-daemon](https://github.com/grodansparadis/vscp-mqtt-daemon). If you mainly work with MQTT the later is probably the one you need.
-
-### TCP/IP interface
-
-In version 14.0, the TCP/IP interface was part of the daemon. To provide the VSCP Link Protocol interface with version 15.0 or later, install the [vscpl2drv-tcpipsrv driver](https://github.com/grodansparadis/vscpl2drv-tcpipsrv).
-
-To connect to another device that provides a VSCP TCP/IP interface, use the [vscpl2drv-tcpiplink driver](https://github.com/grodansparadis/vscpl2drv-tcpiplink). This can connect the current daemon to a system running version 14.0 or to a lower-level Ethernet node that exports the interface.
 
 ### Web server, WebSockets and REST
 
@@ -147,6 +138,12 @@ Remote variables have been removed from the daemon. A related driver may be avai
 
 If you need a feature that is no longer built in, you can continue using version 14.0 or provide the feature through a driver in the current architecture.
 
+## Features changed since version 14.0
+
+First of all the version schema has changed to _year.month.build_
+
+Secondly there now is two seperate daemons/servers, one that export the VSCP link tcp/ip interface and one that need a and connect to one or many MQTT broker(s). This server ([vscp-tcpip-daemon](https://github.com/grodansparadis/vscp-tcpip-daemon)) and the MQTT oriented [vscp-mqtt-daemon](https://github.com/grodansparadis/vscp-mqtt-daemon). If you mainly work with MQTT the later is probably the one you need. There is a level II VSCP MQTT driver that can be used also for vscp-tcpip-daemon so (limited) MQTT connectivity is available also for this software. Just the same way as the the [vscpl2drv-tcpiplink driver](https://github.com/grodansparadis/vscpl2drv-tcpiplink) is available for both.
+
 ## Support
 
 To report a bug, [open an issue](https://github.com/grodansparadis/vscp/issues). For general VSCP discussions, visit [GitHub Discussions](https://github.com/grodansparadis/vscp/discussions).
@@ -161,10 +158,9 @@ The daemon also uses these open-source projects:
 
 - [nlohmann JSON](https://github.com/nlohmann/json)
 - [Expat](https://github.com/libexpat/libexpat)
-- [Eclipse Mosquitto](https://github.com/eclipse/mosquitto)
 - [spdlog](https://github.com/gabime/spdlog)
-- [CivetWeb](https://github.com/civetweb/civetweb)
-- [Mustache.js](https://github.com/janl/mustache.js)
+- [libsodium](https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://github.com/jedisct1/libsodium&ved=2ahUKEwjLl5C3qcmXAxU-JRAIHdaOIWkQFnoECCMQAQ&usg=AOvVaw0DZzHeEmKIpw2_UBQUfNAB)
+
 
 We thank the teams and contributors who maintain these projects.
 
