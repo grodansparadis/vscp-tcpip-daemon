@@ -1,14 +1,20 @@
 {
   "_comment": "VSCP tcp/ip Daemon configuration file — JSON format",
   "_docs": "https://docs.vscp.org/vscpd/15.0/#/configuring_the_vscp_daemon",
-  "runasuser": "vscp",
-  "debug": 0,
+  "runasuser": "vscp",  
   "guid": "-",
   "servername": "The VSCP daemon",
   "classtypedb": "/var/lib/vscp/vscpd/vscp_events.sqlite3",
   "maindb": "/var/lib/vscp/vscpd/vscp.sqlite3",
   "discoverydb": "/var/lib/vscp/vscpd/vscp.sqlite3",
-  "vscpkey": "/etc/vscp/vscp.key",
+  
+  "security": {
+    "_comment_key": "Path to the system key file",
+    "_comment_hmac": "Path to the HMAC key file",
+    "key": "/etc/vscp/vscp.key",
+    "hmac": "/etc/vscp/vscp.hmac",
+    "token": "Carpe diem quam minimum credula postero"
+  },
 
   "logging": {
     "file-enable-log": true,
@@ -63,7 +69,8 @@
 
   
   "tcpip": {
-    "interface-address": "tcp://127.0.0.1:9598",
+    "_comment_interface": "The interface address the TCP/IP server will bind to. Can be array or single string.",
+    "interface-address": "tcp://0.0.0.0:9598",
     "_comment1": "If ssl is used, configure the SSL options below otherwise remove this section",
     "_comment2": "The certificate and key paths exist and match. I’d use server.crt for certfile",
     "_comment3": "and server.key for keyfile; server.pem includes the certificate and key together.",

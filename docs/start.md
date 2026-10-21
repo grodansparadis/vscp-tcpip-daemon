@@ -2,9 +2,8 @@
 
 # The VSCP tcp/ip daemon
 
-**Describe software version**:${/var/document-version}      
+**Describe software version:** ${/var/document-version}      
 **Doc update:** ${/var/creation-time}       
-[history](./history.md)
 
 Author Åke Hedman and [the VSCP project](https://www.vscp.org), [info@vscp.org](info@vscp.org)  
 

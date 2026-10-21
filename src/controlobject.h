@@ -396,19 +396,23 @@ class CControlObject {
     //**************************************************************************
 
     // Password is MD5 hash over "username:domain:password"
-    std::string m_admin_user; // Defaults to "admin"
-    std::string m_admin_password;
+    //std::string m_admin_user; // Defaults to "admin"
+    //std::string m_admin_password;
     // Default password salt;key
     // E2D453EF99FB3FCD19E67876554A8C27;A4A86F7D7E119BA3F0CD06881E371B989B33B6D606A863B633EF529D64544F8E
-    std::string m_admin_allowfrom; // Remotes allowed to connect from as admin.
+    //std::string m_admin_allowfrom; // Remotes allowed to connect from as admin.
                                    // Defaults to ""
     std::string m_vscptoken;
-    // A4A86F7D7E119BA3F0CD06881E371B989B33B6D606A863B633EF529D64544F8E
-    // {
-    // 0xA4,0xA8,0x6F,0x7D,0x7E,0x11,0x9B,0xA3,0xF0,0xCD,0x06,0x88,0x1E,0x37,0x1B,0x98,
-    //   0x9B,0x33,0xB6,0xD6,0x06,0xA8,0x63,0xB6,0x33,0xEF,0x52,0x9D,0x64,0x54,0x4F,0x8E
-    //   };
-    uint8_t m_systemKey[32];
+    
+    /*!
+        Decoded system key bytes, zero-padded to 32 bytes.
+    */
+    std::string m_systemKey;
+
+    /*!
+        Decoded HMAC key bytes. Always 32 bytes.
+    */
+    std::string m_hmacKey;
 
     /*!
         User to run as for Unix

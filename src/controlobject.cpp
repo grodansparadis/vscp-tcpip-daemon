@@ -73,9 +73,11 @@
 #endif
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <deque>
 #include <fstream>
+#include <initializer_list>
 #include <list>
 #include <map>
 #include <set>
@@ -235,7 +237,9 @@ CControlObject::CControlObject()
 
     // Default admin user credentials
     m_vscptoken = "Carpe diem quam minimum credula postero";
-    vscp_hexStr2ByteArray(m_systemKey,
+    m_systemKey.assign(32, '\0');
+    m_hmacKey.assign(32, '\0');
+    vscp_hexStr2ByteArray(reinterpret_cast<uint8_t*>(m_systemKey.data()),
                           32,
                           "A4A86F7D7E119BA3F0CD06881E371B989B"
                           "33B6D606A863B633EF529D64544F8E");
@@ -1268,10 +1272,10 @@ uint8_t*
 CControlObject::getSystemKey(uint8_t* pKey)
 {
     if (NULL != pKey) {
-        memcpy(pKey, m_systemKey, 32);
+        memcpy(pKey, m_systemKey.data(), 32);
     }
 
-    return m_systemKey;
+    return reinterpret_cast<uint8_t*>(m_systemKey.data());
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1282,7 +1286,9 @@ void
 CControlObject::getSystemKeyMD5(std::string& strKey)
 {
     char digest[33];
-    vscp_md5(digest, m_systemKey, 32);
+    vscp_md5(digest,
+             reinterpret_cast<const unsigned char*>(m_systemKey.data()),
+             m_systemKey.size());
     strKey = digest;
 }
 
@@ -2143,22 +2149,87 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
     // Security.
     if (j.contains("security") && j["security"].is_object()) {
         const json& sec = j["security"];
-        get_string(sec, "admin", m_admin_user);
-        get_string(sec, "password", m_admin_password);
-        get_string(sec, "allowfrom", m_admin_allowfrom);
+        //get_string(sec, "admin", m_admin_user);
+        //get_string(sec, "password", m_admin_password);
+        //get_string(sec, "allowfrom", m_admin_allowfrom);
         get_string(sec, "vscptoken", m_vscptoken);
-        // get_string(sec, "authentication_domain",
-        // m_web_authentication_domain);
-        if (sec.contains("vscpkey") && sec["vscpkey"].is_string()) {
-            vscp_hexStr2ByteArray(m_systemKey,
-                                  32,
-                                  sec["vscpkey"].get<std::string>().c_str());
-            spdlog::debug("ReadConfig: Read security 'vscpkey'.");
-        }
-        else {
-            spdlog::debug("ReadConfig: Security 'vscpkey' missing or invalid; "
-                          "default retained.");
-        }
+
+        // Read a hex encoded key from the file given by the config entry.
+        // The target is only updated if the file holds a key of a valid size.
+        auto read_key_file = [&sec](const char* name,
+                                    std::string& target,
+                                    std::initializer_list<size_t> validSizes) {
+            if (!sec.contains(name) || !sec[name].is_string() ||
+                sec[name].get<std::string>().empty()) {
+                spdlog::debug("ReadConfig: Security '{}' key file missing or "
+                              "invalid; default retained.",
+                              name);
+                return;
+            }
+
+            std::string path = sec[name].get<std::string>();
+            std::ifstream in(path, std::ios::in | std::ios::binary);
+            if (!in) {
+                spdlog::error("ReadConfig: Unable to open security '{}' key "
+                              "file '{}'; default retained.",
+                              name,
+                              path);
+                return;
+            }
+
+            std::string hex;
+            char c;
+            while (in.get(c)) {
+                if (isspace(static_cast<unsigned char>(c))) {
+                    continue;
+                }
+                if (!isxdigit(static_cast<unsigned char>(c))) {
+                    spdlog::error("ReadConfig: Security '{}' key file '{}' "
+                                  "contains non hex characters; default "
+                                  "retained.",
+                                  name,
+                                  path);
+                    sodium_memzero(&hex[0], hex.size());
+                    return;
+                }
+                hex += c;
+            }
+
+            if (in.bad()) {
+                spdlog::error("ReadConfig: Unable to read security '{}' key "
+                              "file '{}'; default retained.",
+                              name,
+                              path);
+                sodium_memzero(hex.data(), hex.size());
+                return;
+            }
+
+            uint8_t buf[32] = { 0 };
+            size_t n = vscp_hexStr2ByteArray(buf, sizeof(buf), hex.c_str());
+            if ((hex.length() != 2 * n) ||
+                (std::find(validSizes.begin(), validSizes.end(), n) ==
+                 validSizes.end())) {
+                spdlog::error("ReadConfig: Security '{}' key file '{}' does "
+                              "not hold a valid hex key; default retained.",
+                              name,
+                              path);
+                sodium_memzero(buf, sizeof(buf));
+                sodium_memzero(&hex[0], hex.size());
+                return;
+            }
+
+            target.assign(reinterpret_cast<const char*>(buf), sizeof(buf));
+            sodium_memzero(buf, sizeof(buf));
+            sodium_memzero(&hex[0], hex.size());
+            spdlog::debug("ReadConfig: Read security '{}' key ({} bits) from "
+                          "'{}'.",
+                          name,
+                          n * 8,
+                          path);
+        };
+
+        read_key_file("key", m_systemKey, { 16, 24, 32 });
+        read_key_file("hmac", m_hmacKey, { 32 });
     }
     else {
         spdlog::debug("ReadConfig: 'security' object missing or invalid; "
@@ -2171,9 +2242,54 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
         bool b         = false;
         uint32_t n     = 0;
 
-        std::string addr;
-        get_string(jj, "interface-address", addr);
-        m_tcpipSrv.setInterfaceAddress(addr);
+        if (jj.contains("interface-address")) {
+            const json& addresses = jj["interface-address"];
+            std::vector<std::string> parsedAddresses;
+            bool validAddresses = true;
+
+            if (addresses.is_string()) {
+                parsedAddresses.push_back(addresses.get<std::string>());
+            }
+            else if (addresses.is_array()) {
+                for (const auto& address : addresses) {
+                    if (!address.is_string()) {
+                        validAddresses = false;
+                        break;
+                    }
+                    parsedAddresses.push_back(address.get<std::string>());
+                }
+            }
+            else {
+                validAddresses = false;
+            }
+
+            if (parsedAddresses.empty()) {
+                validAddresses = false;
+            }
+            for (const auto& address : parsedAddresses) {
+                if (address.empty()) {
+                    validAddresses = false;
+                    break;
+                }
+            }
+
+            if (validAddresses) {
+                m_tcpipSrv.setInterfaceAddress(parsedAddresses);
+                spdlog::debug(
+                  "ReadConfig: Read {} TCP/IP interface address(es).",
+                  parsedAddresses.size());
+            }
+            else {
+                spdlog::error(
+                  "ReadConfig: TCP/IP 'interface-address' must be a non-empty "
+                  "string or a non-empty array of non-empty strings; defaults "
+                  "retained.");
+            }
+        }
+        else {
+            spdlog::debug("ReadConfig: TCP/IP 'interface-address' missing; "
+                          "defaults retained.");
+        }
 
         if (jj.contains("ssl-options") && jj["ssl-options"].is_object()) {
             const json& jjj = jj["ssl-options"];

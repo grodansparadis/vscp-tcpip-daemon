@@ -177,13 +177,13 @@ cd /var/lib/vscp
 sudo wget https://www.vscp.org/events/vscp_events.sqlite3
 ```
 
-### key :id=config-general-key
+### vscpkey :id=config-general-key
 
-This is the path to a 128/192/256-bit encryption key used for AES 128/192/256 encryption. Used for the VSCP binary protocol. This file should only be readable by the user the vscp tcp/ip daemon is running under.
+This is the path to a 128/192/256-bit encryption key used for AES 128/192/256 encryption. Used for the VSCP binary protocol. This file should only be readable by the user the vscp tcp/ip daemon is running under. You can generate a random key on [this site](https://randomkeygen.com/aes-key)
 
-### key :id=config-general-hmac
+### hmak :id=config-general-hmac
 
-This is the path to a 256-bit encryption key used for HMAC-SHA-256. Used for the VSCP binary protocol. This file should only be readable by the user the vscp tcp/ip daemon is running under.
+This is the path to a 256-bit encryption key used for HMAC-SHA-256. Used for the VSCP binary protocol. This file should only be readable by the user the vscp tcp/ip daemon is running under. You can generate a random key on [this site](https://randomkeygen.com/hmac-key).
 
 
 ### maindb :id=config-general-maindb
@@ -307,6 +307,43 @@ UDP host to send log messages to. Should be IP-address Default is "127.0.0.1"
 
 UDP port to send log messages to. Default is 9999
 
+
+## TCP/IP server :id=config-tcpip
+
+The `tcpip` object configures the daemon's TCP/IP listeners.
+
+### interface-address :id=config-tcpip-interface-address
+
+Specify one listening address as a string, or multiple listening addresses as an array of strings. Each address is a URL containing a scheme, host or IP address, and port.
+
+One listening address:
+
+```json
+{
+  "tcpip": {
+    "interface-address": "tcp://localhost:9598"
+  }
+}
+```
+
+Multiple listening addresses:
+
+```json
+{
+  "tcpip": {
+    "interface-address": [
+      "tcp://127.0.0.1:9598",
+      "tcp://127.0.0.1:9599"
+    ]
+  }
+}
+```
+
+Each array element defines a separate listener. Use distinct address/port combinations that can be bound simultaneously; do not put multiple addresses in a comma-separated string.
+
+Use `tcp://` for plain TCP or `tls://` for TLS. Different listeners may use different schemes. All TLS listeners share the certificate and key configured under `tcpip.ssl-options`. See [Security and TLS](./security_tls.md) for TLS configuration.
+
+Loopback addresses such as `127.0.0.1` accept local connections only. An address such as `0.0.0.0` listens on all IPv4 interfaces; use TLS for listeners reachable from other machines.
 
 ##  Level I Drivers :id=config-level1-driver
 

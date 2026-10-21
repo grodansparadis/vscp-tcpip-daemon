@@ -8,18 +8,38 @@ Drivers give the daemon access to real devices, so anyone who can connect to the
 
 ## Limit where the daemon listens
 
-The TCP/IP server listens on the address set by `tcpip.interface-address`. If the setting is missing, the daemon listens on `tcp://localhost:9598`, which accepts connections only from the same machine. This is the safest starting point.
+The TCP/IP server uses `tcpip.interface-address` for its listening address or addresses. Specify a string for one listener or an array of strings for multiple listeners. For local-only access, explicitly configure `tcp://localhost:9598`, which accepts connections only from the same machine. This is the safest starting point.
+
+See [interface-address](./configuring_the_vscp_daemon.md#config-tcpip-interface-address) for both formats.
 
 To accept connections from other machines, set an explicit address. The URL scheme selects plain TCP or TLS:
 
 | Address | Meaning |
 | :------ | :------ |
-| `tcp://localhost:9598` | Plain TCP, local connections only (default). |
+| `tcp://localhost:9598` | Plain TCP, local connections only. |
 | `tcp://192.0.2.20:9598` | Plain TCP on one network interface. Use only on a trusted network. |
 | `tls://0.0.0.0:9598` | TLS on all IPv4 interfaces. |
 | `tls://192.0.2.20:9598` | TLS on one network interface. |
 
-The daemon has a single TCP/IP listener, so it accepts either plain TCP or TLS connections, not both. When you switch to TLS, update every client and every TCP/IP Link driver that connects to the daemon.
+For multiple TLS listeners, use an array such as:
+
+```json
+{
+  "tcpip": {
+    "interface-address": [
+      "tls://127.0.0.1:9598",
+      "tls://192.0.2.20:9598"
+    ],
+    "ssl-options": {
+      "certfile": "/etc/vscp/certs/tcpip_server.crt",
+      "keyfile": "/etc/vscp/certs/tcpip_server.key",
+      "cafile": ""
+    }
+  }
+}
+```
+
+Replace `192.0.2.20` with an address assigned to your server. All TLS listeners share `tcpip.ssl-options`; the certificate must cover the host names or IP addresses clients use. Plain TCP and TLS listeners may be mixed in the same array. When you switch a listener to TLS, update every client and every TCP/IP Link driver that connects to that listener.
 
 ## Set up TLS
 
@@ -318,7 +338,7 @@ To restrict an account, start `allowed_remotes` with `-0.0.0.0/0` to deny everyt
 
 ## Security checklist
 
-- Keep the default `localhost` listener unless remote clients need access.
+- Explicitly configure a `localhost` listener unless remote clients need access.
 - Use `tls://` for any listener reachable from another machine.
 - Use a certificate whose name matches the address clients use, and protect its private key.
 - Give each client its own account, with a strong password stored as an Argon2id hash.

@@ -360,13 +360,18 @@ class Daemon {
         password = randomText();
         readerPassword = randomText();
 
+        std::string keyPath = m_folder + "/vscp.key";
+        std::ofstream keyFile(keyPath);
+        keyFile << hex(m_key, sizeof(m_key)) << "\n";
+        keyFile.close();
+
         std::ofstream config(m_folder + "/vscpd.json");
         config << "{\n"
                << "  \"guid\": \"FF:FF:FF:FF:FF:FF:FF:F5:00:00:00:00:00:00:00:01\",\n"
                << "  \"logging\": {\"file-enable-log\": false, \"syslog-enable-log\": false,\n"
                << "              \"udp-enable-log\": false, \"console-enable-log\": true,\n"
                << "              \"console-log-level\": \"info\"},\n"
-               << "  \"security\": {\"vscpkey\": \"" << hex(m_key, sizeof(m_key)) << "\"},\n"
+               << "  \"security\": {\"key\": \"" << keyPath << "\"},\n"
                << "  \"tcpip\": {\"interface-address\": \"tcp://127.0.0.1:" << port
                << "\"},\n"
                << "  \"remoteuser\": [\n"

@@ -2,6 +2,7 @@
 #include "controlobject.h"
 
 #include <cassert>
+#include <cstring>
 #include <iostream>
 
 static std::vector<uint8_t>
@@ -45,6 +46,14 @@ void testBinaryTcp()
     CControlObject control;
     CTcpipSrv& server = control.getTcpipSrv();
     const uint8_t* key = control.getSystemKey(nullptr);
+    uint8_t copiedKey[32];
+    assert(control.getSystemKey(copiedKey) == key);
+    assert(std::memcmp(copiedKey, key, sizeof(copiedKey)) == 0);
+    char expectedDigest[33];
+    vscp_md5(expectedDigest, copiedKey, sizeof(copiedKey));
+    std::string digest;
+    control.getSystemKeyMD5(digest);
+    assert(digest == expectedDigest);
     mg_mgr manager;
     mg_mgr_init(&manager);
     mg_connection* connection = mg_alloc_conn(&manager);

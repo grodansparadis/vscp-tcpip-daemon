@@ -63,6 +63,9 @@ class Daemon {
         }
         m_folder = folderTemplate;
         m_port = freePort();
+        do {
+            m_plainPort = freePort();
+        } while (m_plainPort == m_port);
         m_password = "tls-test-password";
 
         std::ofstream config(m_folder + "/vscpd.json");
@@ -75,7 +78,8 @@ class Daemon {
                << "  \"security\": {\"vscpkey\": "
                << "\"A4A86F7D7E119BA3F0CD06881E371B989B33B6D606A863B633EF529D64544F8E\"},\n"
                << "  \"tcpip\": {\n"
-               << "    \"interface-address\": \"tls://127.0.0.1:" << m_port << "\",\n"
+               << "    \"interface-address\": [\"tls://127.0.0.1:" << m_port
+               << "\", \"tcp://127.0.0.1:" << m_plainPort << "\"],\n"
                << "    \"ssl-options\": {\"cafile\": \"\", \"certfile\": \""
                << certificate << "\", \"keyfile\": \"" << key
                << "\", \"name\": \"\"}\n"
@@ -137,6 +141,7 @@ class Daemon {
     }
 
     uint16_t port() const { return m_port; }
+    uint16_t plainPort() const { return m_plainPort; }
     const std::string& password() const { return m_password; }
 
     void stop()
@@ -160,6 +165,7 @@ class Daemon {
     std::string m_folder;
     std::string m_password;
     uint16_t m_port = 0;
+    uint16_t m_plainPort = 0;
     pid_t m_pid = -1;
 };
 
@@ -200,6 +206,16 @@ void checkTlsConnection(const Daemon& daemon, const std::string& certificate)
         plain.doCmdClose();
         throw std::runtime_error("plain connection unexpectedly succeeded");
     }
+
+    VscpRemoteTcpIf plainListener;
+    if (plainListener.doCmdOpen(
+          "tcp://127.0.0.1:" + std::to_string(daemon.plainPort()),
+          "tlsuser",
+          daemon.password()) != VSCP_ERROR_SUCCESS ||
+        plainListener.doCmdNOOP() != VSCP_ERROR_SUCCESS) {
+        throw std::runtime_error("plain TCP listener failed");
+    }
+    plainListener.doCmdClose();
 }
 
 } // namespace

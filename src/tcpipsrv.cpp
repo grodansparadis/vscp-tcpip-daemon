@@ -228,7 +228,7 @@ CTcpipSrv::CTcpipSrv(CControlObject* obj)
     m_bRun     = true; // Not quitting yet
 
     // Default TCP/IP interface settings
-    m_interfaceAddress = "tcp://localhost:9598";
+    // m_interfaceAddressList.push_back("tcp://localhost:9598");
 
     // No TLS by default
     memset(&m_tcpip_tls_opts, 0, sizeof(m_tcpip_tls_opts));
@@ -3668,7 +3668,9 @@ tcpip_event_handler(struct mg_connection* conn, int ev, void* ev_data)
 #endif
 
         spdlog::debug("SERVER accepted a connection");
-        if (mg_url_is_ssl(pobj->getTcpipSrv().getInterfaceAddress().c_str())) {
+        const auto* listenerContext =
+          static_cast<const CTcpipSrv::ListenerContext*>(conn->fn_data);
+        if (listenerContext != nullptr && listenerContext->tls) {
             spdlog::debug("SERVER accepted a secure (SSL/TLS) connection");
             struct mg_tls_opts opts = pobj->getTcpipSrv().getTlsOpts();
             mg_tls_init(conn, &opts);
@@ -3757,6 +3759,10 @@ tcpip_event_handler(struct mg_connection* conn, int ev, void* ev_data)
         }
     }
     else if (ev == MG_EV_CLOSE) {
+        if (conn->is_listening) {
+            conn->fn_data = nullptr;
+            return;
+        }
 
         // Get client item
         CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
@@ -3805,7 +3811,6 @@ tcpipWorkerThread(void* pdata)
     //                            Initiate Mongoose
     //-------------------------------------------------------------------------
     // struct mg_mgr mgr; // Event manager
-    struct mg_connection* conn;
 
     mg_log_set(MG_LL_INFO); // Set log level
     crcInit();
@@ -3828,25 +3833,38 @@ tcpipWorkerThread(void* pdata)
                  &ptcpipsrv->m_mgr);
 
     // Start to listen for connections
-    spdlog::debug("Starting TCP/IP server on interface: {}",
-                  ptcpipsrv->getInterfaceAddress().c_str());
+    ptcpipsrv->clearListenerContexts();
 
-    conn = mg_listen(&ptcpipsrv->m_mgr,
-                     ptcpipsrv->getInterfaceAddress().c_str(),
-                     tcpip_event_handler,
-                     nullptr); // Create server connection
-    if (conn == NULL) {
-        MG_INFO(("SERVER cant' open a connection"));
-        mg_mgr_free(&ptcpipsrv->m_mgr);
-        return nullptr;
+    for (size_t i = 0; i < ptcpipsrv->getInterfaceAddressCount(); ++i) {
+        const std::string address = ptcpipsrv->getInterfaceAddress(i);
+        auto* listenerContextPtr =
+          ptcpipsrv->addListenerContext(mg_url_is_ssl(address.c_str()));
+
+        spdlog::debug("Starting TCP/IP server on interface: {} ({})",
+                      address,
+                      listenerContextPtr->tls ? "TLS" : "plain TCP");
+
+        struct mg_connection* conn =
+          mg_listen(&ptcpipsrv->m_mgr,
+                    address.c_str(),
+                    tcpip_event_handler,
+                    listenerContextPtr); // Create server connection
+        if (conn == NULL) {
+            spdlog::error("TCP/IP server: unable to listen on '{}'.", address);
+            mg_mgr_free(&ptcpipsrv->m_mgr);
+            ptcpipsrv->clearListenerContexts();
+            return nullptr;
+        }
+
+        pobj->getClientList().setMainReceiveQueueNotifier(
+          [ptcpipsrv, connectionId = conn->id]() {
+              if (!mg_wakeup(&ptcpipsrv->m_mgr, connectionId, "x", 1)) {
+                  spdlog::error(
+                    "TCP/IP server: failed to wake main receive queue");
+              }
+          });
     }
 
-    pobj->getClientList().setMainReceiveQueueNotifier(
-      [ptcpipsrv, connectionId = conn->id]() {
-          if (!mg_wakeup(&ptcpipsrv->m_mgr, connectionId, "x", 1)) {
-              spdlog::error("TCP/IP server: failed to wake main receive queue");
-          }
-      });
     processMainReceiveQueue(ptcpipsrv);
 
     // Event loop
@@ -3857,6 +3875,7 @@ tcpipWorkerThread(void* pdata)
     // Clearing the notifier waits for in-flight notifications before freeing.
     pobj->getClientList().setMainReceiveQueueNotifier({});
     mg_mgr_free(&ptcpipsrv->m_mgr); // Free the event manager resources
+    ptcpipsrv->clearListenerContexts();
 
     spdlog::debug("clientWorkerThread: Client worker thread exiting.");
 

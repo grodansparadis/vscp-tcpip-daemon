@@ -60,12 +60,17 @@ def start_daemon(executable):
                 "allowed_remotes": "",
                 "allowed_events": "*:*"}
 
+    key_path = os.path.join(folder, "vscp.key")
+    with open(key_path, "w") as handle:
+        handle.write(key.hex().upper() + "\n")
+    os.chmod(key_path, 0o600)
+
     config = {
         "guid": "FF:FF:FF:FF:FF:FF:FF:F5:00:00:00:00:00:00:00:01",
         "logging": {"file-enable-log": False, "syslog-enable-log": False,
                     "udp-enable-log": False, "console-enable-log": True,
                     "console-log-level": "info"},
-        "security": {"vscpkey": key.hex().upper()},
+        "security": {"key": key_path},
         "tcpip": {"interface-address": "tcp://127.0.0.1:{}".format(port)},
         "remoteuser": [user("admin", password, "admin"),
                        user("reader", reader_password, "receive-events")],

@@ -45,6 +45,7 @@
 #include "clientlist.h"
 #include "controlobject.h"
 #include "userlist.h"
+#include <memory>
 #include <vector>
 
 #define VSCP_TCPIP_SRV_RUN  0
@@ -150,6 +151,10 @@ typedef struct {
 class CTcpipSrv {
 
   public:
+    struct ListenerContext {
+        bool tls = false;
+    };
+
     /// Constructor
     CTcpipSrv(CControlObject* obj = nullptr);
 
@@ -548,9 +553,27 @@ class CTcpipSrv {
 
     /*!
         Get the interface address for the TCP/IP connection.
-        @return The address of the interface.
+        @param idx The index of the interface address to retrieve.
+        @return The address of the interface at the specified index.
+            Returns an empty string if the index is out of range.
     */
-    std::string getInterfaceAddress() const { return m_interfaceAddress; }
+    std::string getInterfaceAddress(int idx=0) const { return (m_interfaceAddressList.empty() || idx >= m_interfaceAddressList.size()) ? "" : m_interfaceAddressList[idx]; }
+
+    /*!
+        Get the number of interface addresses configured for the TCP/IP connection.
+    */
+    size_t getInterfaceAddressCount() const { return m_interfaceAddressList.size(); }
+
+    ListenerContext* addListenerContext(bool tls)
+    {
+        auto context = std::make_unique<ListenerContext>();
+        context->tls = tls;
+        ListenerContext* ptr = context.get();
+        m_listenerContexts.push_back(std::move(context));
+        return ptr;
+    }
+
+    void clearListenerContexts() { m_listenerContexts.clear(); }
 
     /*!
         Set interface address
@@ -559,7 +582,12 @@ class CTcpipSrv {
     */
     void setInterfaceAddress(const std::string& str)
     {
-        m_interfaceAddress = str;
+        m_interfaceAddressList.push_back(str);
+    };
+
+    void setInterfaceAddress(const std::vector<std::string>& addressarray)
+    {
+        m_interfaceAddressList = addressarray;
     };
 
     /*!
@@ -619,7 +647,7 @@ class CTcpipSrv {
     bool m_bRun;
 
     /*!
-        Interface used for TCP/IP connection  (only one)
+        Interface used for TCP/IP connection(s) One or many
         Examples for IPv4: 80, 127.0.0.1:9598,
             192.0.2.3:9598,
             tcp://192.0.2.3:9599,
@@ -632,7 +660,8 @@ class CTcpipSrv {
             ssl://[::1]:9598,
             tls://[::1]:9598
     */
-    std::string m_interfaceAddress;
+    std::vector<std::string> m_interfaceAddressList;
+    std::vector<std::unique_ptr<ListenerContext>> m_listenerContexts;
 
     /*!
         tcp/ip SSL settings
