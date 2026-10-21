@@ -10,13 +10,9 @@
  * [Startup switches](startup_switches.md)
  * [Files and directory structure](files_and_directory_structure.md)
 
-* Subscribing
-  * [Server subscriptions](subscribing_server.md)
-  * [Driver subscriptions](subscribing_driver.md)
-
-* Publishing
-  * [Server publishing](publishing_server.md)
-  * [Driver publishing](publishing_driver.md)
+* TCP/IP Link
+ * [Commands and examples](tcpip_link_commands.md)
+ * [Security, TLS and Let's Encrypt](security_tls.md)
 
 * Logging, diagnostic and debugging
   * [Solving problems and troubleshooting](solving_problems.md)
@@ -34,8 +30,6 @@
   * [Level II Drivers](level_ii_drivers.md)
 
 * Appendix
- * [Setting up a Mosquitto MQTT broker](./mosquitto_set_up_broker.md)
- * [Setting up websockets on a Mosquitto MQTT broker](./mosquitto_set_up_websockets.md)
 
 * Other documentation
  *  [Documentation Site](https://docs.vscp.org)

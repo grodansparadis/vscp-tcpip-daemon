@@ -149,4 +149,8 @@ Check the daemon log for driver-loading or configuration errors. Then connect a 
 
 With all three examples enabled, VSCP events received from the CAN interface or remote server can be delivered to local clients and recorded by the logger. A quiet bus or remote server produces no device events until a device or application sends them.
 
+For command syntax, replies, permissions, and examples, see the [VSCP TCP/IP Link command reference](./tcpip_link_commands.md).
+
+For accounts, certificates, TLS, and Let's Encrypt setup, see [Security and TLS](./security_tls.md).
+
 [filename](./bottom_copyright.md ':include')
