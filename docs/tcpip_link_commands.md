@@ -54,39 +54,39 @@ Log in before using operational commands. The rights below refer to the account'
 
 | Command | Aliases | Purpose | Required account rights |
 | :------ | :------ | :------ | :---------------------- |
-| `NOOP` | None | Check that the connection responds. | No login required. |
-| `USER` | None | Select an account. | No login required. |
-| `PASS` | None | Authenticate the selected account. | A preceding `USER`. |
-| `CHALLENGE` | None | Generate a session ID. | No login required. |
-| `QUIT` | `EXIT` | Close the connection. | No login required. |
-| `HELP` | None | Read built-in help. | No login required. |
-| `VERS` | `VERSION` | Read the daemon version. | No login required. |
-| `WCYD` | `WHATCANYOUDO` | Read the capability bitmap. | No login required. |
-| `SEND` | None | Submit a VSCP event. | `send-events` and allowed class/type. |
-| `MEASUREMENT` | `M` | Construct and submit a measurement. | `send-events` and allowed class/type. |
-| `RETR` | `RETRIEVE` | Retrieve queued events. | `receive-events`. |
-| `RCVLOOP` | `RECEIVELOOP` | Enable continuous event delivery. | `receive-events`. |
-| `QUITLOOP` | `QUITRCVLOOP`, `QUITRECEIVELOOP` | Stop continuous delivery. | `receive-events`. |
-| `CDTA` | `CHKDATA`, `CHECKDATA` | Count queued events. | Logged-in account. |
-| `CLRA` | `CLRALL`, `CLEARALL` | Discard queued events. | Logged-in account. |
-| `STAT` | None | Read channel statistics. | Logged-in account. |
-| `INFO` | None | Read channel status. | Logged-in account. |
-| `CHID` | `GETCHID` | Read the channel ID. | Logged-in account. |
-| `GGID` | `GETGUID` | Read the channel GUID. | Logged-in account. |
-| `SGID` | `SETGUID` | Request a channel GUID change; see current limitation below. | Set-GUID bit (`0x08000000`). |
-| `SFLT` | `SETFILTER` | Set the channel's receive filter. | Set-filter bit (`0x04000000`). |
-| `SMSK` | `SETMASK` | Set the channel's receive mask. | Set-filter bit (`0x04000000`). |
-| `INTERFACE` | `CLIENT` | List interfaces; see limitations below. | `interface`. |
-| `TEST` | None | Acknowledge a diagnostic request. | `test`. |
-| `SHUTDOWN` | None | Stop the daemon process. | `shutdown`. |
-| `RESTART` | None | Request a process restart. | `restart`. |
-| `BINARY` | None | Switch this connection to VSCP-GBP frames. | No login required to switch; binary operations enforce their own rights. |
+| [`NOOP`](#command-noop) | None | Check that the connection responds. | No login required. |
+| [`USER`](#command-user-pass) | None | Select an account. | No login required. |
+| [`PASS`](#command-user-pass) | None | Authenticate the selected account. | A preceding `USER`. |
+| [`CHALLENGE`](#command-challenge) | None | Generate a session ID. | No login required. |
+| [`QUIT`](#command-quit-exit) | [`EXIT`](#command-quit-exit) | Close the connection. | No login required. |
+| [`HELP`](#command-help) | None | Read built-in help. | No login required. |
+| [`VERS`](#command-vers-version) | [`VERSION`](#command-vers-version) | Read the daemon version. | No login required. |
+| [`WCYD`](#command-wcyd-whatcanyoudo) | [`WHATCANYOUDO`](#command-wcyd-whatcanyoudo) | Read the capability bitmap. | No login required. |
+| [`SEND`](#command-send) | None | Submit a VSCP event. | `send-events` and allowed class/type. |
+| [`MEASUREMENT`](#command-measurement) | [`M`](#command-measurement) | Construct and submit a measurement. | `send-events` and allowed class/type. |
+| [`RETR`](#command-retr-retrieve) | [`RETRIEVE`](#command-retr-retrieve) | Retrieve queued events. | `receive-events`. |
+| [`RCVLOOP`](#command-rcvloop-receiveloop) | [`RECEIVELOOP`](#command-rcvloop-receiveloop) | Enable continuous event delivery. | `receive-events`. |
+| [`QUITLOOP`](#command-quitloop-quitrcvloop-quitreceiveloop) | [`QUITRCVLOOP`](#command-quitloop-quitrcvloop-quitreceiveloop), [`QUITRECEIVELOOP`](#command-quitloop-quitrcvloop-quitreceiveloop) | Stop continuous delivery. | `receive-events`. |
+| [`CDTA`](#command-cdta-chkdata-checkdata) | [`CHKDATA`](#command-cdta-chkdata-checkdata), [`CHECKDATA`](#command-cdta-chkdata-checkdata) | Count queued events. | Logged-in account. |
+| [`CLRA`](#command-clra-clrall-clearall) | [`CLRALL`](#command-clra-clrall-clearall), [`CLEARALL`](#command-clra-clrall-clearall) | Discard queued events. | Logged-in account. |
+| [`STAT`](#command-stat) | None | Read channel statistics. | Logged-in account. |
+| [`INFO`](#command-info) | None | Read channel status. | Logged-in account. |
+| [`CHID`](#command-chid-getchid) | [`GETCHID`](#command-chid-getchid) | Read the channel ID. | Logged-in account. |
+| [`GGID`](#command-ggid-getguid) | [`GETGUID`](#command-ggid-getguid) | Read the channel GUID. | Logged-in account. |
+| [`SGID`](#command-sgid-setguid) | [`SETGUID`](#command-sgid-setguid) | Request a channel GUID change; see current limitation below. | Set-GUID bit (`0x08000000`). |
+| [`SFLT`](#command-sflt-setfilter-smsk-setmask) | [`SETFILTER`](#command-sflt-setfilter-smsk-setmask) | Set the channel's receive filter. | Set-filter bit (`0x04000000`). |
+| [`SMSK`](#command-sflt-setfilter-smsk-setmask) | [`SETMASK`](#command-sflt-setfilter-smsk-setmask) | Set the channel's receive mask. | Set-filter bit (`0x04000000`). |
+| [`INTERFACE`](#command-interface-client) | [`CLIENT`](#command-interface-client) | List interfaces; see limitations below. | `interface`. |
+| [`TEST`](#command-test) | None | Acknowledge a diagnostic request. | `test`. |
+| [`SHUTDOWN`](#command-shutdown) | None | Stop the daemon process. | `shutdown`. |
+| [`RESTART`](#command-restart) | None | Request a process restart. | `restart`. |
+| [`BINARY`](#command-binary) | None | Switch this connection to VSCP-GBP frames. | No login required to switch; binary operations enforce their own rights. |
 
 Named rights can be joined with `/`. For example, `user/0x04000000` adds filter-changing rights to a standard user, and `user/0x08000000` adds GUID-changing rights. The parser accepts these numeric bits; `setfilter` and `setguid` are not privilege names.
 
 ## Session and discovery commands
 
-### NOOP
+### NOOP :id=command-noop
 
 Check that the server is responsive without changing session state:
 
@@ -96,13 +96,13 @@ NOOP
 
 Reply: `+OK - Success.` An empty command line also receives a success reply.
 
-### USER and PASS
+### USER and PASS :id=command-user-pass
 
 Select an existing account, then authenticate:
 
 ```text
-USER dashboard
-PASS REPLACE_WITH_YOUR_PASSWORD
+USER <username>
+PASS <replace with your password>
 ```
 
 Successful replies:
@@ -114,7 +114,7 @@ Successful replies:
 
 The account is defined in `remoteuser`. The daemon checks its stored Argon2id hash and allowed remote addresses. A failed `PASS` closes the connection, so reconnect before retrying. To change accounts, open a new connection rather than sending another `USER` after login.
 
-### CHALLENGE
+### CHALLENGE :id=command-challenge
 
 Generate a new random session ID:
 
@@ -124,7 +124,7 @@ CHALLENGE
 
 The reply is `+OK - ` followed by a 64-character hexadecimal session ID. This implementation does **not** authenticate a client using that ID: use `USER` and `PASS` over TLS. No token argument is required.
 
-### QUIT / EXIT
+### QUIT / EXIT :id=command-quit-exit
 
 Close this connection without stopping the daemon:
 
@@ -136,7 +136,7 @@ The server sends `+OK - Connection closed by client.` and closes the connection.
 
 With the current TLS connection-close handling, OpenSSL may then report `unexpected eof while reading`, even after a successful login and closing reply, because the connection ends without a TLS `close_notify`. Distinguish that final shutdown diagnostic from a failed certificate or host-name verification; keep `-verify_hostname` and `-verify_return_error` enabled. An EOF before the expected reply can indicate an interrupted exchange and should not be treated as success.
 
-### HELP
+### HELP :id=command-help
 
 List built-in help, or ask about a command:
 
@@ -148,7 +148,7 @@ HELP MEASUREMENT
 
 Help text is followed by `+OK`. Built-in help contains some historical descriptions; the limitations on this page reflect the current implementation.
 
-### VERS / VERSION
+### VERS / VERSION :id=command-vers-version
 
 Read the version as three comma-separated numbers, followed by `+OK`:
 
@@ -158,7 +158,7 @@ VERS
 
 Reply format: `major,minor,patch`. The values follow the daemon's current release numbering.
 
-### WCYD / WHATCANYOUDO
+### WCYD / WHATCANYOUDO :id=command-wcyd-whatcanyoudo
 
 Read the server's 64-bit capability bitmap:
 
@@ -170,7 +170,7 @@ The data line has eight hexadecimal bytes separated by hyphens, most significant
 
 ## Sending events
 
-### SEND
+### SEND :id=command-send
 
 Submit a fully specified VSCP event:
 
@@ -204,7 +204,7 @@ SEND 0,20,3,0,,1792566000000000000,FF:FF:FF:FF:FF:FF:FF:F5:00:00:00:00:00:00:00:
 
 The general event format allows up to 512 payload bytes, but the text-command line limit also applies. For large payloads, use a suitable binary client. Level I hardware may impose its own eight-byte payload limit.
 
-### MEASUREMENT / M
+### MEASUREMENT / M :id=command-measurement
 
 Construct a measurement event without manually encoding its payload:
 
@@ -233,6 +233,40 @@ Type 6 is temperature; unit 1 is degrees Celsius for these measurement classes. 
 | 1040 | Zero-terminated numeric text, at most 483 characters. Unit/index/zone/subzone 0-255. |
 | 1060 | Float64. Unit/index/zone/subzone 0-255. |
 
+The symbolic class names, as defined in `vscp-class.h`, are:
+
+| Class | Symbolic name | Description |
+| ----: | :------------ | :---------- |
+| 10 | `VSCP_CLASS1_MEASUREMENT` | Measurement |
+| 11 | `VSCP_CLASS1_MEASUREMENTX1` | Measurement (X1 variant) |
+| 12 | `VSCP_CLASS1_MEASUREMENTX2` | Measurement (X2 variant) |
+| 13 | `VSCP_CLASS1_MEASUREMENTX3` | Measurement (X3 variant) |
+| 14 | `VSCP_CLASS1_MEASUREMENTX4` | Measurement (X4 variant) |
+| 60 | `VSCP_CLASS1_MEASUREMENT64` | Double-precision floating-point measurement |
+| 61 | `VSCP_CLASS1_MEASUREMENT64X1` | Double-precision measurement (X1 variant) |
+| 62 | `VSCP_CLASS1_MEASUREMENT64X2` | Double-precision measurement (X2 variant) |
+| 63 | `VSCP_CLASS1_MEASUREMENT64X3` | Double-precision measurement (X3 variant) |
+| 64 | `VSCP_CLASS1_MEASUREMENT64X4` | Double-precision measurement (X4 variant) |
+| 65 | `VSCP_CLASS1_MEASUREZONE` | Measurement with zone |
+| 66 | `VSCP_CLASS1_MEASUREZONEX1` | Measurement with zone (X1 variant) |
+| 67 | `VSCP_CLASS1_MEASUREZONEX2` | Measurement with zone (X2 variant) |
+| 68 | `VSCP_CLASS1_MEASUREZONEX3` | Measurement with zone (X3 variant) |
+| 69 | `VSCP_CLASS1_MEASUREZONEX4` | Measurement with zone (X4 variant) |
+| 70 | `VSCP_CLASS1_MEASUREMENT32` | Single-precision floating-point measurement |
+| 71 | `VSCP_CLASS1_MEASUREMENT32X1` | Single-precision measurement (X1 variant) |
+| 72 | `VSCP_CLASS1_MEASUREMENT32X2` | Single-precision measurement (X2 variant) |
+| 73 | `VSCP_CLASS1_MEASUREMENT32X3` | Single-precision measurement (X3 variant) |
+| 74 | `VSCP_CLASS1_MEASUREMENT32X4` | Single-precision measurement (X4 variant) |
+| 85 | `VSCP_CLASS1_SETVALUEZONE` | Set value with zone |
+| 86 | `VSCP_CLASS1_SETVALUEZONEX1` | Set value with zone (X1 variant) |
+| 87 | `VSCP_CLASS1_SETVALUEZONEX2` | Set value with zone (X2 variant) |
+| 88 | `VSCP_CLASS1_SETVALUEZONEX3` | Set value with zone (X3 variant) |
+| 89 | `VSCP_CLASS1_SETVALUEZONEX4` | Set value with zone (X4 variant) |
+| 1040 | `VSCP_CLASS2_MEASUREMENT_STR` | Level II measurement as a string |
+| 1060 | `VSCP_CLASS2_MEASUREMENT_FLOAT` | Level II measurement as a float |
+
+The names are for reference only. `MEASUREMENT` does not accept them, so enter the class as a number.
+
 The ranges include the reserved X1-X4 variants. Class/type/metadata accept decimal or `0x` notation. Use a decimal numeric value, not a locale-specific comma. Non-finite, out-of-range, underflowing, or unrepresentable values are rejected rather than sent.
 
 `timestamp_ns` accepts an unsigned 64-bit Unix nanosecond count or `@` followed by a UTC ISO date/time. Fractional seconds may have 1-9 digits; `Z`, `+00:00`, or no suffix denotes UTC. Other time-zone offsets and dates before 1970 are rejected. Unlike an empty timestamp, explicit zero is preserved.
@@ -256,7 +290,7 @@ ctest --test-dir build -R '^measurement$' --output-on-failure
 
 ## Receiving and managing queued events
 
-### RETR / RETRIEVE
+### RETR / RETRIEVE :id=command-retr-retrieve
 
 Retrieve one event, or up to a requested count, from this connection's queue:
 
@@ -271,7 +305,7 @@ Each event is returned as a comma-separated data line, followed by the final sta
 
 Retrieval removes events from the queue. Use `CDTA` first if you need to know how many are waiting, and stop `RCVLOOP` before polling with `RETR`.
 
-### RCVLOOP / RECEIVELOOP
+### RCVLOOP / RECEIVELOOP :id=command-rcvloop-receiveloop
 
 Start continuous event delivery:
 
@@ -287,7 +321,7 @@ The server replies:
 
 It then sends matching event lines as they become available. This is asynchronous delivery, not one `+OK` reply per event.
 
-### QUITLOOP / QUITRCVLOOP / QUITRECEIVELOOP
+### QUITLOOP / QUITRCVLOOP / QUITRECEIVELOOP :id=command-quitloop-quitrcvloop-quitreceiveloop
 
 Stop continuous delivery without closing the connection:
 
@@ -297,7 +331,7 @@ QUITLOOP
 
 Reply: `+OK - Quit receive loop.` Events already in flight can appear before that reply.
 
-### CDTA / CHKDATA / CHECKDATA
+### CDTA / CHKDATA / CHECKDATA :id=command-cdta-chkdata-checkdata
 
 Count events waiting for this connection:
 
@@ -314,7 +348,7 @@ Example reply:
 
 This does not remove the events.
 
-### CLRA / CLRALL / CLEARALL
+### CLRA / CLRALL / CLEARALL :id=command-clra-clrall-clearall
 
 Discard all queued events for this connection:
 
@@ -326,7 +360,7 @@ Reply: `+OK - All events cleared.` Other clients' queues and device state are un
 
 ## Channel details and filters
 
-### STAT
+### STAT :id=command-stat
 
 Read statistics for this channel, not totals for the whole daemon:
 
@@ -342,7 +376,7 @@ bus_off,bus_warnings,overruns,receive_bytes,receive_frames,transmit_bytes,transm
 
 A `+OK` line follows. Receive counters describe events submitted by this client to the daemon; transmit counters describe events delivered toward the client. An idle channel can return all zeroes.
 
-### INFO
+### INFO :id=command-info
 
 Read channel status and its last recorded error:
 
@@ -358,7 +392,7 @@ channel_status,last_error_code,last_error_subcode,"last_error_text"
 
 The data line is followed by `+OK`. This reports channel state, not a hardware self-test.
 
-### CHID / GETCHID
+### CHID / GETCHID :id=command-chid-getchid
 
 Read the numeric ID assigned to this connection:
 
@@ -368,7 +402,7 @@ CHID
 
 The response is a decimal ID on one line followed by `+OK`. IDs are assigned at runtime; do not assume that the same reconnecting client will keep its ID.
 
-### GGID / GETGUID
+### GGID / GETGUID :id=command-ggid-getguid
 
 Read this connection's interface GUID:
 
@@ -378,7 +412,7 @@ GGID
 
 The response is a hexadecimal GUID on one line followed by `+OK`.
 
-### SGID / SETGUID
+### SGID / SETGUID :id=command-sgid-setguid
 
 The protocol command requests a change to this connection's interface GUID:
 
@@ -390,7 +424,7 @@ SGID FF:FF:FF:FF:FF:FF:FF:F5:00:00:00:00:00:00:00:02
 
 The requested scope is the connection's GUID, not the daemon's global GUID or another driver's configured GUID.
 
-### SFLT / SETFILTER and SMSK / SETMASK
+### SFLT / SETFILTER and SMSK / SETMASK :id=command-sflt-setfilter-smsk-setmask
 
 Set the receive filter and the bits that must match it:
 
@@ -419,7 +453,7 @@ Filters apply to subsequent event delivery; use `CLRA` if you also want to disca
 
 ## Interfaces and administration
 
-### INTERFACE / CLIENT
+### INTERFACE / CLIENT :id=command-interface-client
 
 List connected interfaces, drivers, and clients:
 
@@ -445,7 +479,7 @@ The dispatcher also recognizes the following historical subcommands, but their t
 
 The same limitation applies with `CLIENT` instead of `INTERFACE`. Do not use these subcommands to control drivers; configure and restart the daemon through its service manager instead.
 
-### TEST
+### TEST :id=command-test
 
 ```text
 TEST
@@ -453,7 +487,7 @@ TEST
 
 The current text handler returns `+OK - Success.` It does not run a diagnostic sequence or test connected hardware.
 
-### SHUTDOWN
+### SHUTDOWN :id=command-shutdown
 
 **Disruptive operation:** stops the daemon process and disconnects clients and drivers.
 
@@ -463,7 +497,7 @@ SHUTDOWN
 
 The daemon sends a closing reply and requests process termination (`SIGUSR1` on Unix). A service manager may restart it according to the service policy. For planned maintenance, use the service manager to stop it deliberately.
 
-### RESTART
+### RESTART :id=command-restart
 
 **Disruptive operation:**
 
@@ -479,7 +513,7 @@ sudo systemctl restart vscpd
 
 ## BINARY and binary command equivalents
 
-### BINARY
+### BINARY :id=command-binary
 
 Switch this connection from text commands to the [VSCP General Binary Protocol (VSCP-GBP)](https://grodansparadis.github.io/vscp-doc-spec/#/vscp_over_binary):
 
