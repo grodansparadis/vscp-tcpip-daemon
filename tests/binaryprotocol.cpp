@@ -4,6 +4,7 @@
 #include <iostream>
 
 void testBinaryTcp();
+void testSecureMemory();
 
 int main()
 {
@@ -85,4 +86,5 @@ int main()
     std::cout << "Binary codec: 2052 plaintext/AES round trips, event and "
                  "malformed-frame and header checks passed\n";
     testBinaryTcp();
+    testSecureMemory();
 }

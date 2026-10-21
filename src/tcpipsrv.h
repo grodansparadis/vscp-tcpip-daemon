@@ -44,6 +44,7 @@
 
 #include "clientlist.h"
 #include "controlobject.h"
+#include "securemem.h"
 #include "userlist.h"
 #include <memory>
 #include <vector>
@@ -519,9 +520,16 @@ class CTcpipSrv {
     */
     void setCurrentCommand(const std::string& cmd)
     {
-        m_currentCommand = cmd;
+        // The previous command may have held a password.
+        secure_wipe(m_currentCommand);
+        m_currentCommand.assign(cmd);
         vscp_trim(m_currentCommand);
     };
+
+    /*!
+        Wipe the current command buffer, including spare capacity.
+    */
+    void wipeCurrentCommand(void) { secure_wipe(m_currentCommand); };
 
     /*!
         Get the last command processed for the client connection.
@@ -535,7 +543,11 @@ class CTcpipSrv {
 
         @param cmd The command string to set as the last command.
     */
-    void setLastCommand(const std::string& cmd) { m_lastCommand = cmd; };
+    void setLastCommand(const std::string& cmd)
+    {
+        secure_wipe(m_lastCommand);
+        m_lastCommand.assign(cmd);
+    };
 
     /*!
         Check if the current command starts with the specified prefix.
@@ -603,7 +615,7 @@ class CTcpipSrv {
     */
     void setTlsOptions(const std::string& ca,
                        const std::string& cert,
-                       const std::string& key,
+                       const secure_string& key,
                        const std::string& name)
     {
         m_tls_ca              = ca;
@@ -690,7 +702,7 @@ class CTcpipSrv {
     mg_tls_opts m_tcpip_tls_opts;
     std::string m_tls_ca;
     std::string m_tls_cert;
-    std::string m_tls_key;
+    secure_string m_tls_key; // Private key, kept in locked memory
     std::string m_tls_name;
 
     // Saved return value for last sockettcp operation

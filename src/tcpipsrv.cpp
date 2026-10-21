@@ -331,20 +331,23 @@ CTcpipSrv::write(struct mg_connection* conn, const char* buf, size_t len)
 bool
 CTcpipSrv::commandStartsWith(const std::string& cmd, bool bFix)
 {
-    if (!vscp_startsWith(vscp_upper(m_currentCommand), vscp_upper(cmd))) {
+    // Compare in place; the command line may hold a password, so no copies.
+    if (m_currentCommand.length() < cmd.length()) {
         return false;
     }
+    for (size_t i = 0; i < cmd.length(); ++i) {
+        if (toupper(static_cast<unsigned char>(m_currentCommand[i])) !=
+            toupper(static_cast<unsigned char>(cmd[i]))) {
+            return false;
+        }
+    }
 
-    // If asked to do so remove the command. Only happens on match
+    // If asked to do so remove the command and the separator. Only happens
+    // on match.
     if (bFix) {
-        if (m_currentCommand.length() - cmd.length()) {
-            m_currentCommand =
-              vscp_str_right(m_currentCommand,
-                             m_currentCommand.length() - cmd.length() - 1);
-        }
-        else {
-            m_currentCommand.clear();
-        }
+        m_currentCommand.erase(
+          0,
+          std::min(m_currentCommand.length(), cmd.length() + 1));
         vscp_trim(m_currentCommand);
     }
 
@@ -407,7 +410,8 @@ CTcpipSrv::commandHandler(struct mg_connection* conn,
         return VSCP_ERROR_SUCCESS;
     }
 
-    else if (vscp_upper(getCurrentCommand()) == "BINARY") {
+    else if (getCurrentCommand().length() == 6 &&
+             commandStartsWith("binary")) {
         // The transition acknowledgement is the last text response.
         if (write(conn, MSG_OK, sizeof(MSG_OK) - 1)) {
             pClientItem->setBinaryMode(true);
@@ -1069,6 +1073,7 @@ CTcpipSrv::handleBinaryFrame(struct mg_connection* conn,
             break;
         case 2: {
             std::string credentials(reinterpret_cast<const char*>(arg), length);
+            SecureWipeGuard<std::string> wipeCredentials(credentials);
             size_t colon         = credentials.find(':');
             std::string username = credentials.substr(0, colon);
             if (username.empty() || username.size() > 64 ||
@@ -1084,7 +1089,11 @@ CTcpipSrv::handleBinaryFrame(struct mg_connection* conn,
               m_pCtrlObj->getUserList().getUser(username.c_str()));
             client->setBinaryLoginDeadline(mg_millis() + 30000);
             if (colon != std::string::npos) {
-                setCurrentCommand(credentials.substr(colon + 1));
+                {
+                    std::string password(credentials, colon + 1);
+                    setCurrentCommand(password);
+                    secure_wipe(password);
+                }
                 bool authenticated = handleClientPassword(conn);
                 client->setBinaryLoginDeadline(0);
                 if (!authenticated)
@@ -1099,8 +1108,12 @@ CTcpipSrv::handleBinaryFrame(struct mg_connection* conn,
                 error = VSCP_ERROR_PARAMETER;
                 break;
             }
-            setCurrentCommand(
-              std::string(reinterpret_cast<const char*>(arg), length));
+            {
+                std::string password(reinterpret_cast<const char*>(arg),
+                                     length);
+                setCurrentCommand(password);
+                secure_wipe(password);
+            }
             {
                 bool hadUser = client->getUserItem() != nullptr ||
                                client->getBinaryLoginDeadline() != 0;
@@ -1406,6 +1419,8 @@ CTcpipSrv::handleIncomingData(struct mg_connection* conn)
             if (!vscp_binary::decode(std::move(wire),
                                      m_pCtrlObj->getSystemKey(nullptr),
                                      frame)) {
+                // Decryption may have left partial plaintext behind.
+                secure_wipe(frame);
                 // The length may be corrupt, so search from the next byte.
                 discardBinaryInput(conn, 1);
                 continue;
@@ -1415,6 +1430,8 @@ CTcpipSrv::handleIncomingData(struct mg_connection* conn)
             client->setBinaryResyncing(false);
             client->setBinaryEncryption(frame[0] & 15);
             handleBinaryFrame(conn, frame);
+            // The frame may have carried login credentials.
+            secure_wipe(frame);
         }
         else {
             auto* eol =
@@ -1440,6 +1457,7 @@ CTcpipSrv::handleIncomingData(struct mg_connection* conn)
             std::string line(reinterpret_cast<const char*>(input.buf), length);
             mg_iobuf_del(&input, 0, length + 2);
             commandHandler(conn, line);
+            secure_wipe(line);
         }
     }
 }
@@ -2807,6 +2825,10 @@ CTcpipSrv::handleClientPassword(struct mg_connection* conn)
 
     CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
 
+    // The current command holds the plaintext password. Wipe it on every
+    // exit path.
+    SecureWipeGuard<std::string> wipePassword(getCurrentCommand());
+
     // Get user item (can be nullptr if not logged in)
     auto pUserItem = pClientItem->getUserItem();
     if (nullptr == pUserItem) {
@@ -2834,8 +2856,8 @@ CTcpipSrv::handleClientPassword(struct mg_connection* conn)
         return false;
     }
 
-    std::string strPassword = getCurrentCommand();
-    vscp_trim(strPassword);
+    // Already trimmed by setCurrentCommand()/commandStartsWith().
+    const std::string& strPassword = getCurrentCommand();
 
     // Must be a password
     if (strPassword.empty()) {

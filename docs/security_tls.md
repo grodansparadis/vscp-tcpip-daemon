@@ -336,6 +336,18 @@ To restrict an account, start `allowed_remotes` with `-0.0.0.0/0` to deny everyt
 - **Linking two daemons:** when one daemon connects to another over TLS, the connecting driver acts as a TLS client. Give it the CA certificate that signed the remote daemon's certificate.
 - **Logger output:** event logs can reveal device activity. Restrict access to the log directory in the same way as configuration files.
 
+## Secrets in memory
+
+The daemon limits how long secrets stay in memory and where they can leak:
+
+- **Keys in locked memory:** the `security.key` and `security.hmac` keys, the `vscptoken`, the TLS private key, and the internal driver password are stored in memory allocated with libsodium's `sodium_malloc`. That memory is guarded, locked against swapping where the system allows it, and wiped when it is released. The key and TLS key files are read without stream buffering, and temporary copies are wiped.
+- **Passwords wiped after use:** plaintext passwords received from clients, through the text `PASS` command or a binary login frame, are wiped from the daemon's buffers once they have been checked. Only Argon2id hashes are kept.
+- **No core dumps:** on Unix the daemon sets its core file size limit to zero. On Linux it also marks itself non-dumpable, again after switching to `runasuser`. This blocks core dumps and stops other processes running as the same user from attaching a debugger or reading its memory.
+
+Some copies remain outside the daemon's control. OpenSSL keeps its own copy of the parsed TLS private key for each TLS connection. The parsed configuration, which includes the password hashes, is not wiped. Protect the configuration and key files with file permissions, as described above.
+
+Locking memory can fail if `RLIMIT_MEMLOCK` is very low. The daemon still runs, but the keys can then be swapped out. To debug the daemon, start it under the debugger; attaching to a running daemon is blocked.
+
 ## Security checklist
 
 - Explicitly configure a `localhost` listener unless remote clients need access.

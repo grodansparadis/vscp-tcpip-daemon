@@ -47,6 +47,7 @@
 #include "clientlist.h"
 #include "devicelist.h"
 #include "interfacelist.h"
+#include "securemem.h"
 #include "tcpipsrv.h"
 #include "userlist.h"
 #include <vscp.h>
@@ -402,17 +403,22 @@ class CControlObject {
     // E2D453EF99FB3FCD19E67876554A8C27;A4A86F7D7E119BA3F0CD06881E371B989B33B6D606A863B633EF529D64544F8E
     //std::string m_admin_allowfrom; // Remotes allowed to connect from as admin.
                                    // Defaults to ""
-    std::string m_vscptoken;
-    
     /*!
-        Decoded system key bytes, zero-padded to 32 bytes.
+        VSCP token. Kept in locked memory that is wiped on release.
     */
-    std::string m_systemKey;
+    secure_string m_vscptoken;
 
     /*!
-        Decoded HMAC key bytes. Always 32 bytes.
+        Decoded system key bytes, zero-padded to 32 bytes. Kept in locked
+        memory that is wiped on release.
     */
-    std::string m_hmacKey;
+    secure_string m_systemKey;
+
+    /*!
+        Decoded HMAC key bytes. Always 32 bytes. Kept in locked memory that is
+        wiped on release.
+    */
+    secure_string m_hmacKey;
 
     /*!
         User to run as for Unix
@@ -534,8 +540,8 @@ class CControlObject {
     /// @brief Username for drivers (CClientItem)
     std::string m_driverUsername;
 
-    /// @brief Password for drivers (CClientItem)
-    std::string m_driverPassword;
+    /// @brief Password for drivers (CClientItem). Kept in locked memory.
+    secure_string m_driverPassword;
 
     //**************************************************************************
     //                                CLIENTS

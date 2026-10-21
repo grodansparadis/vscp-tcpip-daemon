@@ -63,6 +63,9 @@
 #include <pwd.h>
 #include <sys/ioctl.h>
 #include <sys/msg.h>
+#ifdef __linux__
+#include <sys/prctl.h>
+#endif
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -236,6 +239,8 @@ CControlObject::CControlObject()
     m_rootFolder = "/var/lib/vscp/vscpd/";
 
     // Default admin user credentials
+    m_vscptoken.reserve(SECURE_STRING_MIN_CAPACITY);
+    m_driverPassword.reserve(SECURE_STRING_MIN_CAPACITY);
     m_vscptoken = "Carpe diem quam minimum credula postero";
     m_systemKey.assign(32, '\0');
     m_hmacKey.assign(32, '\0');
@@ -379,6 +384,10 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
             spdlog::error("setuid() failed. [{}]", strerror(errno));
         }
     }
+#ifdef __linux__
+    // Changing credentials resets the dumpable flag set in main().
+    prctl(PR_SET_DUMPABLE, 0, 0, 0, 0);
+#endif
 #endif
 
     spdlog::debug("Using configuration file: {}", strcfgfile);
@@ -401,6 +410,7 @@ CControlObject::init(std::string& strcfgfile, std::string& rootFolder)
     memset(buf, 0, sizeof(buf));
     pw.generatePassword(32, buf);
     m_driverPassword = buf;
+    sodium_memzero(buf, sizeof(buf));
 
     std::string drvhash;
     // vscp_makePasswordHash(drvhash, std::string(buf));
@@ -1476,6 +1486,46 @@ CControlObject::sendEvent(CClientItem* pClientItem, vscpEventEx* pex)
 
 // ----------------------------------------------------------------------------
 
+namespace {
+
+const size_t MAX_KEY_FILE_SIZE     = 4096;
+const size_t MAX_TLS_KEY_FILE_SIZE = 1024 * 1024;
+
+/*
+    Read a file holding secret material straight into locked memory. The
+    stream is unbuffered so no copy of the content is left in a stream buffer.
+*/
+bool
+readSecretFile(const std::string& path, secure_string& out, size_t maxSize)
+{
+    secure_wipe(out);
+
+    std::ifstream in;
+    in.rdbuf()->pubsetbuf(nullptr, 0);
+    in.open(path, std::ios::in | std::ios::binary);
+    if (!in) {
+        return false;
+    }
+
+    in.seekg(0, std::ios::end);
+    std::streamoff size = in.tellg();
+    if ((size < 0) || (static_cast<unsigned long long>(size) > maxSize)) {
+        return false;
+    }
+    in.seekg(0, std::ios::beg);
+
+    out.reserve(std::max(static_cast<size_t>(size), SECURE_STRING_MIN_CAPACITY));
+    out.resize(static_cast<size_t>(size));
+    if ((size > 0) && !in.read(&out[0], size)) {
+        secure_wipe(out);
+        return false;
+    }
+
+    return true;
+}
+
+} // namespace
+
 ///////////////////////////////////////////////////////////////////////////////
 // readConfiguration
 //
@@ -2152,12 +2202,19 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
         //get_string(sec, "admin", m_admin_user);
         //get_string(sec, "password", m_admin_password);
         //get_string(sec, "allowfrom", m_admin_allowfrom);
-        get_string(sec, "vscptoken", m_vscptoken);
+        if (sec.contains("vscptoken") && sec["vscptoken"].is_string()) {
+            // Move the token into locked memory and wipe the parsed copy.
+            std::string& token =
+              j["security"]["vscptoken"].get_ref<std::string&>();
+            m_vscptoken.assign(token.begin(), token.end());
+            secure_wipe(token);
+            spdlog::debug("ReadConfig: Read security 'vscptoken'.");
+        }
 
         // Read a hex encoded key from the file given by the config entry.
         // The target is only updated if the file holds a key of a valid size.
         auto read_key_file = [&sec](const char* name,
-                                    std::string& target,
+                                    secure_string& target,
                                     std::initializer_list<size_t> validSizes) {
             if (!sec.contains(name) || !sec[name].is_string() ||
                 sec[name].get<std::string>().empty()) {
@@ -2168,18 +2225,18 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
             }
 
             std::string path = sec[name].get<std::string>();
-            std::ifstream in(path, std::ios::in | std::ios::binary);
-            if (!in) {
-                spdlog::error("ReadConfig: Unable to open security '{}' key "
+            secure_string raw;
+            if (!readSecretFile(path, raw, MAX_KEY_FILE_SIZE)) {
+                spdlog::error("ReadConfig: Unable to read security '{}' key "
                               "file '{}'; default retained.",
                               name,
                               path);
                 return;
             }
 
-            std::string hex;
-            char c;
-            while (in.get(c)) {
+            secure_string hex;
+            hex.reserve(std::max(raw.size(), SECURE_STRING_MIN_CAPACITY));
+            for (char c : raw) {
                 if (isspace(static_cast<unsigned char>(c))) {
                     continue;
                 }
@@ -2189,19 +2246,9 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
                                   "retained.",
                                   name,
                                   path);
-                    sodium_memzero(&hex[0], hex.size());
                     return;
                 }
                 hex += c;
-            }
-
-            if (in.bad()) {
-                spdlog::error("ReadConfig: Unable to read security '{}' key "
-                              "file '{}'; default retained.",
-                              name,
-                              path);
-                sodium_memzero(hex.data(), hex.size());
-                return;
             }
 
             uint8_t buf[32] = { 0 };
@@ -2214,13 +2261,11 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
                               name,
                               path);
                 sodium_memzero(buf, sizeof(buf));
-                sodium_memzero(&hex[0], hex.size());
                 return;
             }
 
             target.assign(reinterpret_cast<const char*>(buf), sizeof(buf));
             sodium_memzero(buf, sizeof(buf));
-            sodium_memzero(&hex[0], hex.size());
             spdlog::debug("ReadConfig: Read security '{}' key ({} bits) from "
                           "'{}'.",
                           name,
@@ -2313,9 +2358,15 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
                 return std::string((std::istreambuf_iterator<char>(file)),
                                    std::istreambuf_iterator<char>());
             };
+            secure_string tlsKey;
+            if (!key.empty() &&
+                !readSecretFile(key, tlsKey, MAX_TLS_KEY_FILE_SIZE)) {
+                spdlog::error("ReadConfig: Unable to read TLS key file '{}'.",
+                              key);
+            }
             m_tcpipSrv.setTlsOptions(read_tls_file(ca),
                                      read_tls_file(cert),
-                                     read_tls_file(key),
+                                     tlsKey,
                                      name);
         }
         else {

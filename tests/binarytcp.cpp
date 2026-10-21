@@ -1,5 +1,6 @@
 #include "vscp-binary-protocol.h"
 #include "controlobject.h"
+#include "securemem.h"
 
 #include <cassert>
 #include <cstring>
@@ -209,4 +210,39 @@ void testBinaryTcp()
     mg_mgr_free(&manager);
     std::cout << "Binary TCP: fragmented AES commands, coalesced frames, "
                  "authorization, asynchronous events, RETR, TEXT and resync passed\n";
+}
+
+void testSecureMemory()
+{
+    // Short secrets must not stay in the small-string buffer of the object.
+    secure_string secret;
+    secret.reserve(SECURE_STRING_MIN_CAPACITY);
+    secret = "pw";
+    const char* data = secret.data();
+    assert(!(data >= reinterpret_cast<const char*>(&secret) &&
+             data < reinterpret_cast<const char*>(&secret) + sizeof(secret)));
+
+    secure_wipe(secret);
+    assert(secret.empty() && secret.capacity() >= SECURE_STRING_MIN_CAPACITY);
+    for (size_t i = 0; i < SECURE_STRING_MIN_CAPACITY; ++i) {
+        assert(secret.data()[i] == 0);
+    }
+
+    std::string text(100, 'x');
+    {
+        SecureWipeGuard<std::string> guard(text);
+    }
+    assert(text.empty());
+    for (size_t i = 0; i < 100; ++i) {
+        assert(text.data()[i] == 0);
+    }
+
+    std::vector<uint8_t> bytes(32, 0xAA);
+    secure_wipe(bytes);
+    assert(bytes.empty());
+    for (size_t i = 0; i < 32; ++i) {
+        assert(bytes.data()[i] == 0);
+    }
+
+    std::cout << "Secure memory helpers passed\n";
 }

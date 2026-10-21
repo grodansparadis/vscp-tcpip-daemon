@@ -51,12 +51,14 @@
 #include <linux/if_ether.h>
 #include <linux/if_packet.h>
 #include <linux/sockios.h>
+#include <sys/prctl.h>
 #endif
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <netdb.h>
 #include <sys/ioctl.h>
 #include <sys/msg.h>
+#include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -307,6 +309,17 @@ runDaemon(int argc, char **argv)
   std::string strcfgfile; // Points to XML configuration file
 #ifndef WIN32
   pid_t sid = 0;
+#endif
+
+#ifndef WIN32
+  // Keep keys and passwords out of core dumps and away from ptrace.
+  {
+    struct rlimit rl = { 0, 0 };
+    setrlimit(RLIMIT_CORE, &rl);
+#ifdef __linux__
+    prctl(PR_SET_DUMPABLE, 0, 0, 0, 0);
+#endif
+  }
 #endif
 
   char *value = getenv("VSCP_ENABLE_UDP_DEBUG");
