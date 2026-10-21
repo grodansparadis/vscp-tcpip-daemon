@@ -245,6 +245,15 @@ MEASUREMENT 1060,6,23.5,1,0,0,0,-,@2026-10-21T08:00:00.123456789Z
 
 The old `format,level,type,value,...` measurement syntax is not supported by this daemon.
 
+The measurement encoder and TCP command handler are covered by a regression
+test. Configure with `-DVSCPD_BUILD_TESTS=ON`, build `measurement_test`, then
+run:
+
+```bash
+cmake --build build --target measurement_test
+ctest --test-dir build -R '^measurement$' --output-on-failure
+```
+
 ## Receiving and managing queued events
 
 ### RETR / RETRIEVE
@@ -481,6 +490,11 @@ BINARY
 The final text response is `+OK - Success.` Authentication is preserved. From then on, every command and response must use binary framing; typing `NOOP` as text no longer works. Binary command 24 (`TEXT`) sends its binary acknowledgement before switching back to text.
 
 Every frame has a three-byte TCP prefix: `0x55`, followed by a big-endian word containing framing version 1 in its upper three bits and frame length in the lower 13 bits. The VSCP-GBP frame follows, including its type/encryption byte and CRC. Its maximum size is 4096 bytes, excluding the TCP prefix. Do not omit this prefix.
+
+For an overview of binary mode, encryption and its tests, see
+[Binary TCP mode](binary_tcp_mode.md). For the full frame layout,
+command/reply/event fields and error recovery behavior, see
+[Binary frame format](binary_frame_format.md).
 
 For example, an unencrypted binary `NOOP` command, including prefix and CRC, is:
 

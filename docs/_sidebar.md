@@ -5,6 +5,9 @@
 * Setup
   * [Setting up the system](setting_up_the_system.md)
 
+* Build
+  * [Building from source](building.md)
+
 * Configure
  * [The configuration file](configuring_the_vscp_daemon.md)
  * [Startup switches](startup_switches.md)
@@ -12,6 +15,8 @@
 
 * TCP/IP Link
  * [Commands and examples](tcpip_link_commands.md)
+ * [Binary TCP mode](binary_tcp_mode.md)
+ * [Binary frame format](binary_frame_format.md)
  * [Security, TLS and Let's Encrypt](security_tls.md)
 
 * Logging, diagnostic and debugging
@@ -30,6 +35,7 @@
   * [Level II Drivers](level_ii_drivers.md)
 
 * Appendix
+ * [Updating the pinned VSCP source](updating_pinned_vscp_source.md)
 
 * Other documentation
  *  [Documentation Site](https://docs.vscp.org)

@@ -73,112 +73,10 @@ and upgrades will be handled for you.
 
 ### Building binaries from source
 
-#### Step 1
-
-Prepare the build environment with
-
-```bash
-sudo apt update
-sudo apt install build-essential cmake
-sudo apt install git libssl-dev libsystemd-dev libexpat-dev libwrap0-dev libz-dev libmosquitto-dev libgtest-dev pandoc libcurl4-openssl-dev
-```    
-to install the build tools and required libraries. `libwebsockets-dev` is needed on older versions of vscp.
-
-#### Step 2
-
-The source tar/zip files for vscpd is available at [GitHub](https://github.com/grodansparadis/vscp/releases). Download the latest version and unpack in the folder of your choice. .
-
-Unpack the source in a folder of your choice with
-
-```bash
-tar -zxvf file
-```
-
-or
-
-```bash
-unzip file
-```
-
-
-If you want to use bleeding edge source use git and clone the repository with
-
-```bash
-git clone -j4 --recurse-submodules https://github.com/grodansparadis/vscp.git
-```    
-
-*Note* For a production system choosing a stable release version is strongly recommended.
-
-You can also download a zip of the latest bleeding edge source by clicking on the 'clone and download' button at
-[GitHub](https://github.com/grodansparadis/vscp).
-
-```
-git clone -j4 --recurse-submodules https://github.com/grodansparadis/vscp
-```
-
-Enter the 'vscp' folder created by the unpacking/clone process
-
-####  Step 3
-
-Enter the VSCP project folder ('vscp') and do
-
-```bash
-cd vscp
-mkdir build
-cd build
-cmake ..
-sudo make install
-```
-
-Use 
-
-```
-cmake -DCMAKE_BUILD_TYPE=Release ..
-```
-
-or
-
-```
-cmake -DCMAKE_BUILD_TYPE=Debug ..
-```
-
-to specify build type.
-
-This builds amd installs the system.
-
-The service should be installed and be started automatically. Id it does not use the following commands
-
-```bash
-sudo systemctl enable vscpd
-sudo systemctl start vscpd
-```
-
-    
-It is also possible to run the daemon as any other program with  
-
-```bash
-/usr/local/bin/vscpd -s
-```
-
-this is probably the best test to do on a newly installed system to see that the daemon starts properly as error messages will be shown in the terminal windows in this mode.  Terminate the daemon with **ctrl+c**  
-    
-Default install directory is */usr/sbin*
+See [Building from source](building.md) for current dependencies, CMake
+commands, tests, and platform-specific build instructions.
 
 ----
-
-If you want to use SysVInit to SystemD instead of there is an init file in the service/sysvinit folder. Issue
-
-```
-make install_sysvinit
-```
-
-to install and then
-
-```
-sudo /etc/init.d/vscpd start to start
-```
-
-to start the service
 
 
 ## Setting up the system on Rasperry Pi
@@ -202,31 +100,12 @@ VSCP & Friends has been tested and works very well on Beaglebone Black. The setu
 
 ## Setting up the system on Windows
 
-The VSCP tcp/ip daemon is not (yet) available on Windows. You can however use Windows Subsystem for Linux (WSL) to run it if you like. With the system installed follow the Linux install instructions. The main problem is that the daemon is not yet available as a service on Windows. This is something that will be added in the future. However the VSCP tcp/ip daemon compiles and runs just fine on windows.
+The daemon can be built for Windows. See [Building from source](building.md)
+for the supported Visual Studio and vcpkg setup.
 
 ### Compile and run on Windows
 
-Firts make a folder **build** and enter it
-
-```bash
-mkdir build
-cd build
-```
-
-If vcpkg is installed on the G: drive and the vcpkg triplet is x64-windows the following cmake commands can be used to compile the VSCP tcp/ip daemon on Windows.
-
-```bash
-cmake .. -G "Visual Studio 18 2026" -DVCPKG_TARGET_TRIPLET=x64-windows  -D CMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=G:\vcpkg\scripts\buildsystems\vcpkg.cmake
-```
-
-Build with
-
-```bash
-cmake --build . --config Release
-```
-
-
-
+Follow the Windows build instructions in [Building from source](building.md).
 
 #### Run as sercice
   * http://nssm.cc/
