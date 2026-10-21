@@ -493,7 +493,7 @@ deviceThread(void* pdata)
                         // Remove the event and the node
                         vscpEvent* pRemovedEvent =
                           pClientItem->getEventFromSendQueue(true);
-                        spdlog::error(
+                        spdlog::trace(
                           "Level II event on Level I queue thrown away. "
                           "class={}, type={}",
                           pev->vscp_class,

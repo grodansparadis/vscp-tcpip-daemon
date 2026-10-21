@@ -380,19 +380,50 @@ install(TARGETS vscpd
 # Configuration file
 if(WIN32)
     install(FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/install/windows/vscpd64.conf_windows_distro"
+        "${CMAKE_CURRENT_SOURCE_DIR}/install/vscp.key"
         DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}/vscp"
-        RENAME vscpd.conf
-    )
+        PERMISSIONS OWNER_READ OWNER_WRITE )   # 0600
+    
+    install(FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/install/hmac.key"
+        DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}/vscp"
+        PERMISSIONS OWNER_READ OWNER_WRITE )   # 0600
+    
+    install(FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/install/windows/vscpd.json_windows_distro"
+        DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}/vscp"
+        RENAME vscpd.json)
+    
+    install(DIRECTORY install/certs
+        DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}/vscp"
+        FILE_PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ
+        DIRECTORY_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE)
 else()
     install(FILES
         "${CMAKE_CURRENT_SOURCE_DIR}/install/unix/vscpd.json"
         DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}/vscp"
     )
+    
     install(FILES
         "${CMAKE_CURRENT_SOURCE_DIR}/install/unix/mimetypes.xml"
         DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}/vscp"
     )
+    
+    install(FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/install/vscp.key"
+        DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}/vscp"
+        PERMISSIONS OWNER_READ OWNER_WRITE )   # 0600
+    
+    install(FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/install/hmac.key"
+        DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}/vscp"
+        PERMISSIONS OWNER_READ OWNER_WRITE )   # 0600
+
+    install(DIRECTORY install/certs
+        DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}/vscp"
+        FILE_PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ
+        DIRECTORY_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE)
+            
     install(PROGRAMS
         "${CMAKE_CURRENT_SOURCE_DIR}/install/unix/tcpip-vscpd.init"
         DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}/init.d"

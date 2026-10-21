@@ -134,7 +134,7 @@ QUIT
 
 The server sends `+OK - Connection closed by client.` and closes the connection. `EXIT` does the same.
 
-With the current TLS connection-close handling, OpenSSL may then report `unexpected eof while reading`, even after a successful login and closing reply. Distinguish that final shutdown diagnostic from a failed certificate or host-name verification; do not disable verification to suppress it.
+With the current TLS connection-close handling, OpenSSL may then report `unexpected eof while reading`, even after a successful login and closing reply, because the connection ends without a TLS `close_notify`. Distinguish that final shutdown diagnostic from a failed certificate or host-name verification; keep `-verify_hostname` and `-verify_return_error` enabled. An EOF before the expected reply can indicate an interrupted exchange and should not be treated as success.
 
 ### HELP
 

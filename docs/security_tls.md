@@ -105,6 +105,10 @@ openssl s_client -connect vscp.example.com:9598 \
 
 When the connection succeeds, the daemon sends its `+OK` greeting. You can then type VSCP Link Protocol commands such as `user`, `pass`, and `vers`. A verification error usually means the host name does not match the certificate or the client does not trust the CA.
 
+After a successful login, send `QUIT` to close the connection. With the current TLS connection-close handling, OpenSSL may report `unexpected eof while reading` after the daemon's `+OK - Connection closed by client.` reply. This means the connection ended without a TLS `close_notify`; it is a shutdown diagnostic, not a certificate or host-name verification failure. An EOF before the expected reply can instead indicate an interrupted exchange and should not be treated as success.
+
+Keep `-verify_hostname` and `-verify_return_error` enabled. Fix certificate trust or host-name errors rather than disabling verification to suppress them. The same shutdown caveat applies to the mutual-TLS and public-CA tests below.
+
 ### Optional: require client certificates
 
 For mutual TLS, set `cafile` to the PEM file containing the CA certificates that are allowed to issue client certificates:

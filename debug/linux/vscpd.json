@@ -12,7 +12,7 @@
     "_comment_key": "Path to the system key file",
     "_comment_hmac": "Path to the HMAC key file",
     "key": "/etc/vscp/vscp.key",
-    "hmac": "/etc/vscp/vscp.hmac",
+    "hmac": "/etc/vscp/hmac.key",
     "token": "Carpe diem quam minimum credula postero"
   },
 
