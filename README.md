@@ -3,9 +3,9 @@
 ![vscp-tcpip-daemon](./docs/images/vscp-tcpip-daemon.jpeg)
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-[![Build VSCP library on Linux](https://github.com/grodansparadis/vscp-tcpip-daemon/actions/workflows/build.yml/badge.svg)](https://github.com/grodansparadis/vscp-tcpip-daemon/actions/workflows/build.yml)
-[![Build VSCP library on Windows](https://github.com/grodansparadis/vscp-tcpip-daemon/actions/workflows/build-windows.yml/badge.svg)](https://github.com/grodansparadis/vscp-tcpip-daemon/actions/workflows/windows.yml)
-[![Build VSCP library on macOS](https://github.com/grodansparadis/vscp-tcpip-daemon/actions/workflows/build-macos.yml/badge.svg)](https://github.com/grodansparadis/vscp-tcpip-daemon/actions/workflows/macos.yml)
+[![Build VSCP library on Linux](https://github.com/grodansparadis/vscp-tcpip-daemon/actions/workflows/linux.yml/badge.svg)](https://github.com/grodansparadis/vscp-tcpip-daemon/actions/workflows/linux.yml)
+[![Build VSCP library on Windows](https://github.com/grodansparadis/vscp-tcpip-daemon/actions/workflows/windows.yml/badge.svg)](https://github.com/grodansparadis/vscp-tcpip-daemon/actions/workflows/windows.yml)
+[![Build VSCP library on macOS](https://github.com/grodansparadis/vscp-tcpip-daemon/actions/workflows/macos.yml/badge.svg)](https://github.com/grodansparadis/vscp-tcpip-daemon/actions/workflows/macos.yml)
 [![Release](https://img.shields.io/github/release/grodansparadis/vscp-tcpip-daemon.svg)](https://github.com/grodansparadis/vscp-tcpip-daemon/releases)
 [![Project Status: Active – The project has reached a stable, usable state and is being actively developed.](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active)
 
