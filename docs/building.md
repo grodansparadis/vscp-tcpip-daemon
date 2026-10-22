@@ -44,7 +44,7 @@ the [test definitions](../tests/CMakeLists.txt) for the current targets.
 Install CMake, Ninja and the required libraries with Homebrew:
 
 ```bash
-brew install cmake ninja openssl expat mosquitto zlib curl libsodium
+brew install cmake ninja openssl expat zlib curl libsodium
 ```
 
 Configure with Homebrew's OpenSSL, curl and expat paths, then build:
