@@ -11,7 +11,7 @@ on:
 jobs:
   build:
     name: Build & package (macOS)
-    runs-on: macos-14        # arm64; use macos-13 for x86_64 if needed
+    runs-on: macos-15        # arm64; use macos-13 for x86_64 if needed
 
     steps:
       - name: Checkout
