@@ -9,13 +9,13 @@ It is very convenient to use one of the online JSON validators to validate the J
 When you change something in the configuration file you have to restart the VSCP tcp/ip daemon for the changes to take effect. You do this with
 
 ```bash
-sudo systemctl restart vscpd::
+sudo systemctl restart vscpd
 ```
 
-If something is wrong the VSCP tcp/ip daemon may not start. Check the log file at **/var/log/vscpd::.log**. You can also use
+If something is wrong the VSCP tcp/ip daemon may not start. Check the log file at **/var/log/vscpd.log**. You can also use
 
 ```bash
-ps aux | grep vscpd::
+ps aux | grep vscpd
 ```
 
 to see if the VSCP tcp/ip daemon is running or not.
@@ -36,9 +36,9 @@ The sample configuration file that is installed holds a lot of information. You 
   "runasuser": "vscp",
   "guid": "FF:FF:FF:FF:FF:FF:FF:F5:00:00:00:00:00:00:00:00",
   "servername": "The VSCP tcp/ip daemon on hostx",
-  "classtypedb": "/var/lib/vscp/vscpd::/vscp_events.sqlite3",
-  "maindb": "/var/lib/vscp/vscpd::/vscp.sqlite3",
-  "discoverydb": "/var/lib/vscp/vscpd::/vscp.sqlite3",
+  "classtypedb": "/var/lib/vscp/vscpd/vscp_events.sqlite3",
+  "maindb": "/var/lib/vscp/vscpd/vscp.sqlite3",
+  "discoverydb": "/var/lib/vscp/vscpd/vscp.sqlite3",
   "vscpkey": "/etc/vscp/vscp.key",
   "logging": {
     "file-enable-log": true,
