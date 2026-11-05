@@ -50,10 +50,6 @@
 #include <tcpd.h>
 #endif
 
-#ifndef DWORD
-#define DWORD unsigned long
-#endif
-
 #include "mongoose.h"
 #include "spdlog/spdlog.h"
 
