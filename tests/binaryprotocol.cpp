@@ -87,9 +87,11 @@ int main()
     assert(restored.timestamp_ns == event.timestamp_ns);
     assert(std::equal(data, data + sizeof(data), restored.pdata));
     delete[] restored.pdata;
-    frame[18] ^= 1;
+    std::vector<uint8_t> corruptCrc;
+    assert(vscp_binary::encode(frame, 0, key, corruptCrc));
+    corruptCrc.back() ^= 1;
     std::vector<uint8_t> decoded;
-    assert(!vscp_binary::decode(frame, key, decoded));
+    assert(!vscp_binary::decode(corruptCrc, key, decoded));
     assert(!vscp_binary::decode({0xe0, 0, 0}, key, decoded));
     assert(!vscp_binary::decode(std::vector<uint8_t>(33, 0xe4), key, decoded));
     for (uint8_t encryption = 1; encryption <= 3; ++encryption) {
@@ -100,14 +102,14 @@ int main()
         assert(vscp_binary::encode(command, encryption, key, wire));
         wire[wire.size() - 17] ^= 0xff;
         assert(!vscp_binary::decode(
-          std::vector<uint8_t>(wire.begin() + 3, wire.end()), key, decoded));
+          wire, key, decoded));
     }
     size_t length = 0;
     const uint8_t noop[] = {0x55, 0x00, 0x05, 0xe0};
     assert(vscp_binary::parseHeader(noop, length) && length == 5);
     const uint8_t wrongVersion[] = {0x55, 0x40, 0x05, 0xe0};
     assert(!vscp_binary::parseHeader(wrongVersion, length));
-    const uint8_t wrongType[] = {0x55, 0x20, 0x05, 0x20};
+    const uint8_t wrongType[] = {0x55, 0x00, 0x05, 0x20};
     assert(!vscp_binary::parseHeader(wrongType, length));
     const uint8_t wrongSync[] = {0x54, 0x20, 0x05, 0xe0};
     assert(!vscp_binary::parseHeader(wrongSync, length));

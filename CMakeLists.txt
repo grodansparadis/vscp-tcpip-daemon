@@ -200,7 +200,8 @@ set(VSCPD_SOURCES
     "${vscp_SOURCE_DIR}/src/common/vscpmd5.c"
     "${vscp_SOURCE_DIR}/src/common/vscpbase64.c"
     "${vscp_SOURCE_DIR}/src/common/randpassword.cpp"
-    "${vscp_SOURCE_DIR}/src/common/sockettcp.c"
+    "${vscp_SOURCE_DIR}/src/vscp/common/vscphelperlogging.cpp"
+    "${vscp_SOURCE_DIR}/src/vscp/common/vscphelperlogging-forward.cpp"
     "${mongoose_SOURCE_DIR}/mongoose.c"
 )
 
@@ -213,7 +214,12 @@ endif()
 # ---- Build the vscpd executable ----
 add_executable(vscpd ${VSCPD_SOURCES})
 set_target_properties(vscpd PROPERTIES OUTPUT_NAME "vscpd")
-target_compile_definitions(vscpd PRIVATE MG_TLS=MG_TLS_OPENSSL)
+target_compile_definitions(vscpd PRIVATE
+    MG_TLS=MG_TLS_OPENSSL
+    VSCP_ENABLE_HELPER_LOGGING
+    VSCP_HELPER_LOGGING_EXPORTS
+    VSCP_HELPER_LOGGING_BACKEND_EXPORTS
+)
 if(WIN32)
     set_target_properties(vscpd PROPERTIES OUTPUT_NAME "tcpip-vscpd")
 endif()

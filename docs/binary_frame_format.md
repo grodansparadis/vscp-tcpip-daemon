@@ -88,7 +88,7 @@ Event confirmations:
 - **Padding:** PKCS#7 pads the encrypted part to a multiple of 16 bytes, so
   `LEN = 1 + 16·k + 16`.
 - **IV:** a random 16-byte IV is appended after the encrypted data.
-- **Key:** the daemon's `security.vscpkey`.
+- **Key:** the daemon's `security.key`.
 - **Encryption of replies and events:** the daemon uses the encryption setting
   from the client's most recent valid frame. Right after `BINARY`, there is no
   encryption.
@@ -104,6 +104,11 @@ legacy version 0. Unencrypted frames always use version 0.
 
 For version 0, encrypted `LEN = 1 + 16·k + 16`; with version 1, the 16-byte
 tag adds to this length.
+
+```text
+Version 1: [55][20 | LEN high][LEN low][type][ciphertext][IV][tag]
+tag = first 16 bytes of HMAC-SHA-256(hmac_key, all preceding bytes)
+```
 
 ## Errors and recovery
 

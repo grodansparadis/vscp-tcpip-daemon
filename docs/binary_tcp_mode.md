@@ -33,7 +33,7 @@ headers, commands, replies and events.
 ## Encryption
 
 Encryption codes 0 (none), 1 (AES-128), 2 (AES-192) and 3 (AES-256) are
-supported. The daemon uses the key configured in `security.vscpkey`.
+supported. The daemon uses the AES key configured in `security.key`.
 
 Encrypted frames use standard PKCS#7 padding and an appended 16-byte IV. This
 is deliberately different from the helper library's zero padding, which cannot
@@ -76,8 +76,9 @@ lists the binary command codes supported by this daemon.
 Configure the build with `-DVSCPD_BUILD_TESTS=ON` to enable the
 `binaryprotocol` CTest regression test. It covers event encoding, CRC
 validation, plaintext and AES round trips across payload and padding lengths,
-fragmented and combined input, mode transitions, permissions, event delivery,
-binary reply shapes, and recovery from invalid data.
+HMAC verification and downgrade rejection, fragmented and combined input, mode
+transitions, permissions, event delivery, binary reply shapes, and recovery
+from invalid data.
 
 Two black-box suites test the protocol against a running daemon. On Linux and
 macOS, they are also registered with CTest:
@@ -90,7 +91,8 @@ macOS, they are also registered with CTest:
 - **`binaryserver_python`:** a Python `unittest` suite in
   [tests/binary_server/](../tests/binary_server/) with broader coverage. It is
   registered only when Python 3 and the `cryptography` and `pynacl` modules are
-  found.
+  found. Its private-daemon run configures an HMAC key and checks authenticated
+  frames, tag tampering and downgrade rejection.
 
 ```bash
 cmake -S . -B build -DVSCPD_BUILD_TESTS=ON
@@ -101,8 +103,12 @@ ctest --test-dir build --output-on-failure
 python3 tests/binary_server/test_binary_server.py --vscpd build/bin/vscpd
 # ...or test a daemon that is already running
 VSCP_HOST=127.0.0.1 VSCP_PORT=9598 VSCP_USER=admin VSCP_PASSWORD=secret \
-  VSCP_KEY=<64 hex characters> python3 tests/binary_server/test_binary_server.py
+  VSCP_KEY=<64 hex characters> VSCP_HMAC_KEY=<64 hex characters> \
+  python3 tests/binary_server/test_binary_server.py
 ```
+
+`VSCP_HMAC_KEY` is optional when testing an external daemon without HMAC
+configured.
 
 When the Python suite tests a running daemon, set `VSCP_READER_USER` and
 `VSCP_READER_PASSWORD` to a user that has only `receive-events` rights. This

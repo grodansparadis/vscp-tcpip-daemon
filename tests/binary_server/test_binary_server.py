@@ -521,7 +521,7 @@ class BinaryServerTest(unittest.TestCase):
 
     def test_stalled_false_header_times_out(self):
         client = self.connect()
-        client.send_raw(b"\x55\x2f\xff\xe0")
+        client.send_raw(b"\x55\x0f\xff\xe0")
         start = time.monotonic()
         client.send_frame(vb.command_frame(vb.NOOP), encryption=1)
         reply = client.read_reply(timeout=6)

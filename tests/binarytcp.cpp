@@ -191,7 +191,7 @@ void testBinaryTcp()
     assert(connection->send.len == 0);
 
     // A false header claiming a long frame stalls only until the timeout.
-    const uint8_t stall[] = {0x55, 0x2f, 0xff, 0xe0};
+    const uint8_t stall[] = {0x55, 0x0f, 0xff, 0xe0};
     feed(server, connection, stall, sizeof(stall));
     auto afterStall = command(0, 1, key);
     feed(server, connection, afterStall.data(), afterStall.size());

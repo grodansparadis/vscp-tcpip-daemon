@@ -656,7 +656,7 @@ void testResync(Fixture& fixture)
     CHECK(reply.command() == cmdNoop && reply.error() == errSuccess);
 
     // A header that promises more data than arrives is dropped after a timeout.
-    client->sendRaw({0x55, 0x2f, 0xff, 0xe0});
+    client->sendRaw({0x55, 0x0f, 0xff, 0xe0});
     error = client->readReply(5000);
     CHECK(error.command() == cmdAsync && error.error() == errInvalidFrame);
     CHECK(client->command(cmdNoop).error() == errSuccess);
