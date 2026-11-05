@@ -1289,6 +1289,20 @@ CControlObject::getSystemKey(uint8_t* pKey)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// getHmacKey
+//
+
+uint8_t*
+CControlObject::getHmacKey(uint8_t* pKey)
+{
+    if (NULL != pKey) {
+        memcpy(pKey, m_hmacKey.data(), 32);
+    }
+
+    return reinterpret_cast<uint8_t*>(m_hmacKey.data());
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // getSystemKeyMD5
 //
 
@@ -2197,6 +2211,7 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
     }
 
     // Security.
+    m_hasHmacKey = false;
     if (j.contains("security") && j["security"].is_object()) {
         const json& sec = j["security"];
         //get_string(sec, "admin", m_admin_user);
@@ -2221,7 +2236,7 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
                 spdlog::debug("ReadConfig: Security '{}' key file missing or "
                               "invalid; default retained.",
                               name);
-                return;
+                return false;
             }
 
             std::string path = sec[name].get<std::string>();
@@ -2231,7 +2246,7 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
                               "file '{}'; default retained.",
                               name,
                               path);
-                return;
+                return false;
             }
 
             secure_string hex;
@@ -2246,7 +2261,7 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
                                   "retained.",
                                   name,
                                   path);
-                    return;
+                    return false;
                 }
                 hex += c;
             }
@@ -2261,7 +2276,7 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
                               name,
                               path);
                 sodium_memzero(buf, sizeof(buf));
-                return;
+                return false;
             }
 
             target.assign(reinterpret_cast<const char*>(buf), sizeof(buf));
@@ -2271,10 +2286,11 @@ CControlObject::readConfiguration(const std::string& strcfgfile)
                           name,
                           n * 8,
                           path);
+            return true;
         };
 
         read_key_file("key", m_systemKey, { 16, 24, 32 });
-        read_key_file("hmac", m_hmacKey, { 32 });
+        m_hasHmacKey = read_key_file("hmac", m_hmacKey, { 32 });
     }
     else {
         spdlog::debug("ReadConfig: 'security' object missing or invalid; "

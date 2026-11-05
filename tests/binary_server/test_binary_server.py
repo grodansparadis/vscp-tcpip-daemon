@@ -50,6 +50,7 @@ def start_daemon(executable):
     folder = tempfile.mkdtemp(prefix="vscpd-binary-test-")
     port = _free_port()
     key = os.urandom(32)
+    hmac_key = os.urandom(32)
     password = uuid.uuid4().hex
     reader_password = uuid.uuid4().hex
 
@@ -64,13 +65,17 @@ def start_daemon(executable):
     with open(key_path, "w") as handle:
         handle.write(key.hex().upper() + "\n")
     os.chmod(key_path, 0o600)
+    hmac_path = os.path.join(folder, "vscp.hmac")
+    with open(hmac_path, "w") as handle:
+        handle.write(hmac_key.hex().upper() + "\n")
+    os.chmod(hmac_path, 0o600)
 
     config = {
         "guid": "FF:FF:FF:FF:FF:FF:FF:F5:00:00:00:00:00:00:00:01",
         "logging": {"file-enable-log": False, "syslog-enable-log": False,
                     "udp-enable-log": False, "console-enable-log": True,
                     "console-log-level": "info"},
-        "security": {"key": key_path},
+        "security": {"key": key_path, "hmac": hmac_path},
         "tcpip": {"interface-address": "tcp://127.0.0.1:{}".format(port)},
         "remoteuser": [user("admin", password, "admin"),
                        user("reader", reader_password, "receive-events")],
@@ -86,14 +91,16 @@ def start_daemon(executable):
         if process.poll() is not None:
             raise RuntimeError("vscpd exited early, see " + log.name)
         try:
-            vb.Client("127.0.0.1", port, key, timeout=1).close()
+            vb.Client("127.0.0.1", port, key, timeout=1,
+                      hmac_key=hmac_key).close()
             break
         except OSError:
             if time.monotonic() > deadline:
                 process.kill()
                 raise RuntimeError("vscpd did not start, see " + log.name)
             time.sleep(0.1)
-    SERVER.update(host="127.0.0.1", port=port, key=key, user="admin",
+    SERVER.update(host="127.0.0.1", port=port, key=key, hmac_key=hmac_key,
+                  user="admin",
                   password=password, reader="reader",
                   reader_password=reader_password, process=process,
                   folder=folder, log=log)
@@ -122,6 +129,8 @@ def configure_external():
         host=os.environ.get("VSCP_HOST", "127.0.0.1"),
         port=int(os.environ.get("VSCP_PORT", "9598")),
         key=bytes.fromhex(os.environ.get("VSCP_KEY", vb.DEFAULT_KEY.hex())),
+        hmac_key=bytes.fromhex(os.environ["VSCP_HMAC_KEY"])
+        if os.environ.get("VSCP_HMAC_KEY") else None,
         user=os.environ.get("VSCP_USER", "admin"),
         password=os.environ.get("VSCP_PASSWORD", "secret"),
         reader=os.environ.get("VSCP_READER_USER"),
@@ -141,7 +150,7 @@ class BinaryServerTest(unittest.TestCase):
 
     def connect(self, encryption=0, login=True, user=None, password=None):
         client = vb.Client(SERVER["host"], SERVER["port"], SERVER["key"],
-                           encryption)
+                           encryption, hmac_key=SERVER.get("hmac_key"))
         self.clients.append(client)
         client.enter_binary()
         if login:
@@ -436,12 +445,14 @@ class BinaryServerTest(unittest.TestCase):
 
     def test_fragmented_and_coalesced_frames(self):
         client = self.connect(encryption=3)
-        wire = vb.encode(vb.command_frame(vb.GETCHID), 3, SERVER["key"])
+        wire = vb.encode(vb.command_frame(vb.GETCHID), 3, SERVER["key"],
+                         hmac_key=SERVER.get("hmac_key"))
         for byte in wire:
             client.send_raw(bytes([byte]))
             time.sleep(0.002)
         self.assertOk(client.read_reply(), vb.GETCHID)
-        wire = b"".join(vb.encode(vb.command_frame(code), enc, SERVER["key"])
+        wire = b"".join(vb.encode(vb.command_frame(code), enc, SERVER["key"],
+                                  hmac_key=SERVER.get("hmac_key"))
                         for code, enc in ((vb.NOOP, 0), (vb.VERSION, 1),
                                           (vb.GETCHID, 2), (vb.NOOP, 3)))
         client.send_raw(wire)
@@ -478,6 +489,21 @@ class BinaryServerTest(unittest.TestCase):
         client = self.connect()
         wire = vb.encode(vb.command_frame(vb.NOOP), 3, bytes(32))
         self.expect_resync(client, wire)
+
+    def test_resync_after_bad_hmac(self):
+        if not SERVER.get("hmac_key"):
+            self.skipTest("daemon has no HMAC key configured")
+        wire = bytearray(vb.encode(
+            vb.command_frame(vb.NOOP), 3, SERVER["key"],
+            hmac_key=SERVER["hmac_key"]))
+        wire[-1] ^= 1
+        self.expect_resync(self.connect(), bytes(wire))
+
+    def test_rejects_encrypted_legacy_frame_when_hmac_is_configured(self):
+        if not SERVER.get("hmac_key"):
+            self.skipTest("daemon has no HMAC key configured")
+        legacy = vb.encode(vb.command_frame(vb.NOOP), 3, SERVER["key"])
+        self.expect_resync(self.connect(), legacy)
 
     def test_one_error_per_bad_data_run(self):
         client = self.connect()

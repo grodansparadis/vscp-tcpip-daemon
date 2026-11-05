@@ -816,6 +816,187 @@ CUserList::~CUserList(void)
     m_userhashmap.clear();
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// loadUsersFromFile
+//
+
+bool
+CUserList::loadUsersFromFile(const std::string& filename)
+{
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        spdlog::error("loadUsersFromFile: Failed to open user file '{}'.",
+                      filename);
+        return false;
+    }
+
+    nlohmann::json data;
+    try {
+        file >> data;
+    }
+    catch (const nlohmann::json::parse_error& ex) {
+        spdlog::error("loadUsersFromFile: Invalid JSON in '{}': {}",
+                      filename,
+                      ex.what());
+        return false;
+    }
+
+    if (!data.is_object() || !data.contains("users") ||
+        !data["users"].is_array()) {
+        spdlog::error("loadUsersFromFile: '{}' must contain a 'users' array.",
+                      filename);
+        return false;
+    }
+
+    struct UserRecord {
+        std::string name;
+        std::string password;
+        std::string fullname;
+        std::string note;
+        std::string rights;
+        std::string remotes;
+        std::string events;
+        vscpEventFilter filter;
+    };
+
+    std::vector<UserRecord> records;
+    const auto read_string_field =
+      [&filename](const nlohmann::json& user,
+                  const char* key,
+                  const std::string& separator,
+                  bool allow_array,
+                  std::string& value,
+                  size_t index) {
+          const auto field = user.find(key);
+          if (field == user.end() || field->is_null()) {
+              value.clear();
+              return true;
+          }
+
+          if (field->is_string()) {
+              value = field->get<std::string>();
+              return true;
+          }
+
+          if (allow_array && field->is_array()) {
+              value.clear();
+              for (const auto& item : *field) {
+                  if (!item.is_string()) {
+                      spdlog::error(
+                        "loadUsersFromFile: User {} field '{}' in '{}' must "
+                        "contain only strings.",
+                        index,
+                        key,
+                        filename);
+                      return false;
+                  }
+
+                  const std::string part = item.get<std::string>();
+                  if (!part.empty()) {
+                      if (!value.empty()) {
+                          value += separator;
+                      }
+                      value += part;
+                  }
+              }
+              return true;
+          }
+
+          spdlog::error(
+            "loadUsersFromFile: User {} field '{}' in '{}' must be a string "
+            "or an array of strings.",
+            index,
+            key,
+            filename);
+          return false;
+      };
+
+    size_t index = 0;
+    for (const auto& user : data["users"]) {
+        ++index;
+        if (!user.is_object()) {
+            spdlog::error(
+              "loadUsersFromFile: User {} in '{}' must be a JSON object.",
+              index,
+              filename);
+            return false;
+        }
+
+        UserRecord record;
+        if (!read_string_field(
+              user, "name", "", false, record.name, index) ||
+            record.name.empty()) {
+            spdlog::error(
+              "loadUsersFromFile: User {} in '{}' must have a non-empty "
+              "string 'name'.",
+              index,
+              filename);
+            return false;
+        }
+
+        if (!read_string_field(
+              user, "password", "", false, record.password, index) ||
+            record.password.empty()) {
+            spdlog::error(
+              "loadUsersFromFile: User '{}' in '{}' must have a non-empty "
+              "string 'password'.",
+              record.name,
+              filename);
+            return false;
+        }
+
+        if (!read_string_field(
+              user, "fullname", "", false, record.fullname, index) ||
+            !read_string_field(
+              user, "note", "", false, record.note, index) ||
+            !read_string_field(
+              user, "rights", "/", true, record.rights, index) ||
+            !read_string_field(
+              user, "remotes", ",", true, record.remotes, index) ||
+            !read_string_field(
+              user, "events", ",", true, record.events, index)) {
+            return false;
+        }
+
+        std::string filter;
+        std::string mask;
+        if (!read_string_field(
+              user, "filter", "", false, filter, index) ||
+            !read_string_field(user, "mask", "", false, mask, index)) {
+            return false;
+        }
+
+        vscp_clearVSCPFilter(&record.filter);
+        if (!filter.empty()) {
+            vscp_readFilterFromString(&record.filter, filter);
+        }
+        if (!mask.empty()) {
+            vscp_readMaskFromString(&record.filter, mask);
+        }
+
+        records.push_back(std::move(record));
+    }
+
+    for (const auto& record : records) {
+        if (!addUser(record.name,
+                     record.password,
+                     record.fullname,
+                     record.note,
+                     &record.filter,
+                     record.rights,
+                     record.remotes,
+                     record.events)) {
+            spdlog::error(
+              "loadUsersFromFile: Failed to add user '{}' from '{}'.",
+              record.name,
+              filename);
+            return false;
+        }
+    }
+
+    return true;
+}
+
 uint32_t
 CUserList::getUserCount(void) const
 {

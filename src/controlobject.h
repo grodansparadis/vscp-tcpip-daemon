@@ -287,6 +287,19 @@ class CControlObject {
     uint8_t* getSystemKey(uint8_t* pKey);
 
     /*!
+     * Get the configured 32-byte binary protocol HMAC key.
+     *
+     * @param pKey Optional buffer that receives a copy of the key.
+     * @return Pointer to the 32-byte key.
+     */
+    uint8_t* getHmacKey(uint8_t* pKey);
+
+    /*!
+     * Check whether a binary protocol HMAC key was successfully configured.
+     */
+    bool hasHmacKey() const { return m_hasHmacKey; }
+
+    /*!
      * Get MD5 of system key (vscptoken)
      *
      * @param Reference to string that will receive the MD5 of the key.
@@ -419,6 +432,7 @@ class CControlObject {
         wiped on release.
     */
     secure_string m_hmacKey;
+    bool m_hasHmacKey = false;
 
     /*!
         User to run as for Unix

@@ -876,7 +876,10 @@ CTcpipSrv::writeBinaryFrame(struct mg_connection* conn,
     if (!vscp_binary::encode(std::move(frame),
                              client->getBinaryEncryption(),
                              m_pCtrlObj->getSystemKey(nullptr),
-                             wire) ||
+                             wire,
+                             m_pCtrlObj->hasHmacKey()
+                               ? m_pCtrlObj->getHmacKey(nullptr)
+                               : nullptr) ||
         !mg_send(conn, wire.data(), wire.size())) {
         spdlog::error("TCP/IP binary: failed to serialize or send frame");
         conn->is_closing = 1;
@@ -1412,13 +1415,16 @@ CTcpipSrv::handleIncomingData(struct mg_connection* conn)
                 }
                 return;
             }
-            std::vector<uint8_t> wire(input.buf + vscp_binary::headerSize,
-                                      input.buf + vscp_binary::headerSize +
-                                        length);
+            std::vector<uint8_t> wire(
+              input.buf,
+              input.buf + vscp_binary::headerSize + length);
             std::vector<uint8_t> frame;
             if (!vscp_binary::decode(std::move(wire),
                                      m_pCtrlObj->getSystemKey(nullptr),
-                                     frame)) {
+                                     frame,
+                                     m_pCtrlObj->hasHmacKey()
+                                       ? m_pCtrlObj->getHmacKey(nullptr)
+                                       : nullptr)) {
                 // Decryption may have left partial plaintext behind.
                 secure_wipe(frame);
                 // The length may be corrupt, so search from the next byte.

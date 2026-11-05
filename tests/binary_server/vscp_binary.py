@@ -9,6 +9,7 @@ CRC-CCITT computed over everything except the first byte. Encrypted frames
 keep the first byte in clear text and append the 16-byte AES-CBC IV.
 """
 
+import hmac
 import os
 import socket
 import struct
@@ -18,9 +19,11 @@ from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 SYNC_BYTE = 0x55
-FRAMING_VERSION = 1
+FRAMING_VERSION = 0
+HMAC_FRAMING_VERSION = 1
 HEADER_SIZE = 3
 MAX_FRAME_SIZE = 4096
+HMAC_TAG_SIZE = 16
 
 TYPE_EVENT0 = 0x0
 TYPE_EVENT1 = 0x1
@@ -94,7 +97,7 @@ def header(length, version=FRAMING_VERSION):
     return bytes([SYNC_BYTE]) + struct.pack(">H", (version << 13) | length)
 
 
-def encode(frame, encryption=0, key=DEFAULT_KEY, version=FRAMING_VERSION):
+def encode(frame, encryption=0, key=DEFAULT_KEY, version=None, hmac_key=None):
     """Encrypt (optionally) a complete VSCP-GBP frame and add the TCP header."""
     frame = bytes([(frame[0] & 0xF0) | encryption]) + bytes(frame[1:])
     if encryption:
@@ -104,14 +107,40 @@ def encode(frame, encryption=0, key=DEFAULT_KEY, version=FRAMING_VERSION):
         cipher = Cipher(algorithms.AES(key[:_KEY_SIZES[encryption]]),
                         modes.CBC(iv)).encryptor()
         frame = frame[:1] + cipher.update(plain) + cipher.finalize() + iv
-    if len(frame) > MAX_FRAME_SIZE:
+    if version is None:
+        version = HMAC_FRAMING_VERSION if encryption and hmac_key else \
+            FRAMING_VERSION
+    tag_size = HMAC_TAG_SIZE if version == HMAC_FRAMING_VERSION else 0
+    if len(frame) + tag_size > MAX_FRAME_SIZE:
         raise ValueError("frame too large")
-    return header(len(frame), version) + frame
+    wire = header(len(frame) + tag_size, version) + frame
+    if tag_size:
+        if not encryption or not hmac_key:
+            raise ValueError("HMAC framing requires encryption and an HMAC key")
+        wire += hmac.new(hmac_key, wire, "sha256").digest()[:HMAC_TAG_SIZE]
+    return wire
 
 
-def decode(body, key=DEFAULT_KEY):
-    """Decrypt a VSCP-GBP frame (without TCP header) and verify its CRC."""
+def decode(wire, key=DEFAULT_KEY, hmac_key=None):
+    """Verify, decrypt and CRC-check a complete TCP-framed VSCP-GBP frame."""
+    if len(wire) < HEADER_SIZE + 1 or wire[0] != SYNC_BYTE:
+        raise ValueError("invalid frame header")
+    word = struct.unpack(">H", wire[1:3])[0]
+    version, length = word >> 13, word & 0x1FFF
+    if len(wire) != HEADER_SIZE + length:
+        raise ValueError("invalid frame length")
+    body = wire[HEADER_SIZE:]
     encryption = body[0] & 0x0F
+    if version == HMAC_FRAMING_VERSION:
+        if not encryption or not hmac_key or len(body) < HMAC_TAG_SIZE + 1:
+            raise ValueError("missing HMAC key or invalid authenticated frame")
+        expected = hmac.new(
+            hmac_key, wire[:-HMAC_TAG_SIZE], "sha256").digest()[:HMAC_TAG_SIZE]
+        if not hmac.compare_digest(expected, wire[-HMAC_TAG_SIZE:]):
+            raise ValueError("bad HMAC")
+        body = body[:-HMAC_TAG_SIZE]
+    elif version != FRAMING_VERSION or (encryption and hmac_key):
+        raise ValueError("unsupported framing version or HMAC downgrade")
     if encryption:
         iv = body[-16:]
         cipher = Cipher(algorithms.AES(key[:_KEY_SIZES[encryption]]),
@@ -177,8 +206,10 @@ class Reply:
 class Client:
     """Blocking client for a VSCP daemon in binary mode."""
 
-    def __init__(self, host, port, key=DEFAULT_KEY, encryption=0, timeout=5.0):
+    def __init__(self, host, port, key=DEFAULT_KEY, encryption=0, timeout=5.0,
+                 hmac_key=None):
         self.key = key
+        self.hmac_key = hmac_key
         self.encryption = encryption
         self.timeout = timeout
         self.sock = socket.create_connection((host, port), timeout=timeout)
@@ -234,7 +265,8 @@ class Client:
 
     def send_frame(self, frame, encryption=None):
         enc = self.encryption if encryption is None else encryption
-        self.sock.sendall(encode(frame, enc, self.key))
+        self.sock.sendall(encode(frame, enc, self.key,
+                                 hmac_key=self.hmac_key))
 
     def read_frame(self, timeout=None):
         """Read and decode the next binary frame from the server."""
@@ -244,14 +276,12 @@ class Client:
         if self.buffer[0] != SYNC_BYTE:
             raise ValueError("missing sync byte: {}".format(self.buffer[:8].hex()))
         word = struct.unpack(">H", self.buffer[1:3])[0]
-        if word >> 13 != FRAMING_VERSION:
-            raise ValueError("unexpected framing version {}".format(word >> 13))
         length = word & 0x1FFF
         while len(self.buffer) < HEADER_SIZE + length:
             self._fill(deadline)
-        body = self.buffer[HEADER_SIZE:HEADER_SIZE + length]
+        wire = self.buffer[:HEADER_SIZE + length]
         self.buffer = self.buffer[HEADER_SIZE + length:]
-        return decode(body, self.key)
+        return decode(wire, self.key, self.hmac_key)
 
     def read_reply(self, timeout=None):
         """Next reply frame; unsolicited events are queued in self.events."""

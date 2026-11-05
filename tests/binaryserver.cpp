@@ -225,12 +225,12 @@ class Client {
         size_t length = 0;
         CHECK(vscp_binary::parseHeader(m_buffer.data(), length));
         fill(vscp_binary::headerSize + length, timeoutMs);
-        Bytes body(m_buffer.begin() + vscp_binary::headerSize,
+        Bytes wire(m_buffer.begin(),
                    m_buffer.begin() + vscp_binary::headerSize + length);
         m_buffer.erase(m_buffer.begin(),
                        m_buffer.begin() + vscp_binary::headerSize + length);
         Frame frame;
-        CHECK(vscp_binary::decode(body, m_key, frame.data));
+        CHECK(vscp_binary::decode(wire, m_key, frame.data));
         return frame;
     }
 

@@ -16,8 +16,9 @@ keepalives. If the client was logged in, it stays logged in after the switch.
 
 Every binary frame starts with a three-byte TCP header: a `0x55` sync byte,
 followed by a big-endian word holding a 3-bit framing version and the 13-bit
-frame length. The VSCP-GBP frame follows; its first byte holds the frame type
-and the encryption selection.
+frame length. Version 0 is the legacy format; version 1 adds an HMAC-SHA-256
+tag to encrypted frames. The VSCP-GBP frame follows; its first byte holds the
+frame type and the encryption selection.
 
 The header is used in both directions. It is needed for variable-length
 commands and replies, and it lets the receiver find the next frame after bad
@@ -39,7 +40,11 @@ is deliberately different from the helper library's zero padding, which cannot
 reliably mark where a variable-length encrypted command ends.
 
 Replies and asynchronous events use the same encryption as the latest valid
-frame received from the client. Right after `BINARY`, no encryption is used.
+frame received from the client. Configure `security.hmac` with a separate
+32-byte key to enable version-1 HMAC authentication for encrypted frames. The
+daemon then requires authenticated encrypted input and authenticates its
+encrypted replies and events. Unencrypted frames remain version 0. Right after
+`BINARY`, no encryption is used.
 
 Frame encryption does not protect the text exchange that happens before
 `BINARY`, including the login. Use [TLS](security_tls.md) to protect that part

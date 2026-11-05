@@ -11,10 +11,11 @@ The client and the daemon use the same layout for every binary message in
 
 - **Sync byte:** always `0x55`. It marks where a frame header starts.
 - **Version and length:** the next two bytes are a big-endian word. The top 3
-  bits are the framing version, currently `1`. The low 13 bits are `LEN`, the
-  size of the VSCP-GBP frame that follows. `LEN` does not count the 3 header
-  bytes and must be 5 to 4096. With version 1, the second header byte is
-  `0x20 | (LEN >> 8)`.
+  bits are the framing version: `0` is the legacy format and `1` adds an
+  HMAC-SHA-256 tag to encrypted frames. The low 13 bits are `LEN`, the size of
+  the VSCP-GBP frame and any tag that follows. `LEN` does not count the 3
+  header bytes and must be 5 to 4096. Version 0 uses `LEN >> 8` in the second
+  header byte; version 1 uses `0x20 | (LEN >> 8)`.
 - **Byte 0 of the frame:**
   - The high nibble is the frame type: `0`/`1` = event, `E` = command,
     `F` = reply.
@@ -36,7 +37,7 @@ frames.
 | 3…     | Arguments (optional, command-specific)   |
 | last 2 | CRC                                      |
 
-For example, `NOOP` (command 0) is sent as `55 20 05  E0  00 00  1D 0F`.
+For example, `NOOP` (command 0) is sent as `55 00 05  E0  00 00  1D 0F`.
 
 ## Reply (daemon to client), type `0xF0`
 
@@ -48,7 +49,7 @@ For example, `NOOP` (command 0) is sent as `55 20 05  E0  00 00  1D 0F`.
 | 5…     | Reply arguments (optional)                                         |
 | last 2 | CRC                                                                |
 
-For example, a successful `NOOP` reply is `55 20 07  F0  00 00  00 00  84 C0`.
+For example, a successful `NOOP` reply is `55 00 07  F0  00 00  00 00  84 C0`.
 
 ## Event (either direction), type `0x00` or `0x10`
 
@@ -79,7 +80,7 @@ Event confirmations:
 ## Encrypted frames (encryption 1–3)
 
 ```
-[55][VER|LEN][byte 0 in clear][AES-CBC(bytes 1..end incl. CRC, PKCS#7 padded)][16-byte IV]
+[55][VER|LEN][byte 0 in clear][AES-CBC(bytes 1..end incl. CRC, PKCS#7 padded)][16-byte IV][optional 16-byte HMAC tag]
 ```
 
 - **What's encrypted:** byte 0 stays unencrypted. Everything after it is
@@ -92,18 +93,32 @@ Event confirmations:
   from the client's most recent valid frame. Right after `BINARY`, there is no
   encryption.
 
+When a 32-byte `security.hmac` key is configured, encrypted frames use framing
+version 1 and append the first 16 bytes of HMAC-SHA-256. The HMAC key is
+separate from the AES key. Compute the tag over the three-byte TCP header,
+clear byte 0, ciphertext and IV (everything before the tag); the header length
+includes the tag. The daemon verifies the tag in constant time before
+decrypting. With an HMAC key configured, encrypted legacy version-0 frames
+are rejected to prevent downgrade. Without an HMAC key, encrypted frames use
+legacy version 0. Unencrypted frames always use version 0.
+
+For version 0, encrypted `LEN = 1 + 16·k + 16`; with version 1, the 16-byte
+tag adds to this length.
+
 ## Errors and recovery
 
 Invalid data never closes the connection. The receiver searches for the next
 valid frame instead:
 
 - **Not a frame start:** bytes before the next `0x55` are discarded.
-- **Bad header:** if the version is not `1`, `LEN` is outside 5–4096, or the
-  frame's first byte has an unknown type or encryption code (or `LEN` doesn't
-  fit the encrypted layout), the `0x55` is discarded and the search continues.
-- **Bad frame:** if a complete frame fails decryption, padding or CRC, only its
-  `0x55` is discarded and the search continues from the next byte, since the
-  length itself may be wrong. A valid frame that follows is still handled.
+- **Bad header:** if the version is not `0` or `1`, `LEN` is outside 5–4096,
+  or the frame's first byte has an unknown type or encryption code (or `LEN`
+  doesn't fit that version's encrypted layout), the `0x55` is discarded and
+  the search continues.
+- **Bad frame:** if a complete frame fails HMAC verification, decryption,
+  padding or CRC, only its `0x55` is discarded and the search continues from
+  the next byte, since the length itself may be wrong. A valid frame that
+  follows is still handled.
 - **Stalled frame:** if a frame stays incomplete for 2 seconds, its header is
   treated as false and the search continues. Junk claiming a long length can't
   block the frames behind it.

@@ -10,6 +10,8 @@ int main()
 {
     crcInit();
     uint8_t key[32] = {};
+    uint8_t hmacKey[32];
+    std::fill(std::begin(hmacKey), std::end(hmacKey), 0x5a);
     for (uint8_t encryption = 0; encryption <= 3; ++encryption) {
         for (size_t size = 0; size <= 512; ++size) {
             std::vector<uint8_t> arguments(size, 0x42);
@@ -22,17 +24,47 @@ int main()
             std::vector<uint8_t> wire, decoded;
             assert(vscp_binary::encode(frame, encryption, key, wire));
             size_t length = 0;
-            assert(vscp_binary::parseHeader(wire.data(), length));
-            assert(wire[0] == 0x55 && (wire[1] >> 5) == 1);
+            uint8_t version = 0xff;
+            assert(vscp_binary::parseHeader(wire.data(), length, &version));
+            assert(wire[0] == 0x55 &&
+                   version == vscp_binary::legacyFramingVersion);
             assert(length == wire.size() - vscp_binary::headerSize);
-            assert(vscp_binary::decode(
-              std::vector<uint8_t>(wire.begin() + 3, wire.end()), key, decoded));
+            assert(vscp_binary::decode(wire, key, decoded));
             if (frame != decoded) {
                 std::cerr << "Round trip mismatch: encryption=" << unsigned(encryption)
                           << " payload=" << size << " expected="
                           << frame.size() << " decoded=" << decoded.size()
                           << '\n';
                 return 1;
+            }
+
+            if (encryption) {
+                assert(vscp_binary::encode(frame, encryption, key, wire, hmacKey));
+                assert(vscp_binary::parseHeader(wire.data(), length, &version));
+                assert(version == vscp_binary::hmacFramingVersion);
+                assert(length == wire.size() - vscp_binary::headerSize);
+                assert(vscp_binary::decode(wire, key, decoded, hmacKey));
+                assert(frame == decoded);
+
+                auto badTag = wire;
+                badTag.back() ^= 1;
+                assert(!vscp_binary::decode(badTag, key, decoded, hmacKey));
+                assert(!vscp_binary::decode(wire, key, decoded));
+                uint8_t wrongHmacKey[32] = {};
+                assert(!vscp_binary::decode(wire, key, decoded, wrongHmacKey));
+
+                auto legacyDowngrade = std::vector<uint8_t>(wire.begin(),
+                                                             wire.end() - 16);
+                legacyDowngrade[1] &= 0x1f;
+                auto legacyLength = legacyDowngrade.size() -
+                                    vscp_binary::headerSize;
+                legacyDowngrade[1] = static_cast<uint8_t>(
+                  legacyLength >> 8);
+                legacyDowngrade[2] = static_cast<uint8_t>(legacyLength);
+                assert(!vscp_binary::decode(legacyDowngrade,
+                                            key,
+                                            decoded,
+                                            hmacKey));
             }
         }
     }
@@ -71,7 +103,7 @@ int main()
           std::vector<uint8_t>(wire.begin() + 3, wire.end()), key, decoded));
     }
     size_t length = 0;
-    const uint8_t noop[] = {0x55, 0x20, 0x05, 0xe0};
+    const uint8_t noop[] = {0x55, 0x00, 0x05, 0xe0};
     assert(vscp_binary::parseHeader(noop, length) && length == 5);
     const uint8_t wrongVersion[] = {0x55, 0x40, 0x05, 0xe0};
     assert(!vscp_binary::parseHeader(wrongVersion, length));
@@ -81,10 +113,14 @@ int main()
     assert(!vscp_binary::parseHeader(wrongSync, length));
     const uint8_t tooLong[] = {0x55, 0x30, 0x01, 0xe0};
     assert(!vscp_binary::parseHeader(tooLong, length));
-    const uint8_t badAesLength[] = {0x55, 0x20, 0x22, 0xe1};
+    const uint8_t badAesLength[] = {0x55, 0x00, 0x22, 0xe1};
     assert(!vscp_binary::parseHeader(badAesLength, length));
+    const uint8_t badHmacLength[] = {0x55, 0x20, 0x22, 0xe1};
+    assert(!vscp_binary::parseHeader(badHmacLength, length));
+    const uint8_t hmacOnPlaintext[] = {0x55, 0x20, 0x05, 0xe0};
+    assert(!vscp_binary::parseHeader(hmacOnPlaintext, length));
     std::cout << "Binary codec: 2052 plaintext/AES round trips, event and "
-                 "malformed-frame and header checks passed\n";
+                 "HMAC, malformed-frame and header checks passed\n";
     testBinaryTcp();
     testSecureMemory();
 }

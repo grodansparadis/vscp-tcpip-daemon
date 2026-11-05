@@ -33,11 +33,11 @@ static std::vector<uint8_t> receive(mg_connection* connection, const uint8_t* ke
     size_t length = 0;
     assert(vscp_binary::parseHeader(connection->send.buf, length));
     assert(connection->send.len >= length + vscp_binary::headerSize);
+    std::vector<uint8_t> wire(connection->send.buf,
+                               connection->send.buf + length +
+                                 vscp_binary::headerSize);
     std::vector<uint8_t> frame;
-    assert(vscp_binary::decode(
-      std::vector<uint8_t>(connection->send.buf + vscp_binary::headerSize,
-                           connection->send.buf + vscp_binary::headerSize + length),
-      key, frame));
+    assert(vscp_binary::decode(wire, key, frame));
     mg_iobuf_del(&connection->send, 0, length + vscp_binary::headerSize);
     return frame;
 }

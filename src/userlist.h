@@ -557,10 +557,11 @@ class CUserList {
     CUserList& operator=(const CUserList&) = delete;
 
     /*!
-     * Load users from database
-     * @return true on success
+     * Load users from a JSON file
+     * @param filename Path to the JSON file containing user data
+     * @return true on success, false on failure
      */
-    bool loadUsers(void);
+    bool loadUsersFromFile(const std::string& filename);
 
     /*!
         Add a user to the in memory list. Must saved to database to make

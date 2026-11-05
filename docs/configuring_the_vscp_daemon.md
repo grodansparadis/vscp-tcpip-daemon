@@ -31,15 +31,24 @@ status data will go to the display and it is easy to see any errors.
 
 The sample configuration file that is installed holds a lot of information. You can use defaults for most of it. A minimum configuration file looks like this
 
-'''json
+```json
 {
   "runasuser": "vscp",
   "guid": "FF:FF:FF:FF:FF:FF:FF:F5:00:00:00:00:00:00:00:00",
   "servername": "The VSCP tcp/ip daemon on hostx",
-  "classtypedb": "/var/lib/vscp/vscpd/vscp_events.sqlite3",
-  "maindb": "/var/lib/vscp/vscpd/vscp.sqlite3",
-  "discoverydb": "/var/lib/vscp/vscpd/vscp.sqlite3",
-  "vscpkey": "/etc/vscp/vscp.key",
+
+  "database" : {
+    "classtypedb": "/var/lib/vscp/vscpd/vscp_events.sqlite3",
+    "maindb": "/var/lib/vscp/vscpd/vscp.sqlite3",
+    "discoverydb": "/var/lib/vscp/vscpd/vscp.sqlite3",
+  },
+
+  "security" : {
+    "key" : "Path to a file with a 128/192/256-bit encryption key on hex format",
+    "hmac" : "Path to a file with a 256 bit HMAC-SHA256 key on hex format",
+    "token" : "carpe diem, quam minimum credula postero"
+  },
+
   "logging": {
     "file-enable-log": true,
     "file-log-level": "debug",
@@ -59,7 +68,7 @@ The sample configuration file that is installed holds a lot of information. You 
     "udp-host" : "127.0.0.1",
     "udp-port" : 9999
   }
-'''
+```
 
 ## Location of the configuration file
 
@@ -102,13 +111,19 @@ In the general section you find settings that are common to all components of th
 ```json
 "runasuser" : "vscp",		
 "guid" : "-",
-"key" : "Path to a file with a 128/192/256-bit encryption key on hex format"
-"hmac" : "Path to a file with a 256 bit HMAC-SHA256 key on hex format"
 "servername" : "The VSCP tcp/ip daemon on host",
-"classtypedb" : "/var/lib/vscp/vscpd:/vscp_events.sqlite3",
-"maindb" : "/var/lib/vscp/vscpd:/vscp.sqlite3",
-"discoverydb" : "/var/lib/vscp/vscpd:/vscp.sqlite3",
-"vscpkey" : "/var/vscp/vscp.key",
+
+"database" : {
+  "classtypedb" : "/var/lib/vscp/vscpd:/vscp_events.sqlite3",
+  "maindb" : "/var/lib/vscp/vscpd:/vscp.sqlite3",
+  "discoverydb" : "/var/lib/vscp/vscpd:/vscp.sqlite3",
+}
+
+"security" : {
+  "key" : "Path to a file with a 128/192/256-bit encryption key on hex format",
+  "hmac" : "Path to a file with a 256 bit HMAC-SHA256 key on hex format",
+  "token" : "carpe diem, quam minimum credula postero"
+},
 
 "logging" : {
     "file-enable-log": true,
@@ -177,14 +192,28 @@ cd /var/lib/vscp
 sudo wget https://www.vscp.org/events/vscp_events.sqlite3
 ```
 
-### vscpkey :id=config-general-key
+### security
+
+openssl can be used to create the keys below
+
+```bash
+   umask 077
+   mkdir -p private
+   openssl rand -hex 32 > private/aes.key
+   openssl rand -hex 32 > private/hmac.key
+```
+
+#### key :id=config-general-key
 
 This is the path to a 128/192/256-bit encryption key used for AES 128/192/256 encryption. Used for the VSCP binary protocol. This file should only be readable by the user the vscp tcp/ip daemon is running under. You can generate a random key on [this site](https://randomkeygen.com/aes-key)
 
-### hmak :id=config-general-hmac
+#### hmac :id=config-general-hmac
 
 This is the path to a 256-bit encryption key used for HMAC-SHA-256. Used for the VSCP binary protocol. This file should only be readable by the user the vscp tcp/ip daemon is running under. You can generate a random key on [this site](https://randomkeygen.com/hmac-key).
 
+#### token :id=config-general-token
+
+Variable text token used as seed for some operations.
 
 ### maindb :id=config-general-maindb
 THis is the main database file for the VSCP tcp/ip daemon. It's main content is the discovery database which is used to collect information about nodes in the system. 
