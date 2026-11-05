@@ -34,6 +34,7 @@
 #endif
 
 #include <deque>
+#include <fstream>
 #include <map>
 #include <mutex>
 #include <string>
