@@ -39,7 +39,7 @@ The daemon uses simple to construct, yet very capable, drivers to talk to the re
 : Debug level (0-2). 0=Default. Higher value is more output.
 
 -g
-: Print MIT license.
+: Print GPLv2 license notice.
 
 # SEE ALSO
 
@@ -57,4 +57,4 @@ The [manual](https://grodansparadis.gitbooks.io/the-vscp-daemon) for vscpd conta
 The vscpd source code may be downloaded from <https://github.com/grodansparadis/vscp>. Source code for other system components of VSCP & Friends are here <https://github.com/grodansparadis>
 
 # COPYRIGHT
-Copyright (C) 2000-2026 Ake Hedman and contributors, the VSCP Project - MIT license.
+Copyright (C) 2000-2026 Ake Hedman and contributors, the VSCP Project - GPL-2.0-only.

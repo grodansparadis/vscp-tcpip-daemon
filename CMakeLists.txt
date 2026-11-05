@@ -2,9 +2,8 @@
 #
 # VSCP TCP/IP Daemon — top-level build script.
 #
-# The daemon uses source files from the vscp submodule (third-party/vscp)
-# wherever they are available, and falls back to src/ for files not yet
-# present in the submodule.
+# The daemon compiles selected VSCP common sources from a pinned FetchContent
+# checkout.
 #
 # Configuration is read from a JSON file (vscpd.json).  The XML-based
 # vscpd.conf format is no longer used.
@@ -14,7 +13,7 @@
 #   cmake --build build
 #
 # Copyright (C) 2000-2026 Ake Hedman and contributors, the VSCP project
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-2.0-only
 
 cmake_minimum_required(VERSION 3.16...3.31)
 
@@ -52,10 +51,6 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/bin")
 # ---- Options ----
 option(VSCPD_BUILD_TESTS "Build unit tests" OFF)
 option(VSCPD_ENABLE_SYSTEMD "Link against libsystemd for sd_notify support" ON)
-
-# ---- Include module path from submodule (provides FindMosquitto, etc.) ----
-# list(APPEND CMAKE_MODULE_PATH
-#     "${CMAKE_CURRENT_SOURCE_DIR}/third-party/vscp/cmake/modules")
 
 # ---- System libraries ----
 include(GNUInstallDirs)
@@ -166,20 +161,8 @@ if(NOT TARGET SQLite3::SQLite3) # CMake < 4.3
   add_library(SQLite3::SQLite3 ALIAS SQLite::SQLite3)
 endif()
 
-# ---- Convenience alias for the submodule source root ----
-#set(vscp_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third-party/vscp")
-
-# Use a platform-appropriate daemon entrypoint.
-# if(WIN32)
-#     set(VSCPD_MAIN_SOURCE "${vscp_SOURCE_DIR}/src/vscp/vscpd.cpp")
-# else()
-#     set(VSCPD_MAIN_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/src/vscpd.cpp")
-# endif()
-
 # ---- Daemon source files ----
-# Build the daemon using vscp submodule for common functionality.
 set(VSCPD_SOURCES
-    "${VSCPD_MAIN_SOURCE}"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/vscpd.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/controlobject.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/tcpipsrv.cpp"
@@ -350,16 +333,6 @@ if(UNIX AND NOT APPLE)
     target_link_libraries(vscpd PRIVATE m dl rt)
 endif()
 
-# Clang on macOS treats -Wnon-pod-varargs as an error for code in
-# third-party/vscp/src/vscp/common/tcpipsrv.cpp that passes std::string
-# through a variadic function.  Suppress the warning for that file only.
-if(APPLE)
-    set_source_files_properties(
-        "${vscp_SOURCE_DIR}/src/vscp/common/tcpipsrv.cpp"
-        PROPERTIES COMPILE_OPTIONS "-Wno-non-pod-varargs"
-    )
-endif()
-
 # ---- Optional systemd sd_notify support ----
 if(VSCPD_ENABLE_SYSTEMD)
     find_package(PkgConfig QUIET)
@@ -381,6 +354,10 @@ include(GNUInstallDirs)
 
 install(TARGETS vscpd
     RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}
+)
+
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/licenses/${PROJECT_NAME}"
 )
 
 # Configuration file
@@ -526,7 +503,7 @@ set(CPACK_DEB_COMPONENT_INSTALL       OFF)
 
 # ---- RPM (Linux) ----
 set(CPACK_RPM_PACKAGE_GROUP           "Applications/System")
-set(CPACK_RPM_PACKAGE_LICENSE         "MIT")
+set(CPACK_RPM_PACKAGE_LICENSE         "GPLv2")
 set(CPACK_RPM_PACKAGE_REQUIRES        "openssl-libs")
 set(CPACK_RPM_PACKAGE_URL             "${CPACK_PACKAGE_HOMEPAGE_URL}")
 set(CPACK_RPM_FILE_NAME               RPM-DEFAULT)

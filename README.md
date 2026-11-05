@@ -2,7 +2,7 @@
 
 ![vscp-tcpip-daemon](./docs/images/vscp-tcpip-daemon.jpeg)
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
+[![License: GPLv2](https://img.shields.io/badge/license-GPLv2-blue.svg)](LICENSE)
 [![Build VSCP library on Linux](https://github.com/grodansparadis/vscp-tcpip-daemon/actions/workflows/linux.yml/badge.svg)](https://github.com/grodansparadis/vscp-tcpip-daemon/actions/workflows/linux.yml)
 [![Build VSCP library on Windows](https://github.com/grodansparadis/vscp-tcpip-daemon/actions/workflows/windows.yml/badge.svg)](https://github.com/grodansparadis/vscp-tcpip-daemon/actions/workflows/windows.yml)
 [![Build VSCP library on macOS](https://github.com/grodansparadis/vscp-tcpip-daemon/actions/workflows/macos.yml/badge.svg)](https://github.com/grodansparadis/vscp-tcpip-daemon/actions/workflows/macos.yml)
@@ -158,3 +158,9 @@ To build the same package locally inside a container:
 ```bash
 docker run --rm -v "$PWD:/src" -w /src debian:bookworm scripts/ci/build-deb.sh bookworm
 ```
+
+## License
+
+The daemon distribution is licensed under GNU GPL version 2 only. The full
+license text is in [LICENSE](LICENSE). Individual components may retain their
+own license notices.
