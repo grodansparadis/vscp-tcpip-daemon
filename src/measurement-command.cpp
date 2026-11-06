@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "measurement-command.h"
 
 #include <array>
