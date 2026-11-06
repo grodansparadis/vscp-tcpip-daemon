@@ -30,6 +30,8 @@
 // https://stackoverflow.com/questions/3919420/tutorial-on-using-openssl-with-pthreads
 //
 
+#include "pch.h"
+
 #include <list>
 #include <new>
 #include <string>
@@ -48,10 +50,6 @@
 
 #ifdef WITH_WRAP
 #include <tcpd.h>
-#endif
-
-#ifndef DWORD
-#define DWORD unsigned long
 #endif
 
 #include "mongoose.h"

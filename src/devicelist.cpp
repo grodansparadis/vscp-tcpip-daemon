@@ -37,10 +37,6 @@
 #include <syslog.h>
 #include <unistd.h>
 
-#ifndef DWORD
-#define DWORD unsigned long
-#endif
-
 #include "spdlog/spdlog.h"
 
 #include "controlobject.h"

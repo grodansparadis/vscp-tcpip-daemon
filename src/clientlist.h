@@ -50,6 +50,10 @@
 
 #include <pthread.h>
 
+#ifdef WIN32
+#include <windows.h>
+#endif
+
 #include <guid.h>
 #include <userlist.h>
 #include <vscp.h>
