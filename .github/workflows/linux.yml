@@ -15,7 +15,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, ubuntu-24.04]
+        include:
+          - os: ubuntu-22.04
+            tag: ubuntu22.04
+          - os: ubuntu-24.04
+            tag: ubuntu24.04
 
     steps:
       - name: Checkout
@@ -45,23 +49,56 @@ jobs:
         working-directory: build
         run: cpack -G "DEB;RPM;TGZ"
 
+      - name: Tag package names with distro and create SHA256 checksums
+        working-directory: build
+        env:
+          TAG: ${{ matrix.tag }}
+        run: |
+          set -euo pipefail
+          for f in *.deb *.rpm *.tar.gz; do
+            case "$f" in
+              *.tar.gz) new="${f%.tar.gz}-${TAG}.tar.gz" ;;
+              *)        new="${f%.*}-${TAG}.${f##*.}" ;;
+            esac
+            mv -- "$f" "$new"
+            sha256sum -- "$new" > "$new.sha256"
+          done
+          sha256sum -- *.deb *.rpm *.tar.gz > "SHA256SUMS-${TAG}.txt"
+          cat "SHA256SUMS-${TAG}.txt"
+
       - name: Upload DEB
         uses: actions/upload-artifact@v7
         with:
-          name: deb-${{ matrix.os }}
-          path: build/*.deb
+          name: deb-${{ matrix.tag }}
+          path: |
+            build/*.deb
+            build/*.deb.sha256
+          if-no-files-found: error
 
       - name: Upload RPM
         uses: actions/upload-artifact@v7
         with:
-          name: rpm-${{ matrix.os }}
-          path: build/*.rpm
+          name: rpm-${{ matrix.tag }}
+          path: |
+            build/*.rpm
+            build/*.rpm.sha256
+          if-no-files-found: error
 
       - name: Upload TGZ
         uses: actions/upload-artifact@v7
         with:
-          name: tgz-${{ matrix.os }}
-          path: build/*.tar.gz
+          name: tgz-${{ matrix.tag }}
+          path: |
+            build/*.tar.gz
+            build/*.tar.gz.sha256
+          if-no-files-found: error
+
+      - name: Upload SHA256 checksums
+        uses: actions/upload-artifact@v7
+        with:
+          name: sha256-${{ matrix.tag }}
+          path: build/SHA256SUMS-${{ matrix.tag }}.txt
+          if-no-files-found: error
 
   release:
     name: Publish release packages
