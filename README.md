@@ -161,6 +161,9 @@ docker run --rm -v "$PWD:/src" -w /src debian:bookworm scripts/ci/build-deb.sh b
 
 ## License
 
-The daemon distribution is licensed under GNU GPL version 2 only. The full
-license text is in [LICENSE](LICENSE). Individual components may retain their
-own license notices.
+The daemon distribution is licensed under GNU GPL version 2 only (SPDX:
+`GPL-2.0-only`). The full license text is in [LICENSE](LICENSE). Individual
+components may retain their own license notices. Files copied from the
+[VSCP library](https://github.com/grodansparadis/vscp) (MIT), including the
+copy under `cmake-includes/_deps/vscp-src`, keep their MIT license, and
+`src/mustache.hpp` keeps the Boost Software License 1.0.
