@@ -7,6 +7,8 @@ tagged, rename **Unreleased** to the version and date, and start a new
 
 ## Unreleased
 
+- Add scripts/download-artifacts.sh to download and verify the newest CI build artifacts
+- CI writes a SHA256SUMS-<artifact> checksum file into every uploaded build artifact
 - Added images (ec73e61)
 - chore: update version [version-bot] (c1f6225)
 - Use GPL version 2 only in all source notices (8162499)

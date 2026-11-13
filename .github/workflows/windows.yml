@@ -46,17 +46,39 @@ jobs:
         working-directory: build
         run: cpack -G "NSIS;ZIP" -C Release
 
+      - name: Write SHA256SUMS
+        id: sha256sums_50
+        continue-on-error: true
+        shell: bash
+        run: |
+          bash .github/scripts/write-sha256sums.sh "SHA256SUMS-nsis-windows" <<'SHA256SUMS_PATTERNS'
+          build/*.exe
+          SHA256SUMS_PATTERNS
+
       - name: Upload NSIS installer
         uses: actions/upload-artifact@v7
         with:
           name: nsis-windows
-          path: build/*.exe
+          path: |
+            build/*.exe
+            ${{ steps.sha256sums_50.outputs.file }}
+
+      - name: Write SHA256SUMS
+        id: sha256sums_56
+        continue-on-error: true
+        shell: bash
+        run: |
+          bash .github/scripts/write-sha256sums.sh "SHA256SUMS-zip-windows" <<'SHA256SUMS_PATTERNS'
+          build/*.zip
+          SHA256SUMS_PATTERNS
 
       - name: Upload ZIP
         uses: actions/upload-artifact@v7
         with:
           name: zip-windows
-          path: build/*.zip
+          path: |
+            build/*.zip
+            ${{ steps.sha256sums_56.outputs.file }}
 
   release:
     name: Publish release packages

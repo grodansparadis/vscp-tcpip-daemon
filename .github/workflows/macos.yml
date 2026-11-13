@@ -40,11 +40,22 @@ jobs:
         working-directory: build
         run: cpack -G TGZ
 
+      - name: Write SHA256SUMS
+        id: sha256sums_44
+        continue-on-error: true
+        shell: bash
+        run: |
+          bash .github/scripts/write-sha256sums.sh "SHA256SUMS-tgz-macos" <<'SHA256SUMS_PATTERNS'
+          build/*.tar.gz
+          SHA256SUMS_PATTERNS
+
       - name: Upload TGZ
         uses: actions/upload-artifact@v7
         with:
           name: tgz-macos
-          path: build/*.tar.gz
+          path: |
+            build/*.tar.gz
+            ${{ steps.sha256sums_44.outputs.file }}
 
   release:
     name: Publish release packages
