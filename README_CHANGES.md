@@ -1,0 +1,68 @@
+# Changes in vscp-tcpip-daemon
+
+Every change that goes into a release is listed here, newest release first.
+Add each change under **Unreleased** when it is made. When a release is
+tagged, rename **Unreleased** to the version and date, and start a new
+**Unreleased** section above it.
+
+## Unreleased
+
+- Added images (ec73e61)
+- chore: update version [version-bot] (c1f6225)
+- Use GPL version 2 only in all source notices (8162499)
+- chore: update version [version-bot] (17d3b88)
+- Added SHA artifacts (9868467)
+
+## v26.11.100 - 2026-11-06
+
+- chore: update version [version-bot] (ee6cf9b)
+- chore: update version [version-bot] (8a406bb)
+- Fix Windows header include order (e8d2221)
+- chore: update version [version-bot] (b0a1689)
+- Fix Windows header and macro conflicts (7bfe1af)
+- Initial plan (27d42c5)
+- chore: update version [version-bot] (489eb7f)
+- Now using VSCP 26.11.0.3952 (d7a31db)
+- Changed license to GPLv2 due to mongoose usage (414168f)
+- Implemented HMAC-authenticated binary frames. (37a5628)
+- Using VSCP 26.11.0.3943 (212b3df)
+- chore: update version [version-bot] (ced77e1)
+- chore: update version [version-bot] (5761d9a)
+- Fixed type (8697fad)
+- chore: update version [version-bot] (d14042b)
+- Bump docker/setup-qemu-action from 3 to 4 (4d3dfe3)
+- chore: update version [version-bot] (da952e2)
+- chore: update version [version-bot] (c7aa624)
+- chore: update version [version-bot] (0b112d3)
+- chore: update version [version-bot] (e870dde)
+- chore: update version [version-bot] (dedd670)
+- Fix macOS workflow dependency setup (2f8dca4)
+- Drop unnecessary Mosquitto from macOS build (a027bba)
+- Initial plan (adfeaea)
+- Initial plan (8678451)
+- chore: update version [version-bot] (4e3c5b5)
+- Editing (02a6217)
+- chore: update version [version-bot] (e07067b)
+- Fixed cert folder install (5d7a6b5)
+- chore: update version [version-bot] (3d72073)
+- Added missing file (a618ce2)
+- chore: update version [version-bot] (0e90fc9)
+- Hardening keys and the TLS private key now sit in locked memory, client passwords are wiped after checking, and core dumps are disabled. The build is clean and all 5 tests pass, including the text PASS and binary login paths. (10d890a)
+- Multi listen added (2114c1b)
+- chore: update version [version-bot] (e44e79d)
+- Rearranged docs (be3bfbf)
+- chore: update version [version-bot] (de478b8)
+- Fixed badges (5dc8c80)
+- security and command ref. added (4ac0a54)
+- chore: update version [version-bot] (4ee3f82)
+- Added driver examples (e7cef47)
+- chore: update version [version-bot] (5053ebc)
+- chore: update version [version-bot] (33bd6d9)
+- Fix Pages checkout by removing stale FetchContent gitlinks (3b35034)
+- Initial plan (ac96bb1)
+- chore: update version [version-bot] (0bf8b5c)
+- Initial update of docs (5ad72be)
+- chore: update version [version-bot] (140e8cb)
+- Debiand and raspberry pi builds added (62502e0)
+- chore: update version [version-bot] (092a3b4)
+- ...and 97 earlier commits (see `git log`)
