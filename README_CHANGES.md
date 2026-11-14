@@ -7,6 +7,7 @@ tagged, rename **Unreleased** to the version and date, and start a new
 
 ## Unreleased
 
+- Man pages: only vscpd(8) is built (with pandoc) and installed. Removed the committed generated pages, the old scripts and the outdated pages for vscpcmd, vscp-mkpasswd, vscpd.conf, vscpd.json, vscp, vscpd-tls and vscpdrivers
 - Fix the CI checksum step: readable SHA256SUMS files, bash 3.2 on macOS, and jobs that run in a subfolder
 - Add scripts/download-artifacts.sh to download and verify the newest CI build artifacts
 - CI writes a SHA256SUMS-<artifact> checksum file into every uploaded build artifact

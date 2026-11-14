@@ -414,28 +414,7 @@ else()
     )
 endif()
 
-# Man pages (Linux/macOS only)
-if(UNIX)
-    install(FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/man/vscpd.8"
-        DESTINATION "${CMAKE_INSTALL_MANDIR}/man8"
-    )
-    install(FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/man/vscp-mkpasswd.1"
-        "${CMAKE_CURRENT_SOURCE_DIR}/man/vscpcmd.1"
-        DESTINATION "${CMAKE_INSTALL_MANDIR}/man1"
-    )
-    install(FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/man/vscp.7"
-        "${CMAKE_CURRENT_SOURCE_DIR}/man/vscpd-tls.7"
-        "${CMAKE_CURRENT_SOURCE_DIR}/man/vscpdrivers.7"
-        DESTINATION "${CMAKE_INSTALL_MANDIR}/man7"
-    )
-    install(FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/man/vscpd.conf.5"
-        DESTINATION "${CMAKE_INSTALL_MANDIR}/man5"
-    )
-endif()
+# Man page: man/vscpd.8.md is converted with pandoc in man/CMakeLists.txt
 
 # systemd unit file (Linux only)
 if(UNIX AND NOT APPLE)
