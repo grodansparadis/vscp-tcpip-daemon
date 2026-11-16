@@ -5,7 +5,7 @@ Add each change under **Unreleased** when it is made. When a release is
 tagged, rename **Unreleased** to the version and date, and start a new
 **Unreleased** section above it.
 
-## Unreleased
+## v26.11.118 - 2026-11-16
 
 - Add `INTERFACE LINK id|guid` to the text protocol: a session can take the identity of a driver or other daemon-side interface. `INTERFACE UNIQUE` works the same way, and `INTERFACE NORMAL` / `INTERFACE CLOSE` restore the session (they used to do nothing and send no reply). New interface type 17 for linked sessions
 - Fix the interface type descriptions, which were shifted by one after Level II drivers
