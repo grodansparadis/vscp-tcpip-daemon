@@ -702,6 +702,81 @@ void testTextRoundTripAndQuit(Fixture& fixture)
     CHECK(client->closedByPeer());
 }
 
+// INTERFACE LINK links a text session to a daemon side interface and
+// INTERFACE NORMAL restores the session identity.
+void testInterfaceLink(Fixture& fixture)
+{
+    auto client = fixture.connect(false);
+    CHECK(client->command(cmdText).error() == errSuccess);
+    client->sendText("USER admin\r\n");
+    CHECK(client->readUntil("\r\n").rfind("+OK", 0) == 0);
+    client->sendText("PASS " + fixture.daemon.password + "\r\n");
+    CHECK(client->readUntil("\r\n").rfind("+OK", 0) == 0);
+
+    auto guidOf = [&]() {
+        client->sendText("GGID\r\n");
+        std::string guid = client->readUntil("\r\n");
+        CHECK(client->readUntil("\r\n").rfind("+OK", 0) == 0);
+        return guid;
+    };
+    const std::string ownGuid = guidOf();
+
+    // Find the internal daemon interface (type 1) in the interface list
+    client->sendText("INTERFACE LIST\r\n");
+    std::string internalId;
+    std::string internalGuid;
+    while (true) {
+        std::string line = client->readUntil("\r\n");
+        if (line.rfind("+OK", 0) == 0) break;
+        size_t first  = line.find(',');
+        size_t second = line.find(',', first + 1);
+        size_t third  = line.find(',', second + 1);
+        CHECK(third != std::string::npos);
+        if (line.substr(first + 1, second - first - 1) == "1") {
+            internalId   = line.substr(0, first);
+            internalGuid = line.substr(second + 1, third - second - 1);
+        }
+    }
+    CHECK(!internalId.empty());
+
+    // Missing argument, unknown interface and a remote session are refused
+    client->sendText("INTERFACE LINK\r\n");
+    CHECK(client->readUntil("\r\n").rfind("-OK", 0) == 0);
+    client->sendText("INTERFACE LINK 65000\r\n");
+    CHECK(client->readUntil("\r\n") == "-OK - Interface not found.\r\n");
+    client->sendText("INTERFACE LINK not-a-guid\r\n");
+    CHECK(client->readUntil("\r\n").rfind("-OK", 0) == 0);
+    client->sendText("CHID\r\n");
+    std::string ownId = client->readUntil("\r\n");
+    ownId.erase(ownId.find_last_not_of("\r\n") + 1);
+    CHECK(client->readUntil("\r\n").rfind("+OK", 0) == 0);
+    client->sendText("INTERFACE LINK " + ownId + "\r\n");
+    CHECK(client->readUntil("\r\n") == "-OK - Interface not found.\r\n");
+    CHECK(guidOf() == ownGuid);
+
+    // Link by id: the session takes the GUID of the interface
+    client->sendText("INTERFACE LINK " + internalId + "\r\n");
+    CHECK(client->readUntil("\r\n") ==
+          "+OK - Linked to interface " + internalId + ".\r\n");
+    CHECK(guidOf() == internalGuid + "\r\n");
+
+    // Normal restores the identity; doing it twice is harmless
+    client->sendText("INTERFACE NORMAL\r\n");
+    CHECK(client->readUntil("\r\n").rfind("+OK", 0) == 0);
+    CHECK(guidOf() == ownGuid);
+    client->sendText("INTERFACE NORMAL\r\n");
+    CHECK(client->readUntil("\r\n").rfind("+OK", 0) == 0);
+
+    // Link by GUID with the old UNIQUE name, restore with CLOSE
+    client->sendText("INTERFACE UNIQUE " + internalGuid + "\r\n");
+    CHECK(client->readUntil("\r\n") ==
+          "+OK - Linked to interface " + internalId + ".\r\n");
+    CHECK(guidOf() == internalGuid + "\r\n");
+    client->sendText("INTERFACE CLOSE\r\n");
+    CHECK(client->readUntil("\r\n").rfind("+OK", 0) == 0);
+    CHECK(guidOf() == ownGuid);
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -727,6 +802,7 @@ int main(int argc, char** argv)
         {"resync", testResync},
         {"fragmentation", testFragmentation},
         {"text round trip and quit", testTextRoundTripAndQuit},
+        {"interface link", testInterfaceLink},
     };
 
     try {

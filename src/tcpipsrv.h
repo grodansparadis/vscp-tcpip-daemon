@@ -467,6 +467,13 @@ class CTcpipSrv {
     void handleClientInterface_Close(struct mg_connection* conn);
 
     /*!
+        Client INTERFACE LINK command. Links the session to another
+        interface, selected by client id or GUID.
+        @param conn Pointer to the Mongoose connection
+    */
+    void handleClientInterface_Link(struct mg_connection* conn);
+
+    /*!
         Client WhatCanYouDo command
 
         @param conn Pointer to the client connection.

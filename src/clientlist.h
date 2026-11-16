@@ -117,6 +117,8 @@ class CClientItem {
         CLIENT_ITEM_INTERFACE_TYPE_CLIENT_DISCOVERY,  // 14 Discovery interface
         CLIENT_ITEM_INTERFACE_TYPE_CLIENT_JAVASCRIPT, // 15 JavaScript interface
         CLIENT_ITEM_INTERFACE_TYPE_CLIENT_LUA,        // 16 LUA Script interface
+        CLIENT_ITEM_INTERFACE_TYPE_CLIENT_VSCP_LINK,  // 17 VSCP Link session
+                                                      // linked to an interface
     };
 
   public:
@@ -328,6 +330,45 @@ class CClientItem {
     */
     cguid getInterfaceGUID(void) { return m_guid; };
 
+    /*!
+        True if this client is a VSCP Link session that has been linked to
+        another interface with INTERFACE LINK.
+    */
+    bool isLinkActive(void) const { return m_bLinkActive; };
+
+    /// Client id of the interface this session is linked to (0 if none)
+    uint16_t getLinkTargetClientID(void) const { return m_linkTargetClientId; };
+
+    /*!
+        Link this session to another interface. The session takes the GUID
+        of that interface. The original GUID and type are saved the first
+        time so they can be restored.
+        @param targetId Client id of the interface to link to.
+        @param guid GUID of the interface to link to.
+    */
+    void setLink(uint16_t targetId, const cguid& guid)
+    {
+        if (!m_bLinkActive) {
+            m_linkRestoreGuid = m_guid;
+            m_linkRestoreType = m_type;
+        }
+        m_guid               = guid;
+        m_type               = CLIENT_ITEM_INTERFACE_TYPE_CLIENT_VSCP_LINK;
+        m_linkTargetClientId = targetId;
+        m_bLinkActive        = true;
+    };
+
+    /// Remove a link and restore the original GUID and type of the session.
+    void clearLink(void)
+    {
+        if (m_bLinkActive) {
+            m_guid               = m_linkRestoreGuid;
+            m_type               = m_linkRestoreType;
+            m_linkTargetClientId = 0;
+            m_bLinkActive        = false;
+        }
+    };
+
     /*! Set connection
         @param conn Mongoose connection struct pointer ()
     */
@@ -456,6 +497,18 @@ class CClientItem {
 
     /// True while discarding bytes to find the next valid binary frame.
     bool m_binaryResyncing = false;
+
+    /// True when the session is linked to another interface (INTERFACE LINK)
+    bool m_bLinkActive = false;
+
+    /// Client id of the linked interface
+    uint16_t m_linkTargetClientId = 0;
+
+    /// Interface type to restore when the link is removed
+    CLIENT_ITEM_INTERFACE_TYPE m_linkRestoreType = CLIENT_ITEM_INTERFACE_TYPE_NONE;
+
+    /// GUID to restore when the link is removed
+    cguid m_linkRestoreGuid;
 
     /// Client ID for this client item
     uint16_t m_clientID;

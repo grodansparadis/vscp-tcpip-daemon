@@ -7,6 +7,8 @@ tagged, rename **Unreleased** to the version and date, and start a new
 
 ## Unreleased
 
+- Add `INTERFACE LINK id|guid` to the text protocol: a session can take the identity of a driver or other daemon-side interface. `INTERFACE UNIQUE` works the same way, and `INTERFACE NORMAL` / `INTERFACE CLOSE` restore the session (they used to do nothing and send no reply). New interface type 17 for linked sessions
+- Fix the interface type descriptions, which were shifted by one after Level II drivers
 - Build against the latest vscp master (d75d4f5c6)
 - Man pages: only vscpd(8) is built (with pandoc) and installed. Removed the committed generated pages, the old scripts and the outdated pages for vscpcmd, vscp-mkpasswd, vscpd.conf, vscpd.json, vscp, vscpd-tls and vscpdrivers
 - Fix the CI checksum step: readable SHA256SUMS files, bash 3.2 on macOS, and jobs that run in a subfolder

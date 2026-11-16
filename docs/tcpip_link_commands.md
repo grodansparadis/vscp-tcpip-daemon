@@ -76,7 +76,7 @@ Log in before using operational commands. The rights below refer to the account'
 | [`SGID`](#command-sgid-setguid) | [`SETGUID`](#command-sgid-setguid) | Request a channel GUID change; see current limitation below. | Set-GUID bit (`0x08000000`). |
 | [`SFLT`](#command-sflt-setfilter-smsk-setmask) | [`SETFILTER`](#command-sflt-setfilter-smsk-setmask) | Set the channel's receive filter. | Set-filter bit (`0x04000000`). |
 | [`SMSK`](#command-sflt-setfilter-smsk-setmask) | [`SETMASK`](#command-sflt-setfilter-smsk-setmask) | Set the channel's receive mask. | Set-filter bit (`0x04000000`). |
-| [`INTERFACE`](#command-interface-client) | [`CLIENT`](#command-interface-client) | List interfaces; see limitations below. | `interface`. |
+| [`INTERFACE`](#command-interface-client) | [`CLIENT`](#command-interface-client) | List interfaces and link the session to one. | `interface`. |
 | [`TEST`](#command-test) | None | Acknowledge a diagnostic request. | `test`. |
 | [`SHUTDOWN`](#command-shutdown) | None | Stop the daemon process. | `shutdown`. |
 | [`RESTART`](#command-restart) | None | Request a process restart. | `restart`. |
@@ -469,15 +469,25 @@ client_id,interface_type,GUID,name | Started at timestamp
 
 There is no separate count line in the text implementation. Use `CHID` to identify your own connection in the list.
 
-The dispatcher also recognizes the following historical subcommands, but their text handlers are **not implemented**:
+Link this session to an interface of the daemon, selected by client id or by interface GUID:
 
-| Example | Current result |
-| :------ | :------------- |
-| `INTERFACE UNIQUE FF:FF:FF:FF:FF:FF:FF:F5:01:00:00:00:00:00:00:00` | Returns `-OK - Interface not found.` It does not acquire exclusive access. |
-| `INTERFACE NORMAL 1` | No operation and no reply. Do not wait indefinitely for a status line. |
-| `INTERFACE CLOSE 1` | No operation and no reply. It does not close that interface. |
+```text
+INTERFACE LINK 3
+INTERFACE LINK FF:FF:FF:FF:FF:FF:FF:F5:01:00:00:00:00:00:00:00
+```
 
-The same limitation applies with `CLIENT` instead of `INTERFACE`. Do not use these subcommands to control drivers; configure and restart the daemon through its service manager instead.
+On success the reply is `+OK - Linked to interface <id>.` The session takes the GUID of that interface and is listed with interface type 17, so events it sends without a GUID get the GUID of the linked interface. `GGID` shows the GUID in use. Linking again replaces the current link.
+
+Drivers and other daemon-side interfaces can be linked to. The sessions of remote clients (TCP/IP, UDP, web, WebSocket, REST and other linked sessions) and your own session cannot; they return `-OK - Interface not found.`, as does an unknown id or GUID. A missing or malformed argument returns `-OK - Invalid parameter or format`.
+
+| Command | Result |
+| :------ | :----- |
+| `INTERFACE LINK id\|guid` | Link the session to the interface. |
+| `INTERFACE UNIQUE id\|guid` | Same as `INTERFACE LINK`, kept for older clients. It does not acquire exclusive access. |
+| `INTERFACE NORMAL` | Remove the link and restore the GUID and type of the session. Returns `+OK` also when no link is active. |
+| `INTERFACE CLOSE` | Same as `INTERFACE NORMAL`. It does not close the interface. |
+
+The same subcommands work with `CLIENT` instead of `INTERFACE`. A link is only an identity for the session: it does not give exclusive access and does not start, stop or configure a driver.
 
 ### TEST :id=command-test
 

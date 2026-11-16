@@ -3172,10 +3172,11 @@ CTcpipSrv::handleClientRemote(struct mg_connection* conn)
 ///////////////////////////////////////////////////////////////////////////////
 // handleClientInterface
 //
-// list     List interfaces.
-// unique   Acquire selected interface uniquely. Full format is INTERFACE UNIQUE
-// id normal   Normal access to interfaces. Full format is INTERFACE NORMAL id
-// close    Close interfaces. Full format is INTERFACE CLOSE id
+// list             List interfaces.
+// link id|guid     Link this session to another interface.
+// unique id|guid   Same as link (kept for backward compatibility).
+// normal           Remove the link and restore the session identity.
+// close            Same as normal.
 
 void
 CTcpipSrv::handleClientInterface(struct mg_connection* conn)
@@ -3205,7 +3206,10 @@ CTcpipSrv::handleClientInterface(struct mg_connection* conn)
     if (commandStartsWith(("list"))) {
         handleClientInterface_List(conn);
     }
-    else if (commandStartsWith(("unique"))) {
+    else if (commandStartsWith(("link"), true)) {
+        handleClientInterface_Link(conn);
+    }
+    else if (commandStartsWith(("unique"), true)) {
         handleClientInterface_Unique(conn);
     }
     else if (commandStartsWith(("normal"))) {
@@ -3241,9 +3245,6 @@ CTcpipSrv::handleClientInterface_List(struct mg_connection* conn)
         return;
     }
 
-    // Get client item
-    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
-
     // Display Interface List
     m_pCtrlObj->getClientList().lockClientItemList();
 
@@ -3274,48 +3275,18 @@ CTcpipSrv::handleClientInterface_List(struct mg_connection* conn)
 ///////////////////////////////////////////////////////////////////////////////
 // handleClientInterface_Unique
 //
+// Kept for backward compatibility. Works as INTERFACE LINK.
 
 void
 CTcpipSrv::handleClientInterface_Unique(struct mg_connection* conn)
 {
-    unsigned char ifGUID[16];
-    memset(ifGUID, 0, 16);
-
-    // Check that conn is valid
-    if (nullptr == conn) {
-        spdlog::info("Connection is NULL.");
-        return;
-    }
-
-    // Client item must be available
-    if (nullptr == conn->fn_data) {
-        spdlog::info("Connection has noassociated client item.");
-        return;
-    }
-
-    // Get client item
-    CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
-
-    // Must be connected
-    if (!pClientItem->isConnected()) {
-        spdlog::error(
-          "Client is not connected, cannot handle interface unique command.");
-        return;
-    }
-
-    // Get GUID
-    vscp_trim(getCurrentCommand());
-    vscp_getGuidFromStringToArray(ifGUID, getCurrentCommand());
-
-    // Add the client to the Client List
-    // TODO
-
-    write(conn, MSG_INTERFACE_NOT_FOUND, strlen(MSG_INTERFACE_NOT_FOUND));
+    handleClientInterface_Link(conn);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // handleClientInterface_Normal
 //
+// Remove a link and restore the identity of the session.
 
 void
 CTcpipSrv::handleClientInterface_Normal(struct mg_connection* conn)
@@ -3335,15 +3306,36 @@ CTcpipSrv::handleClientInterface_Normal(struct mg_connection* conn)
     // Get client item
     CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
 
-    // TODO
+    // The list lock protects GUID and type from readers of the client list
+    m_pCtrlObj->getClientList().lockClientItemList();
+    pClientItem->clearLink();
+    m_pCtrlObj->getClientList().unlockClientItemList();
+
+    write(conn, MSG_OK, strlen(MSG_OK));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // handleClientInterface_Close
 //
+// Same as INTERFACE NORMAL.
 
 void
 CTcpipSrv::handleClientInterface_Close(struct mg_connection* conn)
+{
+    handleClientInterface_Normal(conn);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// handleClientInterface_Link
+//
+// Link this VSCP Link session to an interface of the daemon (a driver or
+// another daemon side interface), selected by client id or interface GUID.
+// The session takes the GUID of that interface, so events it sends without a
+// GUID get the GUID of the linked interface. Sessions of remote clients can
+// not be linked to.
+
+void
+CTcpipSrv::handleClientInterface_Link(struct mg_connection* conn)
 {
     // Check that conn is valid
     if (nullptr == conn) {
@@ -3360,7 +3352,95 @@ CTcpipSrv::handleClientInterface_Close(struct mg_connection* conn)
     // Get client item
     CClientItem* pClientItem = static_cast<CClientItem*>(conn->fn_data);
 
-    // TODO
+    // Must be connected
+    if (!pClientItem->isConnected()) {
+        spdlog::error(
+          "Client is not connected, cannot handle interface link command.");
+        return;
+    }
+
+    // The sub command has been removed. What is left is the id or the GUID.
+    std::string token = getCurrentCommand();
+    vscp_trim(token);
+    if (token.empty()) {
+        write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+        return;
+    }
+
+    // An id is a decimal number. Everything else is read as a GUID.
+    char* endptr             = nullptr;
+    const unsigned long reqId = strtoul(token.c_str(), &endptr, 10);
+    const bool bNumeric      = (nullptr != endptr) && ('\0' == *endptr);
+
+    cguid reqGuid;
+    if (!bNumeric) {
+        // A GUID is 16 hexadecimal bytes separated by colons
+        size_t colons = 0;
+        bool bValid   = true;
+        for (char c : token) {
+            if (':' == c) {
+                colons++;
+            }
+            else if (!isxdigit(static_cast<unsigned char>(c))) {
+                bValid = false;
+            }
+        }
+        if (!bValid || (15 != colons)) {
+            write(conn, MSG_PARAMETER_ERROR, strlen(MSG_PARAMETER_ERROR));
+            return;
+        }
+        reqGuid.getFromString(token);
+    }
+
+    bool bFound         = false;
+    uint16_t selectedId = 0;
+
+    m_pCtrlObj->getClientList().lockClientItemList();
+
+    std::deque<CClientItem*>::iterator it;
+    for (it = m_pCtrlObj->getClientList().getItemList().begin();
+         it != m_pCtrlObj->getClientList().getItemList().end();
+         ++it) {
+
+        CClientItem* pItem = *it;
+        if ((nullptr == pItem) || (pItem == pClientItem)) {
+            continue;
+        }
+
+        // Sessions of remote clients are not interfaces one can link to
+        switch (pItem->getInterfaceType()) {
+            case CClientItem::CLIENT_ITEM_INTERFACE_TYPE_NONE:
+            case CClientItem::CLIENT_ITEM_INTERFACE_TYPE_CLIENT_TCPIP:
+            case CClientItem::CLIENT_ITEM_INTERFACE_TYPE_CLIENT_UDP:
+            case CClientItem::CLIENT_ITEM_INTERFACE_TYPE_CLIENT_WEB:
+            case CClientItem::CLIENT_ITEM_INTERFACE_TYPE_CLIENT_WEBSOCKET:
+            case CClientItem::CLIENT_ITEM_INTERFACE_TYPE_CLIENT_REST:
+            case CClientItem::CLIENT_ITEM_INTERFACE_TYPE_CLIENT_VSCP_LINK:
+                continue;
+            default:
+                break;
+        }
+
+        if (bNumeric ? (reqId == pItem->getClientID())
+                     : (pItem->getInterfaceGUID() == reqGuid)) {
+            selectedId = pItem->getClientID();
+            pClientItem->setLink(selectedId, pItem->getInterfaceGUID());
+            bFound = true;
+            break;
+        }
+    }
+
+    m_pCtrlObj->getClientList().unlockClientItemList();
+
+    if (!bFound) {
+        write(conn, MSG_INTERFACE_NOT_FOUND, strlen(MSG_INTERFACE_NOT_FOUND));
+        return;
+    }
+
+    std::string msg = "+OK - Linked to interface ";
+    msg += std::to_string(selectedId);
+    msg += ".\r\n";
+    write(conn, msg);
 }
 
 // -----------------------------------------------------------------------------
@@ -3588,10 +3668,15 @@ CTcpipSrv::handleClientHelp(struct mg_connection* conn)
     }
     else if (commandStartsWith("interface", true)) {
         std::string str =
-          "'INTERFACE' list interfaces on the daemon. Format is\r\n";
-        str += "'count'.\r\n";
-        str +=
-          "'Row(s) with interface details: (clientid, type, guid,name)'.\r\n";
+          "'INTERFACE' Handle interfaces on the daemon.\r\n";
+        str += "'INTERFACE list' list interfaces, one row for each: "
+               "clientid,type,guid,name.\r\n";
+        str += "'INTERFACE link id|guid' link this session to an interface "
+               "of the daemon.\r\n";
+        str += "'INTERFACE unique id|guid' same as INTERFACE link.\r\n";
+        str += "'INTERFACE normal' remove the link and restore the session "
+               "identity.\r\n";
+        str += "'INTERFACE close' same as INTERFACE normal.\r\n";
         write(conn, (const char*)str.c_str(), str.length());
     }
     else if (commandStartsWith("wcyd", true) ||

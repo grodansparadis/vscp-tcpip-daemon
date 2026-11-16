@@ -79,6 +79,7 @@ const char* interface_description[] = { "Unknown (you should not see this).",
                                         "Internal VSCP server client.",
                                         "Level I (CANAL) Driver.",
                                         "Level II Driver.",
+                                        "Level III Driver.",
                                         "TCP/IP Client.",
                                         "UDP Client.",
                                         "Web Server Client.",
@@ -91,6 +92,7 @@ const char* interface_description[] = { "Unknown (you should not see this).",
                                         "Discovery client",
                                         "JavaScript client",
                                         "Lua client",
+                                        "VSCP Link session linked to an interface",
                                         NULL };
 
 ///////////////////////////////////////////////////////////////////////////////
